@@ -23,90 +23,88 @@ export default function OverviewModal({
     KNOWLEDGE_REGIONS["REG-01"];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-[#0f1624] p-6 shadow-2xl space-y-4">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-slate-800 pb-4">
-          <div className="space-y-1">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17263C]/45 backdrop-blur-xs p-4 overflow-y-auto">
+      <div className="w-full max-w-2xl rounded-3xl border border-[#DFE6F0] bg-white p-6 shadow-2xl space-y-4">
+        <div className="flex items-start justify-between gap-4 border-b border-[#DFE6F0] pb-4">
+          <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-0.5 text-xs font-semibold text-indigo-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF2FF] px-3 py-0.5 text-xs font-bold text-[#2F80ED]">
                 <BookOpenCheck className="h-3.5 w-3.5" />
-                Modul Fondasi Vault (FR-04)
+                Foundation Overview Module (FR-04)
               </span>
               <span
-                className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${regInfo.badgeClass}`}
+                className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${regInfo.badgeClass}`}
               >
-                Starting Region: {regInfo.code} ({regInfo.shortName})
+                Starting Region: {regInfo.code} · {regInfo.shortName}
               </span>
             </div>
-            <h2 className="text-lg font-bold text-slate-100">
+            <h2 className="text-xl font-extrabold text-[#17233C]">
               {vault.overview.title}
             </h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-800 p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            className="rounded-xl border border-[#DFE6F0] bg-white p-2 text-[#6F7E93] hover:bg-[#F3F6FC] hover:text-[#17233C]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Summary */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-2">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Sintesis Pengantar &amp; Konteks Pemetaan (Bukan Salinan Buku Cetak — BR-08)
+        <div className="rounded-2xl border border-[#DFE6F0] bg-[#F8FAFC] p-4 space-y-1.5">
+          <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93]">
+            Conceptual Synthesis (Copyright-Safe Summary — BR-08)
           </div>
-          <p className="text-sm leading-relaxed text-slate-200">
+          <p className="text-sm leading-relaxed text-[#334155]">
             {vault.overview.summary}
           </p>
         </div>
 
-        {/* Key Concepts */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-2.5">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-300">
+        <div className="rounded-2xl border border-[#DFE6F0] bg-white p-4 space-y-2.5">
+          <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[#2F80ED]">
             <Layers className="h-4 w-4" />
-            Konsep Kunci yang Diekstrak ke Dalam Vault:
+            Extracted Key Concepts in Vault
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {vault.overview.keyConcepts.map((kc, i) => (
               <div
                 key={i}
-                className="flex items-center gap-2 rounded-lg border border-slate-800 bg-[#0b101b] px-3 py-2 text-xs text-slate-200"
+                className="flex items-center gap-2 rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] px-3 py-2 text-xs font-semibold text-[#17233C]"
               >
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-[#0D9468] shrink-0" />
                 <span>{kc}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Core Principle & Reference */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3.5">
-            <div className="text-xs font-semibold text-amber-300 mb-1 flex items-center gap-1.5">
+          <div className="rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-3.5">
+            <div className="text-xs font-extrabold text-[#B45309] mb-1 flex items-center gap-1.5">
               <Compass className="h-3.5 w-3.5" />
-              Alur Prinsip Utama:
+              Core Flow / Principle
             </div>
-            <div className="font-mono text-xs text-slate-200">
+            <div className="font-mono text-xs font-semibold text-[#78350F]">
               {vault.overview.coreFormulaOrPrinciple}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3.5">
-            <div className="text-xs font-semibold text-emerald-300 mb-1">
-              📚 Rujukan Literatur Utama:
+          <div className="rounded-2xl border border-[#A7F3D0] bg-[#ECFDF5] p-3.5">
+            <div className="text-xs font-extrabold text-[#047857] mb-1">
+              Primary Open Reference
             </div>
-            <div className="text-xs text-slate-200">
+            <div className="text-xs font-medium text-[#065F46]">
               {vault.overview.primaryReference}
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end pt-2 border-t border-slate-800">
+        <div className="flex justify-end pt-2 border-t border-[#DFE6F0]">
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-xs font-semibold text-white"
+            className="rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-5 py-2 text-xs font-bold text-white"
           >
-            Kembali ke Peta Skill Tree
+            Continue Exploring
           </button>
         </div>
       </div>

@@ -2,28 +2,68 @@
 
 import { EDGE_RELATIONS, KNOWLEDGE_REGIONS } from "@/lib/regions";
 import {
+  layoutGraphWithRegionContainment,
+  NODE_CARD_H,
+  NODE_CARD_W,
+  RegionBounds,
+} from "@/lib/validator";
+import {
   EdgeRelationType,
+  KnowledgeEdge,
   KnowledgeNode,
   KnowledgeVault,
   RegionCode,
 } from "@/types/knowledge";
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  CloudFog,
   Compass,
   Eye,
   GitBranch,
+  Layers,
   ListTree,
   Lock,
+  LocateFixed,
+  Maximize2,
+  Minus,
   Network,
+  Plus,
+  Search,
   Sparkles,
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
+export type RegionVisualMode = "hybrid" | "aura_only" | "bordered";
 
 interface SkillTreeCanvasProps {
   vault: KnowledgeVault;
   selectedNodeId: string;
   onSelectNode: (nodeId: string) => void;
   onUnlockAllFog: () => void;
+  newlyAddedIds?: string[];
+  expandedRegions?: RegionCode[];
+  isFullCanvas?: boolean;
+  onToggleFullCanvas?: () => void;
+}
+
+function trimToCardEdge(
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  px: number,
+  py: number,
+  pad = 4
+): [number, number] {
+  const vx = px - cx;
+  const vy = py - cy;
+  if (vx === 0 && vy === 0) return [cx, cy];
+  const sx = vx !== 0 ? (w / 2 + pad) / Math.abs(vx) : 1e9;
+  const sy = vy !== 0 ? (h / 2 + pad) / Math.abs(vy) : 1e9;
+  const k = Math.min(sx, sy, 1);
+  return [cx + vx * k, cy + vy * k];
 }
 
 export default function SkillTreeCanvas({
@@ -31,331 +71,632 @@ export default function SkillTreeCanvas({
   selectedNodeId,
   onSelectNode,
   onUnlockAllFog,
+  newlyAddedIds = [],
+  expandedRegions = [],
+  isFullCanvas = false,
+  onToggleFullCanvas,
 }: SkillTreeCanvasProps) {
   const [viewMode, setViewMode] = useState<"graph" | "outline">("graph");
   const [regionFilter, setRegionFilter] = useState<RegionCode | "ALL">("ALL");
   const [relationFilter, setRelationFilter] = useState<EdgeRelationType | "ALL">(
     "ALL"
   );
+  const [regionVisualMode, setRegionVisualMode] =
+    useState<RegionVisualMode>("hybrid");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [legendExpanded, setLegendExpanded] = useState(true);
+  const [hoveredEdge, setHoveredEdge] = useState<KnowledgeEdge | null>(null);
+
+  // Pan & Zoom state
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(0.92);
+  const [pan, setPan] = useState({ x: 18, y: 18 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panOriginRef = useRef({ x: 0, y: 0, startPanX: 0, startPanY: 0 });
+
+  const layout = useMemo(
+    () => layoutGraphWithRegionContainment(vault.nodes),
+    [vault.nodes]
+  );
 
   const regionCodes = Object.keys(KNOWLEDGE_REGIONS) as RegionCode[];
   const relationTypes = Object.keys(EDGE_RELATIONS) as EdgeRelationType[];
 
-  const filteredNodes = vault.nodes.filter((n) =>
-    regionFilter === "ALL" ? true : n.region === regionFilter
-  );
-  const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+  const normalizedQuery = searchQuery.trim().toLowerCase();
 
-  const visibleEdges = vault.edges.filter((e) => {
-    if (!filteredNodeIds.has(e.source) || !filteredNodeIds.has(e.target)) {
-      return false;
-    }
-    if (relationFilter !== "ALL" && e.relation !== relationFilter) {
-      return false;
-    }
-    return true;
-  });
+  const filteredNodes = useMemo(() => {
+    return layout.nodes.filter((n) =>
+      regionFilter === "ALL" ? true : n.region === regionFilter
+    );
+  }, [layout.nodes, regionFilter]);
+
+  const filteredNodeMap = useMemo(() => {
+    const m = new Map<string, KnowledgeNode>();
+    filteredNodes.forEach((n) => m.set(n.id, n));
+    return m;
+  }, [filteredNodes]);
+
+  const visibleRegionBounds = useMemo(() => {
+    if (regionFilter === "ALL") return layout.regionBounds;
+    return layout.regionBounds.filter((b) => b.region === regionFilter);
+  }, [layout.regionBounds, regionFilter]);
+
+  const visibleEdges = useMemo(() => {
+    return vault.edges.filter((e) => {
+      if (!filteredNodeMap.has(e.source) || !filteredNodeMap.has(e.target)) {
+        return false;
+      }
+      if (relationFilter !== "ALL" && e.relation !== relationFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [vault.edges, filteredNodeMap, relationFilter]);
 
   const fogCount = vault.nodes.filter((n) => !n.explored).length;
+  const openedCount = vault.nodes.filter((n) => n.explored).length;
+  const masteredCount = vault.nodes.filter((n) => n.mastered).length;
+  const activeRegionCount = layout.regionBounds.length;
+
+  const fitGraphToViewport = () => {
+    const el = containerRef.current;
+    if (!el) {
+      setZoom(0.9);
+      setPan({ x: 16, y: 16 });
+      return;
+    }
+    const cw = el.clientWidth || 860;
+    const ch = el.clientHeight || 580;
+    const scaleX = (cw - 32) / layout.canvasWidth;
+    const scaleY = (ch - 32) / layout.canvasHeight;
+    const nextZoom = Math.max(0.45, Math.min(1.15, Math.min(scaleX, scaleY)));
+    const offsetX = Math.max(12, (cw - layout.canvasWidth * nextZoom) / 2);
+    const offsetY = Math.max(12, (ch - layout.canvasHeight * nextZoom) / 2);
+    setZoom(Number(nextZoom.toFixed(2)));
+    setPan({ x: Math.round(offsetX), y: Math.round(offsetY) });
+  };
+
+  useEffect(() => {
+    fitGraphToViewport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vault.id, regionFilter]);
+
+  const centerOnOrigin = () => {
+    const origin =
+      layout.nodes.find((n) => n.relationToOrigin === "root" || n.id === "root") ||
+      layout.nodes[0];
+    const el = containerRef.current;
+    if (!origin || !el) return;
+    const nextZoom = 1;
+    setZoom(nextZoom);
+    setPan({
+      x: Math.round(el.clientWidth / 2 - origin.x * nextZoom),
+      y: Math.round(el.clientHeight / 2 - origin.y * nextZoom),
+    });
+    onSelectNode(origin.id);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("[data-node-card='true']")) return;
+    setIsPanning(true);
+    panOriginRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      startPanX: pan.x,
+      startPanY: pan.y,
+    };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isPanning) return;
+    const dx = e.clientX - panOriginRef.current.x;
+    const dy = e.clientY - panOriginRef.current.y;
+    setPan({
+      x: panOriginRef.current.startPanX + dx,
+      y: panOriginRef.current.startPanY + dy,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (!e.ctrlKey && !e.metaKey && Math.abs(e.deltaY) < 40) return;
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.08 : 0.92;
+    setZoom((z) => Math.max(0.42, Math.min(1.8, Number((z * factor).toFixed(2)))));
+  };
+
+  const cycleVisualMode = () => {
+    setRegionVisualMode((m) =>
+      m === "hybrid" ? "aura_only" : m === "aura_only" ? "bordered" : "hybrid"
+    );
+  };
+
+  const visualModeLabel =
+    regionVisualMode === "hybrid"
+      ? "Aura: Soft"
+      : regionVisualMode === "aura_only"
+      ? "Aura: Pure"
+      : "Borders: Solid";
 
   return (
-    <section className="flex flex-col rounded-2xl border border-slate-800/90 bg-[#0d1320] p-4 shadow-xl">
-      {/* Top Bar: View Toggle & Filters */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/90 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-400">
-            <Network className="h-4 w-4" />
+    <section className="flex flex-col rounded-2xl border border-[#DFE6F0] bg-white shadow-sm overflow-hidden">
+      {/* Workspace Top Bar matching Figma Screen 07 */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#DFE6F0] bg-white px-4 py-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF2FF] text-[#2F80ED] shrink-0">
+            <Network className="h-4.5 w-4.5" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-slate-100">
-                Peta Regional Skill Tree (DAG)
+              <h2 className="text-sm font-extrabold text-[#17233C] truncate">
+                {vault.name}
               </h2>
-              <span className="rounded-md bg-slate-800 px-2 py-0.5 text-xs font-mono text-slate-300">
-                {vault.nodes.length} Nodes • {vault.edges.length} Edges
+              <span className="hidden sm:inline-flex rounded-full bg-[#EAF2FF] px-2 py-0.5 text-[11px] font-semibold text-[#2F80ED]">
+                {vault.inputContext.mode === "mode_a" ? "Mode A" : "Mode B"}
               </span>
             </div>
-            <p className="text-xs text-slate-400">
-              6 Kuadran Rumpun Ilmu (Path of Exile Region Analog) &amp; 5 Jenis Garis Relasi
+            <p className="text-[11px] text-[#6F7E93] truncate">
+              {vault.nodes.length} nodes · {activeRegionCount} of 6 regions · Outward Region Containment
             </p>
           </div>
         </div>
 
-        {/* View Switcher & Unlock Fog Button */}
+        {/* Right Controls: Tree/Outline Switcher, Search, Aura Toggle, Filters */}
         <div className="flex flex-wrap items-center gap-2">
-          {fogCount > 0 && (
+          {/* Tree / Outline Switcher */}
+          <div className="flex items-center rounded-xl border border-[#DFE6F0] bg-[#F3F6FC] p-1">
             <button
-              onClick={onUnlockAllFog}
-              className="flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1.5 text-xs font-medium text-amber-300 transition-all"
-              title="Buka seluruh node yang masih tertutup Fog of War"
-            >
-              <Eye className="h-3.5 w-3.5" />
-              Singkap Fog ({fogCount})
-            </button>
-          )}
-          <div className="flex items-center rounded-xl border border-slate-800 bg-[#090d16] p-1">
-            <button
+              type="button"
               onClick={() => setViewMode("graph")}
               className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                 viewMode === "graph"
-                  ? "bg-indigo-600 text-white shadow"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-[#2F80ED] text-white shadow-sm"
+                  : "text-[#6F7E93] hover:text-[#17233C]"
               }`}
             >
               <GitBranch className="h-3.5 w-3.5" />
-              Skill Tree View
+              Tree
             </button>
             <button
+              type="button"
               onClick={() => setViewMode("outline")}
               className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                 viewMode === "outline"
-                  ? "bg-indigo-600 text-white shadow"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-[#2F80ED] text-white shadow-sm"
+                  : "text-[#6F7E93] hover:text-[#17233C]"
               }`}
             >
               <ListTree className="h-3.5 w-3.5" />
-              Outline View (Aksesibel)
+              Outline
             </button>
           </div>
+
+          {/* Concept Search */}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8C9AAE]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search concepts..."
+              className="w-36 sm:w-44 rounded-xl border border-[#DFE6F0] bg-[#F3F6FC] pl-8 pr-2.5 py-1.5 text-xs text-[#17233C] placeholder:text-[#94A3B8] focus:border-[#2F80ED] focus:bg-white focus:outline-none"
+            />
+          </div>
+
+          {/* Aura / Region Borders Toggle */}
+          {viewMode === "graph" && (
+            <button
+              type="button"
+              onClick={cycleVisualMode}
+              title="Toggle Region boundary style: Soft Aura, Pure Aura, or Solid Borders"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#2F80ED]/40 bg-[#EAF2FF] hover:bg-[#DCEAFE] px-3 py-1.5 text-xs font-bold text-[#2F80ED] transition-all"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              {visualModeLabel}
+            </button>
+          )}
+
+          {/* Region Filter */}
+          <div className="relative flex items-center">
+            <Layers className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#6F7E93]" />
+            <select
+              aria-label="Filter Knowledge Region"
+              value={regionFilter}
+              onChange={(e) =>
+                setRegionFilter(e.target.value as RegionCode | "ALL")
+              }
+              className="appearance-none rounded-xl border border-[#DFE6F0] bg-white pl-8 pr-7 py-1.5 text-xs font-semibold text-[#17233C] hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
+            >
+              <option value="ALL">Regions: All 6</option>
+              {regionCodes.map((rc) => (
+                <option key={rc} value={rc}>
+                  {rc} · {KNOWLEDGE_REGIONS[rc].shortName} (
+                  {vault.nodes.filter((n) => n.region === rc).length})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-[#6F7E93]" />
+          </div>
+
+          {/* Edge Relation Filter */}
+          <div className="relative flex items-center">
+            <GitBranch className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#6F7E93]" />
+            <select
+              aria-label="Filter Edge Relations"
+              value={relationFilter}
+              onChange={(e) =>
+                setRelationFilter(e.target.value as EdgeRelationType | "ALL")
+              }
+              className="appearance-none rounded-xl border border-[#DFE6F0] bg-white pl-8 pr-7 py-1.5 text-xs font-semibold text-[#17233C] hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
+            >
+              <option value="ALL">Relations: All 5</option>
+              {relationTypes.map((rt) => (
+                <option key={rt} value={rt}>
+                  {EDGE_RELATIONS[rt].shortLabel}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-[#6F7E93]" />
+          </div>
+
+          {/* Singkap Semua Fog button */}
+          {fogCount > 0 && (
+            <button
+              type="button"
+              onClick={onUnlockAllFog}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 text-xs font-semibold text-amber-800 transition-all"
+              title="Lift atmospheric Fog of War on all nodes"
+            >
+              <CloudFog className="h-3.5 w-3.5" />
+              Reveal Fog ({fogCount})
+            </button>
+          )}
+
+          {onToggleFullCanvas && (
+            <button
+              type="button"
+              onClick={onToggleFullCanvas}
+              title={isFullCanvas ? "Exit Full Canvas" : "Expand Canvas Width"}
+              className="hidden lg:inline-flex items-center justify-center rounded-xl border border-[#DFE6F0] bg-white hover:bg-[#F3F6FC] p-1.5 text-[#17233C]"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Filter Bar: 6 Knowledge Regions & 5 Edge Types */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pb-3">
-        {/* Region Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-slate-400 mr-1">Region:</span>
-          <button
-            onClick={() => setRegionFilter("ALL")}
-            className={`rounded-lg border px-2 py-0.5 text-xs font-medium transition-all ${
-              regionFilter === "ALL"
-                ? "border-indigo-500 bg-indigo-500/20 text-indigo-200"
-                : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            Semua (6)
-          </button>
-          {regionCodes.map((rc) => {
-            const r = KNOWLEDGE_REGIONS[rc];
-            const countInVault = vault.nodes.filter((n) => n.region === rc).length;
-            const active = regionFilter === rc;
-            return (
-              <button
-                key={rc}
-                onClick={() => setRegionFilter(active ? "ALL" : rc)}
-                className={`rounded-lg border px-2 py-0.5 text-xs font-medium transition-all ${
-                  active
-                    ? r.badgeClass
-                    : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                {rc} • {r.shortName} ({countInVault})
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Edge Legend & Filter */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-slate-400 mr-1">Edge:</span>
-          <button
-            onClick={() => setRelationFilter("ALL")}
-            className={`rounded-lg border px-2 py-0.5 text-xs font-medium ${
-              relationFilter === "ALL"
-                ? "border-indigo-500 bg-indigo-500/20 text-indigo-200"
-                : "border-slate-800 bg-slate-900/70 text-slate-400"
-            }`}
-          >
-            Semua Garis
-          </button>
-          {relationTypes.map((rt) => {
-            const rel = EDGE_RELATIONS[rt];
-            const active = relationFilter === rt;
-            return (
-              <button
-                key={rt}
-                onClick={() => setRelationFilter(active ? "ALL" : rt)}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-medium transition-all ${
-                  active
-                    ? rel.badgeClass
-                    : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"
-                }`}
-                title={rel.description}
-              >
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ backgroundColor: rel.strokeColor }}
-                />
-                {rel.shortLabel}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Main Content Area: Graph vs Outline */}
+      {/* Main Workspace Area: Interactive Tree Canvas OR Accessible Outline View */}
       {viewMode === "graph" ? (
-        <div className="relative w-full overflow-x-auto rounded-xl border border-slate-800 bg-[#080c14]">
-          <div className="relative min-w-[860px] h-[536px] select-none">
-            {/* SVG Layer: 6 Region Quadrants + Directed Edges */}
+        <div
+          ref={containerRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onWheel={handleWheel}
+          style={{
+            backgroundImage:
+              "radial-gradient(#CFDCEB 1.25px, transparent 1.25px)",
+            backgroundSize: "26px 26px",
+          }}
+          className={`relative w-full ${
+            isFullCanvas ? "h-[690px]" : "h-[600px]"
+          } select-none overflow-hidden bg-[#F3F6FC] ${
+            isPanning ? "cursor-grabbing" : "cursor-grab"
+          }`}
+        >
+          {/* Floating Unbounded Open Exploration Telemetry Pill (Top Center - NFR-11) */}
+          <div className="pointer-events-none absolute inset-x-0 top-3.5 z-20 flex justify-center px-4">
+            <div className="pointer-events-auto inline-flex flex-wrap items-center gap-3 rounded-full border border-[#DFE6F0] bg-white/95 backdrop-blur-sm px-4 py-1.5 text-xs shadow-sm">
+              <span className="inline-flex items-center gap-1.5 font-semibold text-[#17233C]">
+                <Network className="h-3.5 w-3.5 text-[#2F80ED]" />
+                {vault.nodes.length} mapped
+              </span>
+              <span className="h-3.5 w-px bg-[#DFE6F0]" />
+              <span className="inline-flex items-center gap-1.5 font-semibold text-[#475569]">
+                <Eye className="h-3.5 w-3.5 text-[#6F7E93]" />
+                {openedCount} opened
+              </span>
+              <span className="h-3.5 w-px bg-[#DFE6F0]" />
+              <span className="inline-flex items-center gap-1.5 font-semibold text-[#0D9468]">
+                <CheckCircle2 className="h-3.5 w-3.5 text-[#0D9468]" />
+                {masteredCount} mastered
+              </span>
+              <span className="h-3.5 w-px bg-[#DFE6F0]" />
+              <span className="inline-flex items-center gap-1.5 font-semibold text-[#7C3AED]">
+                <Layers className="h-3.5 w-3.5 text-[#7C3AED]" />
+                {activeRegionCount} / 6 regions
+              </span>
+            </div>
+          </div>
+
+          {/* Floating Left Zoom Controls */}
+          <div className="absolute left-3.5 top-3.5 z-20 flex flex-col items-center gap-2">
+            <div className="flex flex-col rounded-xl border border-[#DFE6F0] bg-white/95 shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() =>
+                  setZoom((z) => Math.min(1.8, Number((z + 0.12).toFixed(2))))
+                }
+                title="Zoom In"
+                className="p-2 text-[#17233C] hover:bg-[#F3F6FC] border-b border-[#DFE6F0]"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setZoom((z) => Math.max(0.42, Number((z - 0.12).toFixed(2))))
+                }
+                title="Zoom Out"
+                className="p-2 text-[#17233C] hover:bg-[#F3F6FC] border-b border-[#DFE6F0]"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={centerOnOrigin}
+                title="Locate Origin Node"
+                className="p-2 text-[#17233C] hover:bg-[#F3F6FC] border-b border-[#DFE6F0]"
+              >
+                <LocateFixed className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={fitGraphToViewport}
+                title="Fit All Regions"
+                className="p-2 text-[#17233C] hover:bg-[#F3F6FC]"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={fitGraphToViewport}
+              className="rounded-lg border border-[#DFE6F0] bg-white/95 px-2 py-0.5 text-[11px] font-bold text-[#6F7E93] shadow-sm hover:text-[#17233C]"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+          </div>
+
+          {/* Transformed Infinite Pan/Zoom Stage */}
+          <div
+            style={{
+              width: layout.canvasWidth,
+              height: layout.canvasHeight,
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "0 0",
+            }}
+            className="relative transition-transform duration-75"
+          >
+            {/* SVG Layer: Hybrid Outward Region Auras + Edges */}
             <svg
-              className="absolute inset-0 h-full w-full"
-              viewBox="0 0 930 536"
-              preserveAspectRatio="none"
+              width={layout.canvasWidth}
+              height={layout.canvasHeight}
+              className="absolute inset-0 overflow-visible pointer-events-none"
             >
               <defs>
-                <pattern
-                  id="poe-grid"
-                  width="28"
-                  height="28"
-                  patternUnits="userSpaceOnUse"
-                >
-                  <path
-                    d="M 28 0 L 0 0 0 28"
-                    fill="none"
-                    stroke="rgba(148, 163, 184, 0.07)"
-                    strokeWidth="1"
-                  />
-                </pattern>
-
-                {/* Arrowhead markers for each edge relation type */}
+                {regionCodes.map((rc) => {
+                  const col = KNOWLEDGE_REGIONS[rc].accentHex;
+                  return (
+                    <radialGradient
+                      key={rc}
+                      id={`aura-${rc}`}
+                      cx="0.5"
+                      cy="0.5"
+                      r="0.5"
+                    >
+                      <stop offset="0%" stopColor={col} stopOpacity="0.18" />
+                      <stop offset="60%" stopColor={col} stopOpacity="0.07" />
+                      <stop offset="100%" stopColor={col} stopOpacity="0" />
+                    </radialGradient>
+                  );
+                })}
                 {relationTypes.map((rt) => (
                   <marker
                     key={rt}
-                    id={`arrow-${rt}`}
+                    id={`trellis-arrow-${rt}`}
                     viewBox="0 0 10 10"
-                    refX="8"
+                    refX="8.5"
                     refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
+                    markerWidth="6.5"
+                    markerHeight="6.5"
                     orient="auto-start-reverse"
                   >
                     <path
-                      d="M 0 1.5 L 8.5 5 L 0 8.5 z"
+                      d="M 0 1.2 L 9 5 L 0 8.8 z"
                       fill={EDGE_RELATIONS[rt].strokeColor}
                     />
                   </marker>
                 ))}
               </defs>
 
-              {/* Background Grid */}
-              <rect width="930" height="536" fill="url(#poe-grid)" />
+              {/* Hybrid Region Auras & Borders (NFR-09 Auto-Expanding) */}
+              {visibleRegionBounds.map((box: RegionBounds) => {
+                const reg = KNOWLEDGE_REGIONS[box.region];
+                const isExpandedHere = expandedRegions.includes(box.region);
+                const cx = box.x + box.width / 2;
+                const cy = box.y + box.height / 2;
+                const strokeDash =
+                  regionVisualMode === "hybrid"
+                    ? "6 6"
+                    : regionVisualMode === "bordered"
+                    ? undefined
+                    : "none";
+                const showStroke = regionVisualMode !== "aura_only";
 
-              {/* 6 Knowledge Region Quadrants (Path of Exile Domain Zones) */}
-              {regionCodes.map((rc) => {
-                const reg = KNOWLEDGE_REGIONS[rc];
-                const { x, y, width, height } = reg.quadrantBox;
-                const hasNodes = vault.nodes.some((n) => n.region === rc);
                 return (
-                  <g key={rc}>
-                    <rect
-                      x={x}
-                      y={y}
-                      width={width}
-                      height={height}
-                      rx={14}
-                      fill={hasNodes ? reg.glowColor : "rgba(15, 23, 42, 0.25)"}
-                      stroke={hasNodes ? reg.accentHex : "rgba(51, 65, 85, 0.45)"}
-                      strokeWidth={hasNodes ? "1.3" : "0.8"}
-                      strokeDasharray={hasNodes ? undefined : "4,4"}
-                      fillOpacity={hasNodes ? "0.28" : "0.18"}
+                  <g key={box.region}>
+                    {/* Soft Outward Radial Aura */}
+                    <ellipse
+                      cx={cx}
+                      cy={cy}
+                      rx={box.width * 0.58}
+                      ry={box.height * 0.6}
+                      fill={`url(#aura-${box.region})`}
                     />
-                    <text
-                      x={x + 12}
-                      y={y + 20}
-                      fill={hasNodes ? reg.accentHex : "#64748b"}
-                      fontSize="11"
-                      fontWeight="700"
-                      letterSpacing="0.04em"
-                    >
-                      {reg.code} • {reg.shortName.toUpperCase()}
-                    </text>
-                    <text
-                      x={x + 12}
-                      y={y + 34}
-                      fill="#94a3b8"
-                      fontSize="9.5"
-                      opacity="0.75"
-                    >
-                      {reg.poeArchetype}
-                    </text>
+                    {/* Translucent Territory Wash + Optional Contour */}
+                    <rect
+                      x={box.x}
+                      y={box.y}
+                      width={box.width}
+                      height={box.height}
+                      rx={30}
+                      fill={reg.tintBg}
+                      fillOpacity={regionVisualMode === "aura_only" ? 0.34 : 0.52}
+                      stroke={showStroke ? reg.accentHex : "none"}
+                      strokeWidth={
+                        isExpandedHere
+                          ? 2
+                          : regionVisualMode === "bordered"
+                          ? 1.7
+                          : 1.25
+                      }
+                      strokeDasharray={isExpandedHere ? undefined : strokeDash}
+                      strokeOpacity={
+                        isExpandedHere
+                          ? 0.72
+                          : regionVisualMode === "bordered"
+                          ? 0.65
+                          : 0.42
+                      }
+                    />
                   </g>
                 );
               })}
 
-              {/* Edges with 5 Distinct Visual Styles */}
+              {/* 5 Distinct Edge Styles */}
               {visibleEdges.map((edge) => {
-                const sNode = vault.nodes.find((n) => n.id === edge.source);
-                const tNode = vault.nodes.find((n) => n.id === edge.target);
+                const sNode = filteredNodeMap.get(edge.source);
+                const tNode = filteredNodeMap.get(edge.target);
                 if (!sNode || !tNode) return null;
-
-                const x1 = sNode.x + 64;
-                const y1 = sNode.y + 30;
-                const x2 = tNode.x + 64;
-                const y2 = tNode.y + 30;
 
                 const relDef =
                   EDGE_RELATIONS[edge.relation] || EDGE_RELATIONS.extension;
-                const isConnectedToSelected =
+                const isSelectedEdge =
                   sNode.id === selectedNodeId || tNode.id === selectedNodeId;
+                const isDimmed =
+                  (!sNode.explored || !tNode.explored) && !isSelectedEdge;
+                const isCross =
+                  edge.relation === "cross_disciplinary" || edge.isCrossRegion;
 
-                // Buat lengkungan kurva Bezier yang berbeda untuk cross_disciplinary vs intra-region
-                const dx = x2 - x1;
-                const dy = y2 - y1;
-                const curveOffset =
-                  edge.relation === "cross_disciplinary" || edge.isCrossRegion
-                    ? -36
-                    : 0;
-                const cx1 = x1 + dx * 0.42;
-                const cy1 = y1 + curveOffset;
-                const cx2 = x1 + dx * 0.58;
-                const cy2 = y2 + curveOffset;
+                let pathData = "";
+                let midX = (sNode.x + tNode.x) / 2;
+                let midY = (sNode.y + tNode.y) / 2;
 
-                const pathData = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
-                const midX = (x1 + x2) / 2;
-                const midY = (y1 + y2) / 2 + curveOffset * 0.5;
+                if (isCross) {
+                  const dx = tNode.x - sNode.x;
+                  const dy = tNode.y - sNode.y;
+                  const L = Math.max(1, Math.hypot(dx, dy));
+                  const sign = dy >= 0 ? -1 : 1;
+                  const ctrlX = midX + sign * (-dy / L) * Math.min(85, L * 0.16);
+                  const ctrlY = midY + sign * (dx / L) * Math.min(85, L * 0.16);
+                  const [x1, y1] = trimToCardEdge(
+                    sNode.x,
+                    sNode.y,
+                    NODE_CARD_W,
+                    NODE_CARD_H,
+                    ctrlX,
+                    ctrlY,
+                    5
+                  );
+                  const [x2, y2] = trimToCardEdge(
+                    tNode.x,
+                    tNode.y,
+                    NODE_CARD_W,
+                    NODE_CARD_H,
+                    ctrlX,
+                    ctrlY,
+                    relDef.hasArrow ? 9 : 5
+                  );
+                  pathData = `M ${x1} ${y1} Q ${ctrlX} ${ctrlY} ${x2} ${y2}`;
+                  midX = 0.25 * x1 + 0.5 * ctrlX + 0.25 * x2;
+                  midY = 0.25 * y1 + 0.5 * ctrlY + 0.25 * y2;
+                } else {
+                  const [x1, y1] = trimToCardEdge(
+                    sNode.x,
+                    sNode.y,
+                    NODE_CARD_W,
+                    NODE_CARD_H,
+                    tNode.x,
+                    tNode.y,
+                    5
+                  );
+                  const [x2, y2] = trimToCardEdge(
+                    tNode.x,
+                    tNode.y,
+                    NODE_CARD_W,
+                    NODE_CARD_H,
+                    sNode.x,
+                    sNode.y,
+                    relDef.hasArrow ? 9 : 5
+                  );
+                  pathData = `M ${x1} ${y1} L ${x2} ${y2}`;
+                  midX = (x1 + x2) / 2;
+                  midY = (y1 + y2) / 2;
+                }
 
                 return (
-                  <g key={edge.id}>
-                    {/* Outer subtle glow when selected */}
-                    {isConnectedToSelected && (
+                  <g
+                    key={edge.id}
+                    opacity={isDimmed ? 0.42 : 0.94}
+                    className="pointer-events-auto cursor-help"
+                    onMouseEnter={() => setHoveredEdge(edge)}
+                    onMouseLeave={() => setHoveredEdge(null)}
+                  >
+                    {/* Wide invisible hit target for easy hover */}
+                    <path
+                      d={pathData}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth={14}
+                    />
+                    {isSelectedEdge && (
                       <path
                         d={pathData}
                         fill="none"
                         stroke={relDef.strokeColor}
-                        strokeWidth="6"
-                        strokeOpacity="0.2"
+                        strokeWidth={6.5}
+                        strokeOpacity={0.18}
                       />
                     )}
                     <path
                       d={pathData}
                       fill="none"
                       stroke={relDef.strokeColor}
-                      strokeWidth={isConnectedToSelected ? "2.8" : "1.8"}
-                      strokeOpacity={isConnectedToSelected ? "0.98" : "0.62"}
+                      strokeWidth={isSelectedEdge ? 2.8 : 2.1}
                       strokeDasharray={relDef.dashArray}
-                      markerEnd={`url(#arrow-${edge.relation})`}
+                      strokeLinecap="round"
+                      markerEnd={
+                        relDef.hasArrow
+                          ? `url(#trellis-arrow-${edge.relation})`
+                          : undefined
+                      }
                     />
-                    {/* Label badge on edge midpoint when connected to selected node */}
-                    {isConnectedToSelected && (
-                      <g transform={`translate(${midX - 34}, ${midY - 9})`}>
+                    {(isCross || isSelectedEdge) && (
+                      <g transform={`translate(${midX}, ${midY})`}>
                         <rect
-                          width="68"
-                          height="17"
-                          rx="5"
-                          fill="#0f172a"
+                          x={-38}
+                          y={-9.5}
+                          width={76}
+                          height={19}
+                          rx={9.5}
+                          fill={relDef.bgHex}
                           stroke={relDef.strokeColor}
-                          strokeWidth="1"
+                          strokeWidth={1}
                         />
                         <text
-                          x="34"
-                          y="11.5"
+                          x={0}
+                          y={3.5}
                           textAnchor="middle"
                           fill={relDef.strokeColor}
-                          fontSize="9"
+                          fontSize="9.5"
                           fontWeight="700"
                         >
-                          {relDef.shortLabel}
+                          {isCross ? "cross-region" : relDef.shortLabel}
                         </text>
                       </g>
                     )}
@@ -364,164 +705,383 @@ export default function SkillTreeCanvas({
               })}
             </svg>
 
-            {/* HTML Interactive Nodes Layer */}
-            <div className="absolute inset-0">
-              {filteredNodes.map((node) => {
-                const isSelected = node.id === selectedNodeId;
-                const isRoot = node.relationToOrigin === "root" || node.id === "root";
-                const regDef = KNOWLEDGE_REGIONS[node.region];
-                const relDef =
-                  node.relationToOrigin !== "root"
-                    ? EDGE_RELATIONS[node.relationToOrigin]
-                    : null;
-
-                const leftPct = (node.x / 930) * 100;
-                const topPct = (node.y / 536) * 100;
-
-                return (
-                  <button
-                    key={node.id}
-                    onClick={() => onSelectNode(node.id)}
-                    style={{
-                      left: `${leftPct}%`,
-                      top: `${topPct}%`,
-                    }}
-                    className={`group absolute w-[132px] rounded-xl border p-2 text-left transition-all duration-200 ${
-                      isSelected
-                        ? "z-20 scale-105 border-indigo-400 bg-[#151f36] ring-2 ring-indigo-500/50 shadow-xl"
-                        : node.mastered
-                        ? "z-10 border-emerald-500/60 bg-[#10192b]/95 hover:border-emerald-400"
-                        : !node.explored
-                        ? "z-10 border-slate-700/70 bg-[#0d1422]/75 opacity-70 saturate-50 hover:opacity-95 hover:saturate-100"
-                        : "z-10 border-slate-700/90 bg-[#101829]/95 hover:border-indigo-400/70"
-                    } ${isRoot ? "node-root-glow" : ""}`}
+            {/* Region Headers strictly anchored inside Region top bar */}
+            {visibleRegionBounds.map((box) => {
+              const reg = KNOWLEDGE_REGIONS[box.region];
+              const isExpandedHere = expandedRegions.includes(box.region);
+              return (
+                <div
+                  key={`hdr-${box.region}`}
+                  style={{
+                    left: box.x + 14,
+                    top: box.y + 12,
+                    width: box.width - 28,
+                  }}
+                  className="pointer-events-none absolute flex items-center justify-between gap-2"
+                >
+                  <div
+                    style={{ borderColor: `${reg.accentHex}55` }}
+                    className="inline-flex items-center gap-1.5 rounded-full border bg-white/95 px-2.5 py-1 text-[11px] font-bold shadow-xs"
                   >
-                    <div className="flex items-center justify-between gap-1 mb-1">
+                    <span
+                      style={{ backgroundColor: reg.accentHex }}
+                      className="h-2.5 w-2.5 rounded-full shrink-0"
+                    />
+                    <span style={{ color: reg.darkAccentHex }}>
+                      {reg.code} · {reg.name}
+                    </span>
+                  </div>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-bold border ${
+                      isExpandedHere
+                        ? "bg-[#FFA33A] text-[#3A2200] border-[#F59E0B]"
+                        : "bg-white/95 text-[#6F7E93] border-[#DFE6F0]"
+                    }`}
+                  >
+                    {box.nodeCount} node{box.nodeCount !== 1 ? "s" : ""}
+                    {isExpandedHere ? " · +Expanded" : ""}
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* Interactive Graph Nodes */}
+            {filteredNodes.map((node) => {
+              const isSelected = node.id === selectedNodeId;
+              const isRoot =
+                node.relationToOrigin === "root" || node.id === "root";
+              const isNew = newlyAddedIds.includes(node.id);
+              const reg = KNOWLEDGE_REGIONS[node.region];
+              const matchesSearch =
+                !normalizedQuery ||
+                node.title.toLowerCase().includes(normalizedQuery) ||
+                node.summary.toLowerCase().includes(normalizedQuery);
+
+              return (
+                <div
+                  key={node.id}
+                  data-node-card="true"
+                  style={{
+                    left: node.x - NODE_CARD_W / 2,
+                    top: node.y - NODE_CARD_H / 2,
+                    width: NODE_CARD_W,
+                    height: NODE_CARD_H,
+                  }}
+                  className={`absolute transition-all duration-200 ${
+                    matchesSearch ? "opacity-100" : "opacity-30"
+                  }`}
+                >
+                  {/* Atmospheric Fog of War Cloud Shroud when unexplored */}
+                  {!node.explored && (
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        background:
+                          "radial-gradient(ellipse at center, rgba(203,213,225,0.68) 0%, rgba(226,232,240,0.42) 55%, rgba(243,246,252,0) 78%)",
+                      }}
+                      className="pointer-events-none absolute -inset-5 rounded-3xl blur-[2px]"
+                    />
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => onSelectNode(node.id)}
+                    style={
+                      isRoot
+                        ? undefined
+                        : isSelected
+                        ? { borderColor: "#2F80ED" }
+                        : !node.explored
+                        ? undefined
+                        : {
+                            borderColor: isNew
+                              ? "#FFA33A"
+                              : node.mastered
+                              ? "#2D9D78"
+                              : reg.accentHex,
+                          }
+                    }
+                    className={`relative flex h-full w-full items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left transition-all ${
+                      isSelected
+                        ? "z-20 ring-4 ring-[#2F80ED]/20 scale-[1.03]"
+                        : "z-10 hover:scale-[1.02]"
+                    } ${
+                      isRoot
+                        ? "bg-gradient-to-br from-[#2F80ED] to-[#1D5BC7] text-white border border-[#1B4FA8] node-root-glow"
+                        : !node.explored
+                        ? "bg-[#F8FAFC]/90 backdrop-blur-xs border border-dashed border-[#94A3B8] text-[#475569] hover:border-[#2F80ED] hover:bg-white"
+                        : "bg-white border-[1.75px] text-[#17233C] shadow-sm hover:shadow-md"
+                    }`}
+                  >
+                    {/* Corner Badges matching Figma */}
+                    {isRoot && (
+                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#FFA33A] px-2.5 py-0.5 text-[9.5px] font-extrabold tracking-wider text-[#3A2200] shadow-xs">
+                        START
+                      </span>
+                    )}
+                    {!node.explored && !isRoot && (
+                      <span className="absolute -top-2 right-2 rounded-full border border-[#94A3B8] bg-[#E2E8F0] px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-[#475569]">
+                        FOG
+                      </span>
+                    )}
+                    {node.explored && node.mastered && !isRoot && (
                       <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold border ${
+                        title="Mastered"
+                        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#2D9D78] text-white ring-2 ring-white shadow-xs"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                    {isNew && node.explored && !node.mastered && (
+                      <span className="absolute -top-2.5 right-2 rounded-full bg-[#FFA33A] px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-[#3A2200]">
+                        NEW
+                      </span>
+                    )}
+
+                    {/* Leading Icon Pill */}
+                    <div
+                      style={
+                        !isRoot && node.explored
+                          ? { backgroundColor: reg.tintBg, color: reg.accentHex }
+                          : undefined
+                      }
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                        isRoot
+                          ? "bg-white/20 text-white ring-1 ring-white/40"
+                          : !node.explored
+                          ? "bg-[#E2E8F0] text-[#64748B]"
+                          : ""
+                      }`}
+                    >
+                      {isRoot ? (
+                        <Sparkles className="h-4 w-4" />
+                      ) : !node.explored ? (
+                        <Lock className="h-3.5 w-3.5" />
+                      ) : (
+                        <Compass className="h-4 w-4" />
+                      )}
+                    </div>
+
+                    {/* Node Title */}
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={`text-xs font-bold leading-snug line-clamp-2 ${
                           isRoot
-                            ? "bg-indigo-500/25 text-indigo-200 border-indigo-400/50"
-                            : relDef
-                            ? relDef.badgeClass
-                            : regDef.badgeClass
+                            ? "text-white"
+                            : !node.explored
+                            ? "text-[#475569]"
+                            : "text-[#17233C]"
                         }`}
                       >
-                        {isRoot ? "★ ORIGIN" : relDef?.shortLabel || node.region}
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        {!node.explored ? (
-                          <span className="inline-flex items-center gap-0.5 text-amber-300">
-                            <Lock className="h-2.5 w-2.5" />
-                            Fog
-                          </span>
-                        ) : node.mastered ? (
-                          <span className="inline-flex items-center gap-0.5 text-emerald-400 font-semibold">
-                            <CheckCircle2 className="h-3 w-3" />
-                          </span>
-                        ) : (
-                          node.region
-                        )}
-                      </span>
-                    </div>
-                    <div className="text-xs font-bold leading-tight text-slate-100 line-clamp-2 group-hover:text-indigo-200">
-                      {node.title}
+                        {node.title}
+                      </div>
+                      <div
+                        className={`mt-0.5 text-[10px] font-medium truncate ${
+                          isRoot ? "text-[#E3EEFF]" : "text-[#6F7E93]"
+                        }`}
+                      >
+                        {node.explored ? node.region : "In fog · click to unlock"}
+                      </div>
                     </div>
                   </button>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Bottom Legend Bar inside Canvas */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 bg-[#0b101b] px-3.5 py-2 text-xs text-slate-400">
-            <div className="flex flex-wrap items-center gap-3">
-              <span>
-                <strong className="text-amber-300">---► Amber:</strong> Prerequisite Wajib
-              </span>
-              <span>
-                <strong className="text-indigo-300">───► Indigo:</strong> Extension
-              </span>
-              <span>
-                <strong className="text-emerald-300">───► Emerald:</strong> Application
-              </span>
-              <span>
-                <strong className="text-sky-300">···► Cyan:</strong> Related
-              </span>
-              <span>
-                <strong className="text-purple-300">-·-► Ungu:</strong> Lintas-Region (PoE Cross-Border)
-              </span>
+          {/* Hovered Edge Reason Floating Callout */}
+          {hoveredEdge && (
+            <div className="pointer-events-none absolute right-4 top-16 z-30 max-w-xs rounded-xl border border-[#C7D2FE] bg-white/95 backdrop-blur-sm p-3 shadow-lg">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#4F46E5]">
+                Edge Reason · {EDGE_RELATIONS[hoveredEdge.relation].shortLabel}
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-[#17233C]">
+                {hoveredEdge.reason}
+              </p>
             </div>
-            <span className="text-slate-400">
-              Klik node untuk membuka catatan Obsidian &amp; alasan hubungan
-            </span>
+          )}
+
+          {/* Bottom-Left Edge Relations Legend Card */}
+          <div className="absolute bottom-3.5 left-3.5 z-20 w-[264px] rounded-2xl border border-[#DFE6F0] bg-white/95 backdrop-blur-sm px-3.5 py-2.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setLegendExpanded((s) => !s)}
+              className="flex w-full items-center justify-between text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93]"
+            >
+              <span>Edge Relations</span>
+              {legendExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronUp className="h-3.5 w-3.5" />
+              )}
+            </button>
+            {legendExpanded && (
+              <div className="mt-2 space-y-1.5 text-[11px]">
+                {relationTypes.map((rt) => {
+                  const r = EDGE_RELATIONS[rt];
+                  return (
+                    <div
+                      key={rt}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          style={{
+                            borderColor: r.strokeColor,
+                            borderStyle: r.dashArray ? "dashed" : "solid",
+                          }}
+                          className="inline-block w-6 border-t-2"
+                        />
+                        <span className="font-bold text-[#17233C]">
+                          {r.shortLabel}
+                        </span>
+                      </div>
+                      <span className="text-[10.5px] text-[#6F7E93]">
+                        {rt === "prerequisite"
+                          ? "Must know first"
+                          : rt === "extension"
+                          ? "Direct deepen"
+                          : rt === "application"
+                          ? "Real-world use"
+                          : rt === "related_concept"
+                          ? "Two-way link"
+                          : "Cross-region"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Bottom-Right Live Mini-map */}
+          <div className="hidden sm:block absolute bottom-3.5 right-3.5 z-20 rounded-xl border border-[#DFE6F0] bg-white/95 p-1.5 shadow-sm">
+            <svg
+              width={156}
+              height={96}
+              viewBox={`0 0 ${layout.canvasWidth} ${layout.canvasHeight}`}
+              className="rounded-lg bg-[#F8FAFC] border border-[#DFE6F0]"
+            >
+              {layout.regionBounds.map((box) => {
+                const reg = KNOWLEDGE_REGIONS[box.region];
+                return (
+                  <rect
+                    key={box.region}
+                    x={box.x}
+                    y={box.y}
+                    width={box.width}
+                    height={box.height}
+                    rx={20}
+                    fill={reg.tintBg}
+                    stroke={reg.accentHex}
+                    strokeWidth={8}
+                    strokeOpacity={0.7}
+                  />
+                );
+              })}
+              {layout.nodes.map((n) => (
+                <circle
+                  key={n.id}
+                  cx={n.x}
+                  cy={n.y}
+                  r={n.id === selectedNodeId ? 24 : 16}
+                  fill={
+                    n.id === selectedNodeId
+                      ? "#2F80ED"
+                      : n.explored
+                      ? KNOWLEDGE_REGIONS[n.region].accentHex
+                      : "#94A3B8"
+                  }
+                />
+              ))}
+            </svg>
           </div>
         </div>
       ) : (
-        /* Accessible Outline View (Ramah Layar Kecil & Pembaca Teks - FR-11) */
-        <div className="h-[536px] overflow-y-auto rounded-xl border border-slate-800 bg-[#090d16] p-4 space-y-3">
-          {filteredNodes.map((node: KnowledgeNode, idx: number) => {
-            const isSelected = node.id === selectedNodeId;
-            const regDef = KNOWLEDGE_REGIONS[node.region];
-            const incoming = vault.edges.filter((e) => e.target === node.id);
-            const outgoing = vault.edges.filter((e) => e.source === node.id);
+        /* Accessible Outline View (Light Mode - FEAT-07) */
+        <div
+          className={`${
+            isFullCanvas ? "h-[690px]" : "h-[600px]"
+          } overflow-y-auto bg-[#F3F6FC] p-4 space-y-2.5`}
+        >
+          {filteredNodes
+            .filter(
+              (n) =>
+                !normalizedQuery ||
+                n.title.toLowerCase().includes(normalizedQuery) ||
+                n.summary.toLowerCase().includes(normalizedQuery)
+            )
+            .map((node: KnowledgeNode, idx: number) => {
+              const isSelected = node.id === selectedNodeId;
+              const regDef = KNOWLEDGE_REGIONS[node.region];
+              const incoming = vault.edges.filter((e) => e.target === node.id);
+              const outgoing = vault.edges.filter((e) => e.source === node.id);
 
-            return (
-              <div
-                key={node.id}
-                onClick={() => onSelectNode(node.id)}
-                className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
-                  isSelected
-                    ? "border-indigo-500 bg-indigo-500/10"
-                    : "border-slate-800 bg-[#0f1624] hover:border-slate-700"
-                }`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-slate-400">
-                      #{idx + 1}
-                    </span>
-                    <span
-                      className={`rounded-md border px-2 py-0.5 text-xs font-medium ${regDef.badgeClass}`}
-                    >
-                      {regDef.code} • {regDef.shortName}
-                    </span>
-                    <span className="rounded-md bg-slate-800 px-2 py-0.5 text-xs text-slate-300">
-                      Level: {node.difficulty}
-                    </span>
-                    {node.mastered && (
-                      <span className="rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-xs font-semibold text-emerald-300">
-                        ✓ Dipahami
+              return (
+                <button
+                  type="button"
+                  key={node.id}
+                  onClick={() => onSelectNode(node.id)}
+                  className={`w-full text-left rounded-2xl border p-4 transition-all ${
+                    isSelected
+                      ? "border-[#2F80ED] bg-white ring-2 ring-[#2F80ED]/15 shadow-sm"
+                      : "border-[#DFE6F0] bg-white hover:border-[#2F80ED]/50"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs font-semibold text-[#6F7E93]">
+                        #{idx + 1}
                       </span>
-                    )}
+                      <span
+                        className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${regDef.badgeClass}`}
+                      >
+                        {regDef.code} · {regDef.shortName}
+                      </span>
+                      <span className="rounded-full bg-[#F3F6FC] px-2.5 py-0.5 text-xs font-semibold text-[#6F7E93]">
+                        {node.difficulty}
+                      </span>
+                      {!node.explored && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-xs font-bold text-slate-600">
+                          <Lock className="h-3 w-3" />
+                          In Fog
+                        </span>
+                      )}
+                      {node.mastered && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] border border-[#A7F3D0] px-2 py-0.5 text-xs font-bold text-[#047857]">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Mastered
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-bold text-[#2F80ED]">
+                      Open in Inspector →
+                    </span>
                   </div>
-                  <span className="text-xs font-semibold text-indigo-400 flex items-center gap-1">
-                    <Compass className="h-3.5 w-3.5" />
-                    Buka Catatan Node →
-                  </span>
-                </div>
 
-                <h3 className="text-sm font-bold text-slate-100">{node.title}</h3>
-                <p className="mt-1 text-xs text-slate-300 leading-relaxed">
-                  {node.summary}
-                </p>
+                  <h3 className="text-sm font-extrabold text-[#17233C]">
+                    {node.title}
+                  </h3>
+                  <p className="mt-1 text-xs text-[#6F7E93] leading-relaxed">
+                    {node.summary}
+                  </p>
 
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
-                  <span>
-                    <strong className="text-slate-300">Incoming Links:</strong>{" "}
-                    {incoming.length} koneksi
-                  </span>
-                  <span>
-                    <strong className="text-slate-300">Outgoing Branches:</strong>{" "}
-                    {outgoing.length} cabang
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-indigo-300">
-                    <Sparkles className="h-3 w-3" />
-                    Ref: {node.reference}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+                  <div className="mt-2.5 flex flex-wrap items-center gap-4 text-[11px] text-[#6F7E93]">
+                    <span>
+                      <strong className="text-[#17233C]">Incoming:</strong>{" "}
+                      {incoming.length} link
+                    </span>
+                    <span>
+                      <strong className="text-[#17233C]">Outgoing:</strong>{" "}
+                      {outgoing.length} branch
+                    </span>
+                    <span className="text-[#2F80ED] font-medium truncate max-w-xs">
+                      Ref: {node.reference}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
         </div>
       )}
     </section>

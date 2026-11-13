@@ -1,12 +1,12 @@
 ================================================================================
 REKAP LENGKAP SPESIFIKASI, FITUR & ARSITEKTUR MVP
-Dendro — Knowledge Exploration Platform
+Trellis — Knowledge Exploration Platform
 Kompetisi: LOGICODIX 2026 | Subtema: Smart & Fun Education
 Sumber: Rumusan_Fitur_dan_Spesifikasi_MVP.docx
 ================================================================================
 
 DOKUMEN MASTER SPESIFIKASI & ARSITEKTUR MVP — LOGICODIX 2026
-Dendro — Knowledge Exploration Platform
+Trellis — Knowledge Exploration Platform
 
 Subtema Lomba: 1. Smart & Fun Education
 Struktur Dokumen: 1. Latar Belakang Masalah | 2. Rancangan Aplikasi | 3. Functional Requirement (FR) | 4. Non-Functional Requirement (NFR) | 5. Business Rule (BR) | 6. Spesifikasi Fitur & Batasan MVP | 7. Arsitektur Teknis Next.js
@@ -50,7 +50,7 @@ Berangkat dari cerita dan hipotesis permasalahan tersebut—yang juga terus diuj
 --------------------------------------------------------------------------------
 2.1. Konsep Produk & Positioning
 --------------------------------------------------------------------------------
-Produk yang dibangun adalah Dendro (AI-Powered Knowledge Exploration Platform): sebuah platform berbasis AI yang memetakan materi pembelajaran maupun ketertarikan pribadi pengguna ke dalam peta pengetahuan interaktif (Interactive Knowledge Graph) untuk membantu mereka menemukan, memahami, dan mengeksplorasi kemungkinan pengetahuan yang berkaitan dengan apa yang sedang atau ingin mereka pelajari.
+Produk yang dibangun adalah Trellis (AI-Powered Knowledge Exploration Platform): sebuah platform berbasis AI yang memetakan materi pembelajaran maupun ketertarikan pribadi pengguna ke dalam peta pengetahuan interaktif (Interactive Knowledge Graph) untuk membantu mereka menemukan, memahami, dan mengeksplorasi kemungkinan pengetahuan yang berkaitan dengan apa yang sedang atau ingin mereka pelajari.
 
 Pengalaman pengguna menggabungkan dua filosofi utama:
 1) Konsep Knowledge Vault (terinspirasi dari Obsidian): Pengguna tidak langsung melempar input di ruang kosong, melainkan terlebih dahulu membuat sebuah "Vault Eksplorasi" (ruang kerja pengetahuan tersendiri, misalnya "Vault Biologi Medis" atau "Vault Riset Kanker"). Setiap Vault menyimpan peta graf, jejak eksplorasi node terbuka, dan modul catatan konsepnya masing-masing tanpa batasan jumlah node akhir (unbounded graph exploration).

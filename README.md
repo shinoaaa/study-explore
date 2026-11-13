@@ -1,4 +1,4 @@
-# Dendro — AI-Powered Knowledge Exploration Platform
+# Trellis — AI-Powered Knowledge Exploration Platform
 
 > **Kompetisi:** LOGICODIX 2026 Hackathon Competition  
 > **Kategori:** Web Application  
@@ -9,7 +9,7 @@
 
 ## 1. Identitas Tim & Proyek
 
-- **Nama Aplikasi:** Dendro
+- **Nama Aplikasi:** Trellis
 - **Subtema:** Smart & Fun Education
 - **Kategori:** Web
 - **Target Pengguna:** Pelajar SMA/SMK/MA dan Mahasiswa yang ingin mengeksplorasi materi pelajaran lebih dalam maupun membangun jalur belajar mandiri berdasarkan minat dan tujuan personal.
@@ -25,7 +25,7 @@
 3. **Keterbatasan Chatbot & Mind Map Biasa:**  
    Mesin pencari dan *chatbot* linier hanya menjawab apa yang ditanyakan, padahal pelajar yang baru mulai belajar sering kali *"tidak tahu apa yang belum mereka ketahui"*.
 
-**Solusi Dendro:**  
+**Solusi Trellis:**  
 Platform berbasis AI yang **memetakan** materi pembelajaran maupun ketertarikan pribadi ke dalam peta pengetahuan interaktif (*Interactive Knowledge Graph*). Menggabungkan konsep **Knowledge Vault** (ruang catatan terisolasi layaknya *Obsidian*) dengan visualisasi **Regional Skill Tree** (peta berkuadran lintas-bidang layaknya *Path of Exile*).
 
 ---

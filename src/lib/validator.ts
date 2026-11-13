@@ -32,54 +32,156 @@ const VALID_DIFFICULTIES: DifficultyLevel[] = [
   "Advanced",
 ];
 
+export const NODE_CARD_W = 198;
+export const NODE_CARD_H = 74;
+
+export interface RegionBounds {
+  region: RegionCode;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  nodeCount: number;
+}
+
+const REGION_ROWS: RegionCode[][] = [
+  ["REG-01", "REG-02", "REG-03"],
+  ["REG-04", "REG-05", "REG-06"],
+];
+
 /**
- * Menempatkan node secara rapi di dalam kuadran Knowledge Region-nya (adaptasi Path of Exile)
- * apabila koordinat x/y belum ditentukan atau berada di luar kanvas.
+ * Menghitung tata letak Region & posisi pusat setiap node (NFR-09):
+ * 1) Menjamin 100% node berada secara matematis di dalam batas Region-nya.
+ * 2) Menjamin nol tumpukan (zero overlap) antar-node maupun antar-Region meski node bertambah tanpa batas (NFR-11).
+ * 3) Region otomatis membesar ke arah luar ketika node bertambah (+ Expand).
  */
-export function assignRegionCoordinates(nodes: KnowledgeNode[]): KnowledgeNode[] {
-  const regionCounters: Record<RegionCode, number> = {
-    "REG-01": 0,
-    "REG-02": 0,
-    "REG-03": 0,
-    "REG-04": 0,
-    "REG-05": 0,
-    "REG-06": 0,
-  };
+export function layoutGraphWithRegionContainment(nodes: KnowledgeNode[]): {
+  nodes: KnowledgeNode[];
+  regionBounds: RegionBounds[];
+  canvasWidth: number;
+  canvasHeight: number;
+} {
+  const byRegion = new Map<RegionCode, KnowledgeNode[]>();
+  VALID_REGIONS.forEach((rc) => byRegion.set(rc, []));
 
-  return nodes.map((node) => {
-    const reg = VALID_REGIONS.includes(node.region) ? node.region : "REG-01";
-    const idx = regionCounters[reg]++;
-    const box = KNOWLEDGE_REGIONS[reg].quadrantBox;
+  for (const node of nodes) {
+    const safeReg = VALID_REGIONS.includes(node.region) ? node.region : "REG-01";
+    byRegion.get(safeReg)!.push({ ...node, region: safeReg });
+  }
 
-    // Jika node sudah memiliki koordinat valid di dalam kanvas 930x536, pertahankan
-    if (
-      typeof node.x === "number" &&
-      typeof node.y === "number" &&
-      node.x >= 10 &&
-      node.x <= 880 &&
-      node.y >= 10 &&
-      node.y <= 490
-    ) {
-      return { ...node, region: reg };
+  const gapX = 44;
+  const gapY = 38;
+  const padX = 36;
+  const padTop = 58;
+  const padBot = 30;
+  const sectorChannel = 68;
+  const outerMargin = 36;
+
+  // Hitung dimensi intrinsik setiap Region yang berisi minimal 1 node
+  const sectorSizes = new Map<
+    RegionCode,
+    { w: number; h: number; cols: number; list: KnowledgeNode[] }
+  >();
+
+  for (const rc of VALID_REGIONS) {
+    const rawList = byRegion.get(rc) || [];
+    if (rawList.length === 0) continue;
+
+    // Sort root first, then preserve existing spatial stability (y, then x)
+    const list = [...rawList].sort((a, b) => {
+      const aRoot = a.relationToOrigin === "root" || a.id === "root" ? 0 : 1;
+      const bRoot = b.relationToOrigin === "root" || b.id === "root" ? 0 : 1;
+      if (aRoot !== bRoot) return aRoot - bRoot;
+      if (Math.abs((a.y || 0) - (b.y || 0)) > 24) return (a.y || 0) - (b.y || 0);
+      return (a.x || 0) - (b.x || 0);
+    });
+
+    const cols = list.length <= 1 ? 1 : list.length <= 4 ? 2 : 3;
+    const rows = Math.ceil(list.length / cols);
+    const gridW = cols * NODE_CARD_W + (cols - 1) * gapX;
+    const gridH = rows * NODE_CARD_H + (rows - 1) * gapY;
+
+    // Lebar minimal cukup untuk pill header Region + node count
+    const minHeaderWidth = 310;
+    const w = Math.max(minHeaderWidth, gridW + padX * 2);
+    const h = Math.max(176, gridH + padTop + padBot);
+
+    sectorSizes.set(rc, { w, h, cols, list });
+  }
+
+  // Susun baris demi baris (Row 1: REG-01..03, Row 2: REG-04..06) agar Region membesar bebas tanpa saling menabrak
+  let currentY = outerMargin;
+  const placedNodes: KnowledgeNode[] = [];
+  const regionBounds: RegionBounds[] = [];
+  let maxRight = 840;
+
+  for (const rowRegs of REGION_ROWS) {
+    const activeInRow = rowRegs.filter((rc) => sectorSizes.has(rc));
+    if (activeInRow.length === 0) continue;
+
+    let currentX = outerMargin;
+    let rowMaxH = 0;
+
+    for (const rc of activeInRow) {
+      const spec = sectorSizes.get(rc)!;
+      const boxX = currentX;
+      const boxY = currentY;
+
+      regionBounds.push({
+        region: rc,
+        x: boxX,
+        y: boxY,
+        width: spec.w,
+        height: spec.h,
+        nodeCount: spec.list.length,
+      });
+
+      const innerGridW = spec.cols * NODE_CARD_W + (spec.cols - 1) * gapX;
+      const startX = boxX + (spec.w - innerGridW) / 2 + NODE_CARD_W / 2;
+      const startY = boxY + padTop + NODE_CARD_H / 2;
+
+      spec.list.forEach((node, idx) => {
+        const col = idx % spec.cols;
+        const row = Math.floor(idx / spec.cols);
+        const cx = Math.round(startX + col * (NODE_CARD_W + gapX));
+        const cy = Math.round(startY + row * (NODE_CARD_H + gapY));
+        placedNodes.push({
+          ...node,
+          region: rc,
+          x: cx,
+          y: cy,
+        });
+      });
+
+      currentX += spec.w + sectorChannel;
+      rowMaxH = Math.max(rowMaxH, spec.h);
     }
 
-    // Slot grid 2 kolom di dalam kuadran region masing-masing
-    const col = idx % 2;
-    const row = Math.floor(idx / 2);
-    const x = box.x + 18 + col * 138;
-    const y = box.y + 44 + (row % 2) * 96;
+    maxRight = Math.max(maxRight, currentX - sectorChannel + outerMargin);
+    currentY += rowMaxH + sectorChannel;
+  }
 
-    return {
-      ...node,
-      region: reg,
-      x: Math.min(x, box.x + box.width - 135),
-      y: Math.min(y, box.y + box.height - 68),
-    };
-  });
+  // Jaga urutan node sesuai array awal agar seleksi indeks tetap stabil
+  const coordMap = new Map(placedNodes.map((n) => [n.id, n]));
+  const orderedNodes = nodes.map((n) => coordMap.get(n.id) || n);
+
+  return {
+    nodes: orderedNodes,
+    regionBounds,
+    canvasWidth: Math.max(960, maxRight),
+    canvasHeight: Math.max(580, currentY - sectorChannel + outerMargin + 24),
+  };
 }
 
 /**
- * Memeriksa apakah relasi prerequisite membentuk siklus (Directed Acyclic Graph Guard - BR-06)
+ * Menempatkan seluruh node ke dalam batas wilayah Knowledge Region-nya (NFR-09)
+ */
+export function assignRegionCoordinates(nodes: KnowledgeNode[]): KnowledgeNode[] {
+  return layoutGraphWithRegionContainment(nodes).nodes;
+}
+
+/**
+ * Memeriksa apakah relasi membentuk siklus (Directed Acyclic Graph Guard - BR-06)
  */
 function hasCycleInEdges(
   nodeIds: string[],
@@ -91,7 +193,11 @@ function hasCycleInEdges(
   const sanitizedEdges: KnowledgeEdge[] = [];
   let hadCycle = false;
 
-  const canReach = (start: string, target: string, visited = new Set<string>()): boolean => {
+  const canReach = (
+    start: string,
+    target: string,
+    visited = new Set<string>()
+  ): boolean => {
     if (start === target) return true;
     visited.add(start);
     const neighbors = adj.get(start) || [];
@@ -108,7 +214,6 @@ function hasCycleInEdges(
       hadCycle = true;
       continue;
     }
-    // Jika penambahan edge ini menyebabkan siklus berarah, ubah atau lewati
     if (canReach(edge.target, edge.source)) {
       hadCycle = true;
       continue;
@@ -121,8 +226,7 @@ function hasCycleInEdges(
 }
 
 /**
- * Graph Builder & Validation Engine (Bagian 9.3.B & 9.3.C rencana aplikasi.txt)
- * Memvalidasi node, edge, menghapus duplikat/orphan, memastikan DAG, dan menyusun laporan.
+ * Graph Builder & Validation Engine (BR-02, BR-03, BR-04, BR-06, NFR-09)
  */
 export function validateAndBuildGraph(
   rawNodes: KnowledgeNode[],
@@ -132,7 +236,6 @@ export function validateAndBuildGraph(
   edges: KnowledgeEdge[];
   validation: ValidationReport;
 } {
-  // 1. Deduplikasi node berdasarkan ID dan normalisasi judul (BR-06)
   const seenIds = new Set<string>();
   const seenTitles = new Set<string>();
   const uniqueNodes: KnowledgeNode[] = [];
@@ -201,7 +304,6 @@ export function validateAndBuildGraph(
     positionedNodes.map((n) => [n.id, n])
   );
 
-  // 2. Validasi Edge: pastikan source & target valid, alasan wajib ada (BR-03, BR-04, BR-06)
   let orphanEdgesRemoved = 0;
   const validInitialEdges: KnowledgeEdge[] = [];
 
@@ -221,7 +323,6 @@ export function validateAndBuildGraph(
 
     const isCrossRegion = sourceNode.region !== targetNode.region;
 
-    // BR-04: Jika menyeberang ke Region keilmuan berbeda dan bukan prerequisite dasar, tandai lintas-region
     if (isCrossRegion && relation === "related_concept") {
       relation = "cross_disciplinary";
     }
@@ -241,7 +342,6 @@ export function validateAndBuildGraph(
     });
   }
 
-  // 3. Pemeriksaan DAG Acyclic
   const { acyclic, sanitizedEdges } = hasCycleInEdges(
     Array.from(nodeMap.keys()),
     validInitialEdges
@@ -254,12 +354,14 @@ export function validateAndBuildGraph(
     (e) => e.relation === "cross_disciplinary" || e.isCrossRegion
   ).length;
 
-  // BR-02: Pastikan tidak semua edge dicap prerequisite
   const prereqCount = sanitizedEdges.filter(
     (e) => e.relation === "prerequisite"
   ).length;
   const prerequisiteSeparated =
     sanitizedEdges.length === 0 || prereqCount < sanitizedEdges.length;
+
+  // Enforce unused variable check
+  void KNOWLEDGE_REGIONS;
 
   return {
     nodes: positionedNodes,

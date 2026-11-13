@@ -76,7 +76,7 @@ function buildSystemPromptForExplore(
 - Topik / Hal yang Ingin Dipahami: ${ctx.targetGoal}
 - Motivasi Eksplorasi: ${ctx.motivation || "Memahami konsep dari dasar hingga terapan"}`;
 
-  return `Anda adalah Knowledge Intelligence Engine untuk aplikasi NexusVault AI (Subtema Smart & Fun Education).
+  return `Anda adalah Knowledge Intelligence Engine untuk aplikasi Trellis (Subtema Smart & Fun Education).
 Tugas Anda: Memetakan input pengguna di dalam Vault "${vaultName}" menjadi struktur Directed Acyclic Graph (DAG) JSON yang mematuhi aturan berikut:
 1. Gunakan Bahasa Indonesia yang akurat secara ilmiah namun mudah dipahami pelajar.
 2. Petakan 6 node inti yang mencakup kombinasi:
@@ -548,6 +548,115 @@ export async function expandNodeInVault(
     vault.nodes.find((n) => n.id === targetNodeId) || vault.nodes[0];
   const suffix = Date.now().toString().slice(-4);
   const crossRegion = getAdjacentCrossRegion(parentNode.region);
+
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+
+  if (apiKey) {
+    try {
+      const existingTitles = vault.nodes.map((n) => n.title).join(", ");
+      const expandPrompt = `Anda adalah Knowledge Intelligence Engine untuk aplikasi Trellis.
+Vault: "${vault.name}" (Minat pengguna: "${vault.inputContext.interestDomain}", Tujuan: "${vault.inputContext.targetGoal}").
+Node yang sedang diekspansi: "${parentNode.title}" (${parentNode.region}) — ${parentNode.summary}
+Daftar konsep yang SUDAH ada (DILARANG duplikasi): ${existingTitles}.
+
+Tugas: Buat TEPAT 2 node konsep cabang baru yang memperdalam eksplorasi secara progresif tanpa batas (NFR-11):
+1) Node pertama bertipe relasi "extension" atau "application" di dalam Region yang sesuai (${parentNode.region} atau sekitarnya),
+2) Node kedua bertipe relasi "cross_disciplinary" yang menyeberang ke Knowledge Region berbeda (selain ${parentNode.region}, rekomendasi ${crossRegion}) untuk mencegah Filter Bubble.
+Setiap edge WAJIB memiliki alasan ilmiah "reason" spesifik (BR-03).
+
+Kembalikan HANYA JSON murni:
+{
+  "nodes": [
+    {
+      "id": "n_exp_1_${suffix}",
+      "title": "string",
+      "region": "${parentNode.region}",
+      "relationToOrigin": "extension",
+      "difficulty": "Intermediate",
+      "explored": true,
+      "mastered": false,
+      "summary": "string",
+      "levels": { "simple": "string", "standard": "string", "deep": "string" },
+      "formula": "string",
+      "application": "string",
+      "reference": "string",
+      "quickCheck": { "question": "string", "options": [{"text": "string", "correct": true}, {"text": "string", "correct": false}] }
+    },
+    {
+      "id": "n_exp_2_${suffix}",
+      "title": "string",
+      "region": "${crossRegion}",
+      "relationToOrigin": "cross_disciplinary",
+      "difficulty": "Advanced",
+      "explored": false,
+      "mastered": false,
+      "summary": "string",
+      "levels": { "simple": "string", "standard": "string", "deep": "string" },
+      "formula": "string",
+      "application": "string",
+      "reference": "string",
+      "quickCheck": { "question": "string", "options": [{"text": "string", "correct": true}, {"text": "string", "correct": false}] }
+    }
+  ],
+  "edges": [
+    { "id": "e_exp_1_${suffix}", "source": "${parentNode.id}", "target": "n_exp_1_${suffix}", "relation": "extension", "reason": "string" },
+    { "id": "e_exp_2_${suffix}", "source": "${parentNode.id}", "target": "n_exp_2_${suffix}", "relation": "cross_disciplinary", "reason": "string" }
+  ]
+}`;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: expandPrompt }] }],
+          generationConfig: {
+            temperature: 0.45,
+            responseMimeType: "application/json",
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const parsed = JSON.parse(rawText);
+        if (
+          parsed &&
+          Array.isArray(parsed.nodes) &&
+          parsed.nodes.length >= 1 &&
+          Array.isArray(parsed.edges)
+        ) {
+          const combinedNodes = [...vault.nodes, ...parsed.nodes];
+          const combinedEdges = [...vault.edges, ...parsed.edges];
+          const { nodes, edges, validation } = validateAndBuildGraph(
+            combinedNodes,
+            combinedEdges
+          );
+          const addedNodeIds = parsed.nodes
+            .map((n: { id: string }) => n.id)
+            .filter((id: string) => nodes.some((vn) => vn.id === id));
+
+          if (addedNodeIds.length > 0) {
+            return {
+              engineUsed: "gemini-api",
+              addedNodeIds,
+              vault: {
+                ...vault,
+                updatedAt: new Date().toISOString(),
+                nodes,
+                edges,
+                validation,
+              },
+            };
+          }
+        }
+      }
+    } catch {
+      // Fallback ke deterministic expansion di bawah bila API key invalid/kuota habis
+    }
+  }
 
   const newNodes: KnowledgeNode[] = [
     {

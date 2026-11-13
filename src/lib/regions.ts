@@ -8,8 +8,10 @@ export interface RegionDefinition {
   description: string;
   badgeClass: string;
   borderClass: string;
+  tintBg: string;
   glowColor: string;
   accentHex: string;
+  darkAccentHex: string;
   quadrantBox: {
     x: number;
     y: number;
@@ -22,80 +24,92 @@ export const KNOWLEDGE_REGIONS: Record<RegionCode, RegionDefinition> = {
   "REG-01": {
     code: "REG-01",
     name: "Natural & Life Sciences",
-    shortName: "Sains Alam & Hayati",
-    poeArchetype: "Origin Quadrant • Biologi, Kimia, Fisika",
+    shortName: "Life Sciences",
+    poeArchetype: "Origin Sector · Biologi, Kimia, Fisika",
     description:
       "Hukum alam, struktur materi, sistem organ, sel, genetika, dan fenomena fisika-kimia.",
-    badgeClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-    borderClass: "border-emerald-500/40",
-    glowColor: "rgba(16, 185, 129, 0.14)",
-    accentHex: "#10b981",
-    quadrantBox: { x: 16, y: 16, width: 290, height: 245 },
+    badgeClass: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
+    borderClass: "border-[#0D9468]/40",
+    tintBg: "#ECFDF5",
+    glowColor: "rgba(13, 148, 104, 0.16)",
+    accentHex: "#0D9468",
+    darkAccentHex: "#065F46",
+    quadrantBox: { x: 24, y: 24, width: 320, height: 260 },
   },
   "REG-02": {
     code: "REG-02",
     name: "Health, Medicine & Performance",
-    shortName: "Medis & Fisiologi",
-    poeArchetype: "Vitality Quadrant • Kedokteran, Klinis, Olahraga",
+    shortName: "Health & Medicine",
+    poeArchetype: "Vitality Sector · Kedokteran, Klinis, Olahraga",
     description:
       "Patofisiologi penyakit, homeostatis klinis, onkologi, farmakologi, dan performa fisik atlet.",
-    badgeClass: "bg-rose-500/15 text-rose-300 border-rose-500/30",
-    borderClass: "border-rose-500/40",
-    glowColor: "rgba(244, 63, 94, 0.14)",
-    accentHex: "#f43f5e",
-    quadrantBox: { x: 320, y: 16, width: 290, height: 245 },
+    badgeClass: "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]",
+    borderClass: "border-[#E11D48]/40",
+    tintBg: "#FFF1F2",
+    glowColor: "rgba(225, 29, 72, 0.14)",
+    accentHex: "#E11D48",
+    darkAccentHex: "#9F1239",
+    quadrantBox: { x: 380, y: 24, width: 320, height: 260 },
   },
   "REG-03": {
     code: "REG-03",
     name: "Technology, Computing & AI",
-    shortName: "Komputasi & AI",
-    poeArchetype: "Arcane Quadrant • Ilmu Komputer, Bioinformatika, Data",
+    shortName: "Tech & AI",
+    poeArchetype: "Arcane Sector · Komputasi, Bioinformatika, AI",
     description:
       "Algoritma, pemodelan data, bioinformatika genomik, sensor pintar, dan kecerdasan buatan.",
-    badgeClass: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
-    borderClass: "border-indigo-500/40",
-    glowColor: "rgba(99, 102, 241, 0.14)",
-    accentHex: "#6366f1",
-    quadrantBox: { x: 624, y: 16, width: 290, height: 245 },
+    badgeClass: "bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]",
+    borderClass: "border-[#2563EB]/40",
+    tintBg: "#EFF6FF",
+    glowColor: "rgba(37, 99, 235, 0.14)",
+    accentHex: "#2563EB",
+    darkAccentHex: "#1E40AF",
+    quadrantBox: { x: 736, y: 24, width: 320, height: 260 },
   },
   "REG-04": {
     code: "REG-04",
     name: "Engineering & Applied Systems",
-    shortName: "Rekayasa & Terapan",
-    poeArchetype: "Forge Quadrant • Teknik Biomedis, Elektro, Instrumen",
+    shortName: "Engineering",
+    poeArchetype: "Forge Sector · Biomedis, Elektro, Instrumen",
     description:
       "Perancangan instrumen medis, optoelektronika, mekanika fluida, dan rekayasa sistem.",
-    badgeClass: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-    borderClass: "border-amber-500/40",
-    glowColor: "rgba(245, 158, 11, 0.14)",
-    accentHex: "#f59e0b",
-    quadrantBox: { x: 16, y: 275, width: 290, height: 245 },
+    badgeClass: "bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]",
+    borderClass: "border-[#D97706]/40",
+    tintBg: "#FFFBEB",
+    glowColor: "rgba(217, 119, 6, 0.14)",
+    accentHex: "#D97706",
+    darkAccentHex: "#92400E",
+    quadrantBox: { x: 24, y: 320, width: 320, height: 260 },
   },
   "REG-05": {
     code: "REG-05",
     name: "Formal Logic & Mathematics",
-    shortName: "Matematika & Logika",
-    poeArchetype: "Axiom Quadrant • Kalkulus, Biostatistika, Probabilitas",
+    shortName: "Math & Logic",
+    poeArchetype: "Axiom Sector · Kalkulus, Biostatistika, Logika",
     description:
       "Persamaan diferensial laju reaksi, termodinamika kuantitatif, dan pemodelan statistik.",
-    badgeClass: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
-    borderClass: "border-cyan-500/40",
-    glowColor: "rgba(6, 182, 212, 0.14)",
-    accentHex: "#06b6d4",
-    quadrantBox: { x: 320, y: 275, width: 290, height: 245 },
+    badgeClass: "bg-[#F5F3FF] text-[#6D28D9] border-[#DDD6FE]",
+    borderClass: "border-[#7C3AED]/40",
+    tintBg: "#F5F3FF",
+    glowColor: "rgba(124, 58, 237, 0.14)",
+    accentHex: "#7C3AED",
+    darkAccentHex: "#5B21B6",
+    quadrantBox: { x: 380, y: 320, width: 320, height: 260 },
   },
   "REG-06": {
     code: "REG-06",
     name: "Social, Economy & Humanities",
-    shortName: "Sosial & Humaniora",
-    poeArchetype: "Nexus Quadrant • Kesehatan Masyarakat, Etika, Kebijakan",
+    shortName: "Social & Humanities",
+    poeArchetype: "Nexus Sector · Kesehatan Publik, Etika, Ekonomi",
     description:
       "Dampak sosial, kebijakan kesehatan publik, bioetika, psikologi belajar, dan ekonomi.",
-    badgeClass: "bg-purple-500/15 text-purple-300 border-purple-500/30",
-    borderClass: "border-purple-500/40",
-    glowColor: "rgba(168, 85, 247, 0.14)",
-    accentHex: "#a855f7",
-    quadrantBox: { x: 624, y: 275, width: 290, height: 245 },
+    badgeClass: "bg-[#FEFCE8] text-[#A16207] border-[#FEF08A]",
+    borderClass: "border-[#B45309]/40",
+    tintBg: "#FEFCE8",
+    glowColor: "rgba(180, 83, 9, 0.13)",
+    accentHex: "#B45309",
+    darkAccentHex: "#78350F",
+    quadrantBox: { x: 736, y: 320, width: 320, height: 260 },
   },
 };
 
@@ -104,7 +118,9 @@ export interface EdgeRelationDefinition {
   label: string;
   shortLabel: string;
   strokeColor: string;
+  bgHex: string;
   dashArray?: string;
+  hasArrow: boolean;
   badgeClass: string;
   description: string;
   visualRule: string;
@@ -115,53 +131,63 @@ export const EDGE_RELATIONS: Record<EdgeRelationType, EdgeRelationDefinition> = 
     type: "prerequisite",
     label: "Prerequisite (Prasyarat Wajib)",
     shortLabel: "Prerequisite",
-    strokeColor: "#fbbf24", // Amber 400
-    dashArray: "7,5",
-    badgeClass: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    strokeColor: "#D97706",
+    bgHex: "#FEF3C7",
+    dashArray: "7 5",
+    hasArrow: true,
+    badgeClass: "bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]",
     description:
       "Konsep fondasi yang mutlak harus dipahami terlebih dahulu sebelum konsep target (BR-02).",
-    visualRule: "Garis Putus-Putus Berarah (Amber)",
+    visualRule: "Dashed Arrow (Amber)",
   },
   extension: {
     type: "extension",
     label: "Extension (Pendalaman Materi)",
     shortLabel: "Extension",
-    strokeColor: "#818cf8", // Indigo 400
-    badgeClass: "bg-indigo-500/20 text-indigo-300 border-indigo-500/40",
+    strokeColor: "#4F46E5",
+    bgHex: "#EEF2FF",
+    hasArrow: true,
+    badgeClass: "bg-[#EEF2FF] text-[#3730A3] border-[#C7D2FE]",
     description:
       "Pendalaman ilmiah langsung dari konsep sebelumnya ke bahasan yang lebih spesifik.",
-    visualRule: "Garis Solid Utama (Indigo)",
+    visualRule: "Solid Line (Indigo)",
   },
   application: {
     type: "application",
     label: "Application (Penerapan Nyata)",
     shortLabel: "Application",
-    strokeColor: "#34d399", // Emerald 400
-    badgeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+    strokeColor: "#059669",
+    bgHex: "#D1FAE5",
+    dashArray: "12 4 2 4",
+    hasArrow: true,
+    badgeClass: "bg-[#D1FAE5] text-[#065F46] border-[#6EE7B7]",
     description:
       "Penerapan konsep teori dalam kasus klinis, olahraga, industri, atau kehidupan sehari-hari.",
-    visualRule: "Garis Cabang Terapan (Emerald)",
+    visualRule: "Dash-Dot Line (Emerald)",
   },
   related_concept: {
     type: "related_concept",
     label: "Related Concept (Konsep Terkait)",
     shortLabel: "Related",
-    strokeColor: "#38bdf8", // Sky 400
-    dashArray: "3,4",
-    badgeClass: "bg-sky-500/20 text-sky-300 border-sky-500/40",
+    strokeColor: "#0891B2",
+    bgHex: "#CFFAFE",
+    dashArray: "2 6",
+    hasArrow: false,
+    badgeClass: "bg-[#CFFAFE] text-[#155E75] border-[#67E8F9]",
     description:
       "Keterkaitan konseptual sejajar yang saling melengkapi namun bukan syarat mutlak (BR-02).",
-    visualRule: "Garis Titik-Titik Halus (Cyan)",
+    visualRule: "Dotted Bidir (Cyan)",
   },
   cross_disciplinary: {
     type: "cross_disciplinary",
     label: "Cross-Disciplinary (Lintas Rumpun Ilmu)",
     shortLabel: "Cross-Region",
-    strokeColor: "#c084fc", // Purple 400
-    dashArray: "10,4,2,4",
-    badgeClass: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    strokeColor: "#C026D3",
+    bgHex: "#FAE8FF",
+    hasArrow: true,
+    badgeClass: "bg-[#FAE8FF] text-[#86198F] border-[#F0ABFC]",
     description:
       "Jembatan yang menyeberangkan eksplorasi ke Knowledge Region lain untuk mencegah Filter Bubble (BR-04 & BR-05).",
-    visualRule: "Garis Portal Lintas-Region (Ungu)",
+    visualRule: "Curved Portal (Magenta)",
   },
 };

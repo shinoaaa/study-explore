@@ -35,7 +35,7 @@ Platform berbasis AI yang **memetakan** materi pembelajaran maupun ketertarikan 
 Dokumen ini sekaligus menjadi acuan batasan sistem (*system boundaries*) yang wajib dipatuhi oleh seluruh komponen aplikasi:
 
 ### 3.1. Business Rules (BR) yang Mengikat Sistem
-- **BR-01 (Vault Isolation Rule):** Pengguna tidak dapat melempar input di ruang kosong; setiap topik eksplorasi wajib dibuat di dalam sebuah **Knowledge Vault** tersendiri agar graf dan progres belajar antar-topik tidak tercampur.
+- **BR-01 (Vault Isolation Rule):** Pengguna tidak dapat melempar input di ruang kosong; setiap topik eksplorasi wajib dibuat di dalam sebuah **Knowledge Vault** tersendiri agar graf dan jejak eksplorasi antar-topik tidak tercampur.
 - **BR-02 (Pemisahan Prasyarat vs Keterkaitan Biasa):** Tidak semua konsep yang berkaitan boleh dilabeli sebagai prasyarat (`prerequisite`). Label `prerequisite` hanya sah jika Konsep A mutlak harus dipahami terlebih dahulu sebelum Konsep B.
 - **BR-03 (Kewajiban Alasan Hubungan / Mandatory Edge Reason):** Setiap garis penghubung (*edge*) antar-konsep wajib memiliki alasan ilmiah tertulis (`reason`) yang menjelaskan mengapa kedua konsep tersebut saling terhubung.
 - **BR-04 (Sistem 6 Knowledge Regions ala Path of Exile & Region Containment):** Setiap node wajib dipetakan dan tergabung secara spasial di dalam batas visual salah satu dari 6 rumpun keilmuan:
@@ -47,11 +47,12 @@ Dokumen ini sekaligus menjadi acuan batasan sistem (*system boundaries*) yang wa
   6. `REG-06`: **Social, Economy & Humanities** (Psikologi, Ekonomi, Kebijakan Publik, Humaniora)
 - **NFR-09 (Region Containment & Auto-Expanding Region Bounds):** Setiap node wajib selalu berada di dalam batas wilayah Region-nya (tidak boleh keluar dari region), dan wadah Region harus membesar secara dinamis ketika node baru ditambahkan ke dalamnya.
 - **NFR-10 (Unified Light Mode Visual Consistency):** Seluruh antarmuka workspace—termasuk Dashboard, Create Vault, Library, Knowledge Tree Canvas, Outline View, dan Node Inspector—wajib diseragamkan menggunakan skema Light Mode terpadu.
+- **NFR-11 (Unbounded Open Exploration / No Completion Cap):** Eksplorasi di dalam Vault bersifat terbuka tanpa batas akhir seperti Vault Obsidian. Sistem dilarang membatasi jumlah total node per Vault maupun menampilkan *progress bar* persentase (0–100% selesai); telemetri hanya mencatat jumlah node terpetakan, terbuka, dipahami, dan Region terjamah.
 - **BR-05 (Anti-Filter Bubble Rule):** Meskipun jalur disesuaikan dengan minat pengguna, setiap Vault wajib menyertakan minimal 1 cabang lintas disiplin (`cross_disciplinary` / lintas-Region) untuk membuka wawasan bidang baru.
 - **BR-06 (DAG & Anti-Orphan Validation):** Struktur graf wajib berupa *Directed Acyclic Graph* (DAG) tanpa siklus pada relasi `prerequisite`, tanpa duplikasi node, dan setiap `source`/`target` pada *edge* wajib merujuk ke ID node yang valid.
 - **BR-07 (Kesamaan Mesin Mode A & Mode B):** Eksplorasi dari Materi Kurikulum (Mode A) dan Eksplorasi dari Minat/Tujuan (Mode B) diproses menggunakan mesin *Graph Builder*, sistem 6 Region, dan skema JSON yang sama.
 - **BR-08 (Kepatuhan Hak Cipta / Copyright Rule):** Penjelasan modul wajib berupa sintesis konseptual mandiri dengan atribusi referensi terbuka/terpercaya (bukan salinan tekstual buku cetak berhak cipta).
-- **BR-09 (Progressive Disclosure / Anti-Information Overload):** Pembangkitan awal di dalam Vault dibatasi pada 5–8 node inti (dengan mekanisme *Fog of War*), dan diperluas secara bertahap ketika pengguna mengekspansi node.
+- **BR-09 (Progressive Disclosure & Unbounded Growth):** Pembangkitan awal di dalam Vault dimulai dari 5–8 node inti (dengan mekanisme *Fog of War*) agar tidak *Information Overload*, namun ekspansi selanjutnya bersifat terbuka tanpa batas maksimum node dan tanpa target penyelesaian 100%.
 
 ### 3.2. Batasan Fitur (Out-of-Scope MVP)
 Untuk menjaga keakuratan hubungan konsep dan stabilitas aplikasi:
@@ -72,7 +73,7 @@ Untuk menjaga keakuratan hubungan konsep dan stabilitas aplikasi:
 4. **Regional Skill Tree Canvas & 5 Gaya Edge Berbeda (`FEAT-04`):**
    - Kanvas interaktif dengan filter 6 *Knowledge Regions* (`REG-01` s.d. `REG-06`).
    - 5 visualisasi garis *edge* berbeda: `prerequisite` (Amber putus-putus berarah), `extension` (Indigo solid), `application` (Emerald terapan), `related_concept` (Cyan titik-titik), dan `cross_disciplinary` (Ungu lengkung lintas-region).
-5. **Fog of War & Exploration Telemetry (`FEAT-05`):** Node yang belum dijelajahi tampil redup (*Fog of War*) dan terbuka saat diklik, disertai penghitung progres eksplorasi & jumlah Region yang dijelajahi.
+5. **Fog of War & Open Exploration Telemetry (`FEAT-05`):** Node yang belum dijelajahi tampil redup (*Fog of War*) dan terbuka saat diklik, disertai telemetri terbuka tanpa progress bar batas akhir (jumlah node dipetakan, terbuka, dipahami, dan Region yang dijelajahi).
 6. **Node Note Inspector & Kotak Alasan Hubungan (`FEAT-06`):** Menampilkan alasan spesifik mengapa konsep terhubung (`reason`), tautan masuk/keluar (*backlinks* ala Obsidian), rumus, contoh penerapan, dan referensi sumber.
 7. **Toggle 3 Level Bahasa & Accessible Outline View (`FEAT-07`):** Ubah penjelasan node ke mode *Analogi Mudah*, *Standar SMA*, atau *Sains Lanjut*, serta beralih antara tampilan *Skill Tree* dan *Outline View* (ramah layar HP).
 8. **Progressive Node Expansion & 1-Click Quick Check (`FEAT-08`):** Mekarkan cabang konsep baru secara dinamis dari node mana pun (`+ Expand Cabang`) dan uji pemahaman dengan 1 pertanyaan refleksi cepat.

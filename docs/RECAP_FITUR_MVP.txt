@@ -53,7 +53,7 @@ Berangkat dari cerita dan hipotesis permasalahan tersebut—yang juga terus diuj
 Produk yang dibangun adalah AI-Powered Knowledge Exploration Platform (NexusVault AI): sebuah platform berbasis AI yang memetakan materi pembelajaran maupun ketertarikan pribadi pengguna ke dalam peta pengetahuan interaktif (Interactive Knowledge Graph) untuk membantu mereka menemukan, memahami, dan mengeksplorasi kemungkinan pengetahuan yang berkaitan dengan apa yang sedang atau ingin mereka pelajari.
 
 Pengalaman pengguna menggabungkan dua filosofi utama:
-1) Konsep Knowledge Vault (terinspirasi dari Obsidian): Pengguna tidak langsung melempar input di ruang kosong, melainkan terlebih dahulu membuat sebuah "Vault Eksplorasi" (ruang kerja pengetahuan tersendiri, misalnya "Vault Biologi Medis" atau "Vault Riset Kanker"). Setiap Vault menyimpan peta graf, progres node yang telah dibuka, dan modul catatan konsepnya masing-masing.
+1) Konsep Knowledge Vault (terinspirasi dari Obsidian): Pengguna tidak langsung melempar input di ruang kosong, melainkan terlebih dahulu membuat sebuah "Vault Eksplorasi" (ruang kerja pengetahuan tersendiri, misalnya "Vault Biologi Medis" atau "Vault Riset Kanker"). Setiap Vault menyimpan peta graf, jejak eksplorasi node terbuka, dan modul catatan konsepnya masing-masing tanpa batasan jumlah node akhir (unbounded graph exploration).
 2) Konsep Regional Skill Tree (terinspirasi dari Path of Exile): Peta eksplorasi di dalam Vault memiliki 6 zona/kuadran rumpun ilmu (Knowledge Regions). Ketika pengguna memulai dari satu titik awal (Starting Region), ekspansi node dapat menyebar di dalam rumpun tersebut maupun menyeberang (cross-border) ke rumpun ilmu lain.
 
 
@@ -210,8 +210,8 @@ Pengalaman pengguna menggabungkan dua filosofi utama:
   * Deskripsi Perilaku Sistem: Sistem harus memungkinkan pengguna memperluas (expand) node yang dipilih di dalam Vault untuk memetakan cabang konsep baru—baik di dalam Region yang sama maupun menyeberang ke Region lain.
 [12] ------------------------------------------------------------
   * Kode FR: FR-12
-  * Nama Kebutuhan Fungsional: Penyesuaian Kedalaman Bahasa & Penyimpanan Status Vault
-  * Deskripsi Perilaku Sistem: Sistem harus menyediakan opsi tingkat keterbacaan penjelasan serta menyimpan status node yang telah dibuka/dipahami di dalam Vault pengguna secara lokal.
+  * Nama Kebutuhan Fungsional: Penyesuaian Kedalaman Bahasa & Penyimpanan Jejak Eksplorasi Vault
+  * Deskripsi Perilaku Sistem: Sistem harus menyediakan opsi tingkat keterbacaan penjelasan serta menyimpan status node yang telah dibuka/dipahami di dalam Vault pengguna secara lokal tanpa membatasi jumlah total ekspansi cabang.
 -----------------------------------------------------------------
 
 
@@ -260,6 +260,10 @@ Pengalaman pengguna menggabungkan dua filosofi utama:
   * Kode NFR: NFR-10
   * Aspek Kualitas: Konsistensi Antarmuka Light Mode Terpadu (Visual Consistency)
   * Spesifikasi Kebutuhan Non-Fungsional: Seluruh layar aplikasi—termasuk Dashboard, Form Create Vault, Library, hingga Kanvas Full-Screen Knowledge Tree, Outline View, dan Node Inspector—wajib diseragamkan dalam skema Light Mode terpadu agar perpindahan halaman terasa konsisten, bersih, dan nyaman dibaca.
+[11] ------------------------------------------------------------
+  * Kode NFR: NFR-11
+  * Aspek Kualitas: Eksplorasi Terbuka Tanpa Batas Akhir (Unbounded Knowledge Exploration)
+  * Spesifikasi Kebutuhan Non-Fungsional: Karena aplikasi berorientasi pada eksplorasi pengetahuan bergaya Obsidian, sistem dilarang membatasi jumlah node maksimum pada sebuah Vault maupun menampilkan progress bar persentase penyelesaian (0–100%). Statistik Vault cukup menampilkan metrik aktivitas terbuka (jumlah node dipetakan, node dibuka, node dipahami, dan Region terjamah).
 -----------------------------------------------------------------
 
 
@@ -271,7 +275,7 @@ Pengalaman pengguna menggabungkan dua filosofi utama:
 [1] ------------------------------------------------------------
   * Kode BR: BR-01
   * Nama Aturan Bisnis (Business Rule): Aturan Isolasi Konteks per Vault (Vault Isolation Rule)
-  * Ketentuan & Logika Aturan yang Mengikat Sistem: Setiap sesi eksplorasi baru wajib berada di dalam sebuah Vault. Node, edge, dan progres eksplorasi di dalam satu Vault terisolasi dari Vault lain agar peta pengetahuan antar-topik tidak tercampur secara acak.
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Setiap sesi eksplorasi baru wajib berada di dalam sebuah Vault. Node, edge, dan jejak eksplorasi di dalam satu Vault terisolasi dari Vault lain agar peta pengetahuan antar-topik tidak tercampur secara acak.
 [2] ------------------------------------------------------------
   * Kode BR: BR-02
   * Nama Aturan Bisnis (Business Rule): Aturan Pemisahan Prasyarat vs Keterkaitan Konseptual
@@ -302,8 +306,8 @@ Pengalaman pengguna menggabungkan dua filosofi utama:
   * Ketentuan & Logika Aturan yang Mengikat Sistem: Catatan modul pada setiap node wajib berupa sintesis penjelasan konseptual mandiri yang dilengkapi referensi sumber terpercaya, dan dilarang menyalin mentah isi buku cetak berhak cipta.
 [9] ------------------------------------------------------------
   * Kode BR: BR-09
-  * Nama Aturan Bisnis (Business Rule): Aturan Ekspansi Bertahap (Progressive Disclosure Rule)
-  * Ketentuan & Logika Aturan yang Mengikat Sistem: Pemetaan di dalam Vault tidak membangkitkan ratusan node sekaligus, melainkan dimulai dari gugus node inti di Starting Region dan berkembang secara bertahap mengikuti node yang dieksplorasi pengguna.
+  * Nama Aturan Bisnis (Business Rule): Aturan Ekspansi Bertahap & Tanpa Batas Akhir (Progressive Disclosure & Unbounded Growth)
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Pembangkitan awal di dalam Vault dimulai dari gugus node inti (5–8 node) di Starting Region agar tidak Information Overload, lalu berkembang bebas tanpa batas maksimum node (unbounded seperti Vault Obsidian) tanpa target "100% selesai" mengikuti rasa ingin tahu pengguna.
 -----------------------------------------------------------------
 
 
@@ -336,9 +340,9 @@ Berdasarkan kebutuhan sistem dan Business Rule di atas, berikut adalah daftar fi
   * Acuan FR / BR: FR-05, FR-06, FR-09, BR-04, NFR-09, NFR-10
 [5] ------------------------------------------------------------
   * Kode Fitur: FEAT-05
-  * Nama Fitur Aplikasi: Fog of War & Exploration Telemetry Bar
-  * Spesifikasi Implementasi & Mekanisme Kerja: Node lanjutan pada Vault tampil dalam status Fog of War (redup/terkunci) dan terbuka saat diklik, dilengkapi penghitung progres (Node Terbuka, Node Dipahami, & Jumlah Region Terjamah).
-  * Acuan FR / BR: FR-12, NFR-02, BR-09
+  * Nama Fitur Aplikasi: Fog of War & Open Exploration Telemetry Bar
+  * Spesifikasi Implementasi & Mekanisme Kerja: Node lanjutan pada Vault tampil dalam status Fog of War (redup/terkunci) dan terbuka saat diklik, dilengkapi ringkasan telemetri terbuka tanpa progress bar persentase batas akhir (jumlah Node Dipetakan, Node Terbuka, Node Dipahami, & Region Terjamah).
+  * Acuan FR / BR: FR-12, NFR-02, NFR-11, BR-09
 [6] ------------------------------------------------------------
   * Kode Fitur: FEAT-06
   * Nama Fitur Aplikasi: Obsidian-Style Node Note Inspector & Edge Reason Box

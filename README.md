@@ -38,13 +38,15 @@ Dokumen ini sekaligus menjadi acuan batasan sistem (*system boundaries*) yang wa
 - **BR-01 (Vault Isolation Rule):** Pengguna tidak dapat melempar input di ruang kosong; setiap topik eksplorasi wajib dibuat di dalam sebuah **Knowledge Vault** tersendiri agar graf dan progres belajar antar-topik tidak tercampur.
 - **BR-02 (Pemisahan Prasyarat vs Keterkaitan Biasa):** Tidak semua konsep yang berkaitan boleh dilabeli sebagai prasyarat (`prerequisite`). Label `prerequisite` hanya sah jika Konsep A mutlak harus dipahami terlebih dahulu sebelum Konsep B.
 - **BR-03 (Kewajiban Alasan Hubungan / Mandatory Edge Reason):** Setiap garis penghubung (*edge*) antar-konsep wajib memiliki alasan ilmiah tertulis (`reason`) yang menjelaskan mengapa kedua konsep tersebut saling terhubung.
-- **BR-04 (Sistem 6 Knowledge Regions ala Path of Exile):** Setiap node wajib dipetakan ke salah satu dari 6 rumpun keilmuan:
+- **BR-04 (Sistem 6 Knowledge Regions ala Path of Exile & Region Containment):** Setiap node wajib dipetakan dan tergabung secara spasial di dalam batas visual salah satu dari 6 rumpun keilmuan:
   1. `REG-01`: **Natural & Life Sciences** (Biologi, Kimia, Fisika, Kebumian)
   2. `REG-02`: **Health, Medicine & Performance** (Kedokteran, Fisiologi, Gizi, Olahraga)
   3. `REG-03`: **Technology, Computing & AI** (Ilmu Komputer, Bioinformatika, Data Science, AI)
   4. `REG-04`: **Engineering & Applied Systems** (Teknik Biomedis, Elektro, Mesin, Lingkungan)
   5. `REG-05`: **Formal Logic & Mathematics** (Matematika, Statistika, Probabilitas)
   6. `REG-06`: **Social, Economy & Humanities** (Psikologi, Ekonomi, Kebijakan Publik, Humaniora)
+- **NFR-09 (Region Containment & Auto-Expanding Region Bounds):** Setiap node wajib selalu berada di dalam batas wilayah Region-nya (tidak boleh keluar dari region), dan wadah Region harus membesar secara dinamis ketika node baru ditambahkan ke dalamnya.
+- **NFR-10 (Unified Light Mode Visual Consistency):** Seluruh antarmuka workspace—termasuk Dashboard, Create Vault, Library, Knowledge Tree Canvas, Outline View, dan Node Inspector—wajib diseragamkan menggunakan skema Light Mode terpadu.
 - **BR-05 (Anti-Filter Bubble Rule):** Meskipun jalur disesuaikan dengan minat pengguna, setiap Vault wajib menyertakan minimal 1 cabang lintas disiplin (`cross_disciplinary` / lintas-Region) untuk membuka wawasan bidang baru.
 - **BR-06 (DAG & Anti-Orphan Validation):** Struktur graf wajib berupa *Directed Acyclic Graph* (DAG) tanpa siklus pada relasi `prerequisite`, tanpa duplikasi node, dan setiap `source`/`target` pada *edge* wajib merujuk ke ID node yang valid.
 - **BR-07 (Kesamaan Mesin Mode A & Mode B):** Eksplorasi dari Materi Kurikulum (Mode A) dan Eksplorasi dari Minat/Tujuan (Mode B) diproses menggunakan mesin *Graph Builder*, sistem 6 Region, dan skema JSON yang sama.

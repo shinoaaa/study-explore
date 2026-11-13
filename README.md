@@ -38,14 +38,14 @@ Dokumen ini sekaligus menjadi acuan batasan sistem (*system boundaries*) yang wa
 - **BR-01 (Vault Isolation Rule):** Pengguna tidak dapat melempar input di ruang kosong; setiap topik eksplorasi wajib dibuat di dalam sebuah **Knowledge Vault** tersendiri agar graf dan jejak eksplorasi antar-topik tidak tercampur.
 - **BR-02 (Pemisahan Prasyarat vs Keterkaitan Biasa):** Tidak semua konsep yang berkaitan boleh dilabeli sebagai prasyarat (`prerequisite`). Label `prerequisite` hanya sah jika Konsep A mutlak harus dipahami terlebih dahulu sebelum Konsep B.
 - **BR-03 (Kewajiban Alasan Hubungan / Mandatory Edge Reason):** Setiap garis penghubung (*edge*) antar-konsep wajib memiliki alasan ilmiah tertulis (`reason`) yang menjelaskan mengapa kedua konsep tersebut saling terhubung.
-- **BR-04 (Sistem 6 Knowledge Regions ala Path of Exile & Region Containment):** Setiap node wajib dipetakan dan tergabung secara spasial di dalam batas visual salah satu dari 6 rumpun keilmuan:
+- **BR-04 (Sistem 6 Knowledge Regions ala Path of Exile & Hybrid Outward Region Containment):** Setiap node wajib dipetakan dan tergabung secara spasial di dalam batas wilayah salah satu dari 6 rumpun keilmuan:
   1. `REG-01`: **Natural & Life Sciences** (Biologi, Kimia, Fisika, Kebumian)
   2. `REG-02`: **Health, Medicine & Performance** (Kedokteran, Fisiologi, Gizi, Olahraga)
   3. `REG-03`: **Technology, Computing & AI** (Ilmu Komputer, Bioinformatika, Data Science, AI)
   4. `REG-04`: **Engineering & Applied Systems** (Teknik Biomedis, Elektro, Mesin, Lingkungan)
   5. `REG-05`: **Formal Logic & Mathematics** (Matematika, Statistika, Probabilitas)
   6. `REG-06`: **Social, Economy & Humanities** (Psikologi, Ekonomi, Kebijakan Publik, Humaniora)
-- **NFR-09 (Region Containment & Auto-Expanding Region Bounds):** Setiap node wajib selalu berada di dalam batas wilayah Region-nya (tidak boleh keluar dari region), dan wadah Region harus membesar secara dinamis ketika node baru ditambahkan ke dalamnya.
+- **NFR-09 (Region Containment & Hybrid Auto-Expanding Region Aura):** Setiap node wajib selalu berada di dalam batas wilayah Region-nya (tidak boleh keluar dari region). Secara visual wilayah Region tampil sebagai *Hybrid Soft Outward Aura* (dengan tombol toggle *Region Borders* opsional) yang otomatis membesar ke arah luar secara dinamis ketika node baru ditambahkan ke dalamnya.
 - **NFR-10 (Unified Light Mode Visual Consistency):** Seluruh antarmuka workspace—termasuk Dashboard, Create Vault, Library, Knowledge Tree Canvas, Outline View, dan Node Inspector—wajib diseragamkan menggunakan skema Light Mode terpadu.
 - **NFR-11 (Unbounded Open Exploration / No Completion Cap):** Eksplorasi di dalam Vault bersifat terbuka tanpa batas akhir seperti Vault Obsidian. Sistem dilarang membatasi jumlah total node per Vault maupun menampilkan *progress bar* persentase (0–100% selesai); telemetri hanya mencatat jumlah node terpetakan, terbuka, dipahami, dan Region terjamah.
 - **BR-05 (Anti-Filter Bubble Rule):** Meskipun jalur disesuaikan dengan minat pengguna, setiap Vault wajib menyertakan minimal 1 cabang lintas disiplin (`cross_disciplinary` / lintas-Region) untuk membuka wawasan bidang baru.
@@ -71,9 +71,9 @@ Untuk menjaga keakuratan hubungan konsep dan stabilitas aplikasi:
    - **Mode B (Dari Minat & Tujuan):** Input Bidang Minat, Topik Tujuan, dan Motivasi Belajar.
 3. **Modul Fondasi / Overview Materi Asal (`FEAT-03`):** Sintesis konsep kunci, rumus dasar, dan konteks pengantar di setiap Vault.
 4. **Regional Skill Tree Canvas & 5 Gaya Edge Berbeda (`FEAT-04`):**
-   - Kanvas interaktif dengan filter 6 *Knowledge Regions* (`REG-01` s.d. `REG-06`).
+   - Kanvas graf *pan/zoom* bergaya *Hybrid Outward Region Aura* dengan filter 6 *Knowledge Regions* (`REG-01` s.d. `REG-06`), kontrol *toggle* `Region Borders` (`Soft Aura`), serta jaminan *Region Containment* (`NFR-09`).
    - 5 visualisasi garis *edge* berbeda: `prerequisite` (Amber putus-putus berarah), `extension` (Indigo solid), `application` (Emerald terapan), `related_concept` (Cyan titik-titik), dan `cross_disciplinary` (Ungu lengkung lintas-region).
-5. **Fog of War & Open Exploration Telemetry (`FEAT-05`):** Node yang belum dijelajahi tampil redup (*Fog of War*) dan terbuka saat diklik, disertai telemetri terbuka tanpa progress bar batas akhir (jumlah node dipetakan, terbuka, dipahami, dan Region yang dijelajahi).
+5. **Atmospheric Fog of War & Open Exploration Telemetry (`FEAT-05`):** Cabang lanjutan yang belum dijelajahi tampil terselubung kabut atmosferik (*Fog of War* + lencana `FOG`) dan terbuka mulus saat diklik, disertai telemetri terbuka tanpa progress bar batas akhir (jumlah node dipetakan, terbuka, dipahami, dan Region yang dijelajahi).
 6. **Node Note Inspector & Kotak Alasan Hubungan (`FEAT-06`):** Menampilkan alasan spesifik mengapa konsep terhubung (`reason`), tautan masuk/keluar (*backlinks* ala Obsidian), rumus, contoh penerapan, dan referensi sumber.
 7. **Toggle 3 Level Bahasa & Accessible Outline View (`FEAT-07`):** Ubah penjelasan node ke mode *Analogi Mudah*, *Standar SMA*, atau *Sains Lanjut*, serta beralih antara tampilan *Skill Tree* dan *Outline View* (ramah layar HP).
 8. **Progressive Node Expansion & 1-Click Quick Check (`FEAT-08`):** Mekarkan cabang konsep baru secara dinamis dari node mana pun (`+ Expand Cabang`) dan uji pemahaman dengan 1 pertanyaan refleksi cepat.
@@ -167,3 +167,19 @@ flowchart TD
   - *OpenStax Biology 2e* (Rice University, CC BY 4.0 License)
   - *Campbell Biology 12th Edition* & *Guyton and Hall Textbook of Medical Physiology* (Rujukan bibliografi konsep)
 - **Atribusi Pustaka Open-Source:** Next.js (MIT), React (MIT), Tailwind CSS (MIT), Lucide Icons (ISC).
+
+---
+
+## 9. Aturan Commit & Standar Repositori (LOGICODIX 2026)
+
+Seluruh riwayat pengembangan pada repositori ini mengikuti tata tertib repositori **LOGICODIX 2026**:
+
+1. **Conventional Commits:** Setiap commit menggunakan prefiks standar yang jelas sesuai ruang lingkup perubahan:
+   - `feat:` — penambahan fitur aplikasi, komponen UI, maupun endpoint API baru.
+   - `fix:` — perbaikan bug, validasi DAG/Region, atau penyesuaian tampilan.
+   - `docs:` — pembaruan dokumentasi (`README.md`, spesifikasi MVP, recap).
+   - `refactor:` — perombakan struktur kode/desain internal tanpa mengubah kontrak utama.
+   - `chore:` — konfigurasi environment, dependensi, atau pemeliharaan repositori.
+2. **Incremental History (Dilarang Bulk Upload):** Perubahan dikomit secara bertahap per modul/fitur yang bermakna, bukan mengunggah seluruh proyek sekaligus dalam satu commit raksasa.
+3. **Riwayat Git Bersih & Jujur:** Dilarang keras melakukan `git push --force`, `git rebase` pada branch publik, atau `git squash` untuk memanipulasi/menghilangkan jejak pengerjaan. Seluruh commit sah dikerjakan dalam rentang waktu kompetisi (**7 Nov 2026** hingga *code freeze* **14 Nov 2026 pukul 23:59 WIB**).
+4. **Keamanan Kredensial & Kelayakan Deploy:** File rahasia (`.env`, API key pribadi) wajib tetap berada di `.gitignore` dan tidak pernah dikomit; gunakan `.env.example` sebagai templat variabel lingkungan agar aplikasi dapat langsung dijalankan di `localhost` maupun di-deploy.

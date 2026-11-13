@@ -254,8 +254,8 @@ Pengalaman pengguna menggabungkan dua filosofi utama:
   * Spesifikasi Kebutuhan Non-Fungsional: Pembangkitan graf lintas-region dilakukan secara dinamis (on-demand per Vault) menggunakan satu LLM API dan modul validator tanpa perlu membangun database statis seluruh mata pelajaran.
 [9] ------------------------------------------------------------
   * Kode NFR: NFR-09
-  * Aspek Kualitas: Keterikatan Spasial Node & Auto-Expanding Region (Region Containment)
-  * Spesifikasi Kebutuhan Non-Fungsional: Setiap node wajib selalu tergabung dan dirender di dalam batas wilayah salah satu Knowledge Region-nya (REG-01 s.d. REG-06) tanpa boleh keluar dari area Region tersebut. Ketika node baru ditambahkan melalui ekspansi bertahap (+ Expand), batas/wadah visual Region terkait wajib membesar secara dinamis mengikuti isi node di dalamnya.
+  * Aspek Kualitas: Keterikatan Spasial Node & Auto-Expanding Hybrid Region Aura (Region Containment)
+  * Spesifikasi Kebutuhan Non-Fungsional: Setiap node wajib selalu tergabung dan dirender di dalam batas wilayah salah satu Knowledge Region-nya (REG-01 s.d. REG-06) tanpa boleh keluar dari area Region tersebut. Secara visual, setiap Region menggunakan Hybrid Soft Outward Region Aura dengan opsi toggle batas garis (Region Borders) serta pembesaran wilayah keluar secara dinamis mengikuti node baru dari hasil ekspansi bertahap (+ Expand).
 [10] ------------------------------------------------------------
   * Kode NFR: NFR-10
   * Aspek Kualitas: Konsistensi Antarmuka Light Mode Terpadu (Visual Consistency)
@@ -287,7 +287,7 @@ Pengalaman pengguna menggabungkan dua filosofi utama:
 [4] ------------------------------------------------------------
   * Kode BR: BR-04
   * Nama Aturan Bisnis (Business Rule): Aturan Penempatan Region, Containment & Penyebaran Lintas-Region (PoE Region Rule)
-  * Ketentuan & Logika Aturan yang Mengikat Sistem: Setiap node wajib tergabung ke dalam tepat 1 Knowledge Region utama (REG-01 s.d. REG-06) dan posisinya harus selalu berada di dalam batas Region tersebut. Wadah Region harus otomatis membesar bila node bertambah, sedangkan edge yang menghubungkan dua node berbeda Region merepresentasikan penyebaran lintas-bidang (cross_disciplinary).
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Setiap node wajib tergabung ke dalam tepat 1 Knowledge Region utama (REG-01 s.d. REG-06) dan posisinya harus selalu berada di dalam batas wilayah Region tersebut. Wilayah visual Region berbentuk Soft Aura (dengan toggle garis batas opsional) dan membesar ke arah luar secara otomatis saat node bertambah, sedangkan edge antar-Region menandai penyebaran lintas-bidang (cross_disciplinary).
 [5] ------------------------------------------------------------
   * Kode BR: BR-05
   * Nama Aturan Bisnis (Business Rule): Aturan Pencegahan Filter Bubble di Dalam Vault
@@ -335,13 +335,13 @@ Berdasarkan kebutuhan sistem dan Business Rule di atas, berikut adalah daftar fi
   * Acuan FR / BR: FR-04, BR-08
 [4] ------------------------------------------------------------
   * Kode Fitur: FEAT-04
-  * Nama Fitur Aplikasi: PoE-Inspired Light-Mode Regional Skill Tree Canvas (Dynamic Regions & 5 Edge Styles)
-  * Spesifikasi Implementasi & Mekanisme Kerja: Kanvas graf interaktif seragam Light Mode yang menampilkan wadah 6 Knowledge Regions (REG-01 s.d. REG-06) dengan aturan Region Containment (setiap node berada di dalam batas Region-nya dan wadah Region otomatis membesar saat node bertambah), merender 5 gaya garis edge berbeda, serta filter per Region/Relasi.
+  * Nama Fitur Aplikasi: PoE-Inspired Light-Mode Regional Skill Tree Canvas (Hybrid Soft Aura, Dynamic Regions & 5 Edge Styles)
+  * Spesifikasi Implementasi & Mekanisme Kerja: Kanvas graf interaktif seragam Light Mode dengan 6 Knowledge Regions (REG-01 s.d. REG-06) bergaya Hybrid Outward-Expanding Soft Aura + tombol toggle Region Borders (mematuhi aturan Region Containment sehingga node tidak pernah keluar dari wilayah Region saat cabang baru ditambahkan), 5 gaya garis edge berbeda, serta filter per Region/Relasi.
   * Acuan FR / BR: FR-05, FR-06, FR-09, BR-04, NFR-09, NFR-10
 [5] ------------------------------------------------------------
   * Kode Fitur: FEAT-05
-  * Nama Fitur Aplikasi: Fog of War & Open Exploration Telemetry Bar
-  * Spesifikasi Implementasi & Mekanisme Kerja: Node lanjutan pada Vault tampil dalam status Fog of War (redup/terkunci) dan terbuka saat diklik, dilengkapi ringkasan telemetri terbuka tanpa progress bar persentase batas akhir (jumlah Node Dipetakan, Node Terbuka, Node Dipahami, & Region Terjamah).
+  * Nama Fitur Aplikasi: Atmospheric Fog of War & Open Exploration Telemetry Bar
+  * Spesifikasi Implementasi & Mekanisme Kerja: Node cabang yang belum dijelajahi tampil terselubung kabut atmosferik (Fog of War + label FOG) dan langsung tersibak ketika diklik untuk dibaca/dieksplorasi, dilengkapi telemetri eksplorasi terbuka tanpa progress bar persentase batas akhir (jumlah Node Dipetakan, Node Terbuka, Node Dipahami, & Region Terjamah).
   * Acuan FR / BR: FR-12, NFR-02, NFR-11, BR-09
 [6] ------------------------------------------------------------
   * Kode Fitur: FEAT-06

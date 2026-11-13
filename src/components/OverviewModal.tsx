@@ -23,7 +23,7 @@ export default function OverviewModal({
     KNOWLEDGE_REGIONS["REG-01"];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17263C]/45 backdrop-blur-xs p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17263C]/45 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="w-full max-w-2xl rounded-3xl border border-[#DFE6F0] bg-white p-6 shadow-2xl space-y-4">
         <div className="flex items-start justify-between gap-4 border-b border-[#DFE6F0] pb-4">
           <div className="space-y-1.5">

@@ -91,7 +91,7 @@ export default function CreateVaultModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17263C]/45 backdrop-blur-xs p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17263C]/45 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="w-full max-w-3xl rounded-3xl border border-[#DFE6F0] bg-white p-6 shadow-2xl">
         {/* Header with Transparent Vector Books Illustration */}
         <div className="flex items-center justify-between gap-4 border-b border-[#DFE6F0] pb-4">
@@ -166,7 +166,7 @@ export default function CreateVaultModal({
                   : "bg-[#F3F6FC] text-[#6F7E93]"
               }`}
             >
-              <BookOpen className="h-4.5 w-4.5" />
+              <BookOpen className="h-4 w-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -199,7 +199,7 @@ export default function CreateVaultModal({
                   : "bg-[#F3F6FC] text-[#6F7E93]"
               }`}
             >
-              <Compass className="h-4.5 w-4.5" />
+              <Compass className="h-4 w-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">

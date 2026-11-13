@@ -227,7 +227,7 @@ export default function SkillTreeCanvas({
       <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#DFE6F0] bg-white px-4 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF2FF] text-[#2F80ED] shrink-0">
-            <Network className="h-4.5 w-4.5" />
+            <Network className="h-4 w-4" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -721,7 +721,7 @@ export default function SkillTreeCanvas({
                 >
                   <div
                     style={{ borderColor: `${reg.accentHex}55` }}
-                    className="inline-flex items-center gap-1.5 rounded-full border bg-white/95 px-2.5 py-1 text-[11px] font-bold shadow-xs"
+                    className="inline-flex items-center gap-1.5 rounded-full border bg-white/95 px-2.5 py-1 text-[11px] font-bold shadow-sm"
                   >
                     <span
                       style={{ backgroundColor: reg.accentHex }}
@@ -809,13 +809,13 @@ export default function SkillTreeCanvas({
                       isRoot
                         ? "bg-gradient-to-br from-[#2F80ED] to-[#1D5BC7] text-white border border-[#1B4FA8] node-root-glow"
                         : !node.explored
-                        ? "bg-[#F8FAFC]/90 backdrop-blur-xs border border-dashed border-[#94A3B8] text-[#475569] hover:border-[#2F80ED] hover:bg-white"
+                        ? "bg-[#F8FAFC]/90 backdrop-blur-sm border border-dashed border-[#94A3B8] text-[#475569] hover:border-[#2F80ED] hover:bg-white"
                         : "bg-white border-[1.75px] text-[#17233C] shadow-sm hover:shadow-md"
                     }`}
                   >
                     {/* Corner Badges matching Figma */}
                     {isRoot && (
-                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#FFA33A] px-2.5 py-0.5 text-[9.5px] font-extrabold tracking-wider text-[#3A2200] shadow-xs">
+                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#FFA33A] px-2.5 py-0.5 text-[9.5px] font-extrabold tracking-wider text-[#3A2200] shadow-sm">
                         START
                       </span>
                     )}
@@ -827,7 +827,7 @@ export default function SkillTreeCanvas({
                     {node.explored && node.mastered && !isRoot && (
                       <span
                         title="Mastered"
-                        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#2D9D78] text-white ring-2 ring-white shadow-xs"
+                        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#2D9D78] text-white ring-2 ring-white shadow-sm"
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" />
                       </span>

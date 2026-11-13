@@ -164,7 +164,7 @@ export default function NodeInspector({
               onClick={() => setDepth(item.key)}
               className={`rounded-lg py-1.5 px-2 text-xs font-bold transition-all ${
                 depth === item.key
-                  ? "bg-[#2F80ED] text-white shadow-xs"
+                  ? "bg-[#2F80ED] text-white shadow-sm"
                   : "text-[#6F7E93] hover:text-[#17233C]"
               }`}
             >

@@ -1,0 +1,390 @@
+================================================================================
+REKAP LENGKAP SPESIFIKASI, FITUR & ARSITEKTUR MVP
+NexusVault AI — Knowledge Exploration Platform
+Kompetisi: LOGICODIX 2026 | Subtema: Smart & Fun Education
+Sumber: Rumusan_Fitur_dan_Spesifikasi_MVP.docx
+================================================================================
+
+DOKUMEN MASTER SPESIFIKASI & ARSITEKTUR MVP — LOGICODIX 2026
+NexusVault AI — Knowledge Exploration Platform
+
+Subtema Lomba: 1. Smart & Fun Education
+Struktur Dokumen: 1. Latar Belakang Masalah | 2. Rancangan Aplikasi | 3. Functional Requirement (FR) | 4. Non-Functional Requirement (NFR) | 5. Business Rule (BR) | 6. Spesifikasi Fitur & Batasan MVP | 7. Arsitektur Teknis Next.js
+Deadline Code Freeze: Sabtu, 14 November 2026 Pukul 23.59 WIB
+
+
+================================================================================
+1. LATAR BELAKANG MASALAH
+================================================================================
+
+
+--------------------------------------------------------------------------------
+1.1. Ketika Rasa Ingin Tahu Berhenti di Halaman Terakhir Bab Buku
+--------------------------------------------------------------------------------
+Bayangkan seorang siswa SMA bernama Raka yang malam itu sedang membaca buku paket Biologi bab Sistem Pernapasan Manusia. Di subbab pertukaran gas, ia membaca satu kalimat singkat: bahwa oksigen dari alveolus paru-paru akan masuk ke pembuluh darah dan diedarkan ke seluruh sel tubuh. Kalimat sederhana itu memantik rasa penasarannya. Raka mulai bertanya-tanya: "Setelah oksigen sampai di dalam sel, sebenarnya oksigen itu diapakan? Bagaimana udara yang aku hirup ini bisa berubah menjadi energi untuk berpikir dan bergerak?"
+
+Dengan antusias, Raka membalik halaman berikutnya di buku paket tersebut. Namun, bukannya menemukan jawaban, ia justru mendapati halaman latihan soal akhir bab, lalu bab berikutnya langsung melompat ke Sistem Ekskresi. Buku paket sekolah memang disusun secara sistematis mengikuti kurikulum dan tujuan pedagogis tertentu, tetapi strukturnya yang kaku per bab tidak dirancang untuk memetakan ke mana sebuah konsep bisa dieksplorasi lebih jauh. Padahal, dari satu topik Sistem Pernapasan saja, rasa ingin tahu Raka sebenarnya terhubung langsung dengan ikatan Hemoglobin dalam mengangkut oksigen, proses Respirasi Seluler di mitokondria, Metabolisme Energi, hingga Bioenergetika—atau bahkan bercabang ke arah kapasitas VO2 Max jika ia menyukai olahraga. Sayangnya, karena tidak tahu hubungan antarkonsep dan urutan materi apa yang harus dicari selanjutnya, rasa ingin tahu Raka berhenti malam itu juga.
+
+
+--------------------------------------------------------------------------------
+1.2. Tersesat Saat Mengejar Minat Tanpa Peta Fondasi
+--------------------------------------------------------------------------------
+Di sisi lain, ada pula cerita sebaliknya yang dialami oleh Nadya. Ia tidak sedang mengerjakan tugas bab buku tertentu, tetapi punya ketertarikan kuat pada dunia medis dan sangat ingin memahami satu pertanyaan besar: "Bagaimana sebenarnya sel kanker bisa berkembang di dalam tubuh manusia?" Ketika Nadya mencoba mencari jawabannya sendiri di internet atau YouTube, ia langsung disuguhi artikel ilmiah yang penuh dengan istilah asing seperti mutasi proto-onkogen, kegagalan apoptosis, hingga inaktivasi gen supresor tumor p53.
+
+Dalam sepuluh menit pertama, Nadya merasa kewalahan dan akhirnya menyerah karena mengira topik tersebut terlalu sulit untuknya. Padahal, masalah utamanya bukan karena Nadya tidak mampu belajar, melainkan karena ia melompat langsung ke puncak materi tanpa mengetahui anak tangga prasyarat di bawahnya. Tidak ada yang memberi tahunya bahwa untuk memahami mekanisme perkembangan tumor dengan nyaman, ia perlu menyusuri jalur pengetahuan secara bertahap: dimulai dari Biologi Sel dasar, Struktur DNA, Genetika, Mutasi Genetik, Pembelahan Sel, barulah masuk ke Regulasi Pertumbuhan Sel dan Mekanisme Kanker.
+
+
+--------------------------------------------------------------------------------
+1.3. Mengapa Mesin Pencari dan Chatbot Biasa Belum Menjawab Masalah Ini?
+--------------------------------------------------------------------------------
+Pengalaman Raka dan Nadya menggambarkan dua celah nyata dalam proses belajar mandiri: kesenjangan antara materi kurikulum formal dengan eksplorasi lanjutan (ketika belajar dari buku), serta ketiadaan peta jalur prasyarat (ketika belajar dari minat atau tujuan pribadi). Saat ini, pelajar memang bisa bertanya ke Google atau chatbot AI biasa, dan berbagai platform seperti Khan Academy atau Squirrel AI telah memiliki fitur learning path. Namun, chatbot biasa hanya menjawab apa yang ditanyakan pengguna dalam bentuk teks linier—masalahnya, pelajar yang baru mulai mengeksplorasi sering kali "tidak tahu apa yang belum mereka ketahui" sehingga bingung harus bertanya apa lagi.
+
+Berangkat dari cerita dan hipotesis permasalahan tersebut—yang juga terus diuji validitasnya melalui wawancara nyata bersama siswa dan guru—kami merancang solusi di bawah subtema Smart & Fun Education. Bagaimana jika proses belajar tidak lagi terasa seperti membaca daftar bab yang terputus, melainkan seperti membuka ruang catatan pengetahuan (Vault layaknya Obsidian) yang dipetakan menjadi Skill Tree lintas-bidang seperti di dalam gim Path of Exile? Melalui AI-Powered Knowledge Exploration Platform, sistem tidak mengubah materi pelajar, melainkan memetakan kemungkinan hubungan pengetahuan dari hal yang sedang atau ingin mereka pelajari, lengkap dengan alasan keterkaitan tiap konsep dan penyebaran lintas disiplin ilmu.
+
+
+================================================================================
+2. RANCANGAN APLIKASI
+================================================================================
+
+
+--------------------------------------------------------------------------------
+2.1. Konsep Produk & Positioning
+--------------------------------------------------------------------------------
+Produk yang dibangun adalah AI-Powered Knowledge Exploration Platform (NexusVault AI): sebuah platform berbasis AI yang memetakan materi pembelajaran maupun ketertarikan pribadi pengguna ke dalam peta pengetahuan interaktif (Interactive Knowledge Graph) untuk membantu mereka menemukan, memahami, dan mengeksplorasi kemungkinan pengetahuan yang berkaitan dengan apa yang sedang atau ingin mereka pelajari.
+
+Pengalaman pengguna menggabungkan dua filosofi utama:
+1) Konsep Knowledge Vault (terinspirasi dari Obsidian): Pengguna tidak langsung melempar input di ruang kosong, melainkan terlebih dahulu membuat sebuah "Vault Eksplorasi" (ruang kerja pengetahuan tersendiri, misalnya "Vault Biologi Medis" atau "Vault Riset Kanker"). Setiap Vault menyimpan peta graf, progres node yang telah dibuka, dan modul catatan konsepnya masing-masing.
+2) Konsep Regional Skill Tree (terinspirasi dari Path of Exile): Peta eksplorasi di dalam Vault memiliki 6 zona/kuadran rumpun ilmu (Knowledge Regions). Ketika pengguna memulai dari satu titik awal (Starting Region), ekspansi node dapat menyebar di dalam rumpun tersebut maupun menyeberang (cross-border) ke rumpun ilmu lain.
+
+
+--------------------------------------------------------------------------------
+2.2. Dua Mode Eksplorasi di Dalam Vault
+--------------------------------------------------------------------------------
+
+[1] ------------------------------------------------------------
+  * Mode Eksplorasi:
+      Mode A:
+      Explore from Learning Material
+  * Titik Awal Input di Dalam Vault:
+      1. Nama Vault Eksplorasi
+      2. Mata pelajaran / Domain asal
+      3. Judul bab & Subbab
+      4. Referensi tambahan & minat personal (opsional)
+  * Proses Pemetaan oleh Sistem: AI menentukan Starting Region dari materi tersebut, menyusun modul penjelasan fondasi, mengekstraksi konsep kunci, dan memetakan cabang eksplorasi lanjutan di atas kanvas Knowledge Tree.
+[2] ------------------------------------------------------------
+  * Mode Eksplorasi:
+      Mode B:
+      Explore from Interest & Goals
+  * Titik Awal Input di Dalam Vault:
+      1. Nama Vault Eksplorasi
+      2. Bidang atau topik yang diminati
+      3. Hal yang ingin dipahami
+      4. Motivasi / tujuan eksplorasi
+  * Proses Pemetaan oleh Sistem: AI memetakan jalur pengetahuan mundur dan maju: mulai dari konsep prasyarat dasar (prerequisite) hingga mencapai topik tujuan serta kemungkinan eksplorasi lintas bidang.
+-----------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+2.3. Sistem 6 Knowledge Regions (Adaptasi Kuadran Path of Exile)
+--------------------------------------------------------------------------------
+
+[1] ------------------------------------------------------------
+  * Kode Region: REG-01
+  * Nama Rumpun (PoE Region Analog):
+      Natural & Life Sciences
+      (Sains Alam & Hayati)
+  * Cakupan Bidang & Efek Penyebaran Node: Biologi, Kimia, Fisika, Kebumian. Contoh: Titik awal Bab Sistem Pernapasan atau Struktur DNA berada di kuadran ini.
+[2] ------------------------------------------------------------
+  * Kode Region: REG-02
+  * Nama Rumpun (PoE Region Analog):
+      Health, Medicine & Performance
+      (Kesehatan, Medis & Fisiologi)
+  * Cakupan Bidang & Efek Penyebaran Node: Kedokteran, Patologi, Gizi, Fisiologi Olahraga. Contoh: Cabang Hipoksia Klinis, Onkologi, atau VO2 Max menyebar ke kuadran ini.
+[3] ------------------------------------------------------------
+  * Kode Region: REG-03
+  * Nama Rumpun (PoE Region Analog):
+      Technology, Computing & AI
+      (Teknologi & Komputasi)
+  * Cakupan Bidang & Efek Penyebaran Node: Ilmu Komputer, Bioinformatika, Data Science, Rekayasa Perangkat Lunak. Contoh: Cabang Genomik Kanker & Sports Analytics masuk ke kuadran ini.
+[4] ------------------------------------------------------------
+  * Kode Region: REG-04
+  * Nama Rumpun (PoE Region Analog):
+      Engineering & Applied Systems
+      (Rekayasa & Sistem Terapan)
+  * Cakupan Bidang & Efek Penyebaran Node: Teknik Biomedis, Elektro, Mesin, Lingkungan. Contoh: Cabang alat medis Pulse Oximetry menyeberang ke kuadran ini.
+[5] ------------------------------------------------------------
+  * Kode Region: REG-05
+  * Nama Rumpun (PoE Region Analog):
+      Formal Logic & Mathematics
+      (Matematika & Logika)
+  * Cakupan Bidang & Efek Penyebaran Node: Aljabar, Kalkulus, Biostatistika, Probabilitas, Pemodelan Kuantitatif.
+[6] ------------------------------------------------------------
+  * Kode Region: REG-06
+  * Nama Rumpun (PoE Region Analog):
+      Social, Economy & Humanities
+      (Sosial, Ekonomi & Humaniora)
+  * Cakupan Bidang & Efek Penyebaran Node: Psikologi, Ekonomi, Kebijakan Kesehatan Masyarakat, Etika Medis, Sejarah, & Seni.
+-----------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+2.4. Struktur Knowledge Graph (DAG) & 5 Jenis Edge yang Berbeda
+--------------------------------------------------------------------------------
+
+[1] ------------------------------------------------------------
+  * Jenis Edge (Relation): 1. Prerequisite
+  * Gaya Visual Garis di Peta: Garis Putus-Putus Berarah (Panah Fondasi -> Target) — Warna Amber/Emas
+  * Makna & Perilaku Hubungan: Konsep syarat yang harus dipahami terlebih dahulu sebelum konsep target dapat dikuasai.
+  * Contoh Pemetaan: Difusi Gas & Tekanan Parsial -> Pertukaran Gas Alveolus
+[2] ------------------------------------------------------------
+  * Jenis Edge (Relation): 2. Extension
+  * Gaya Visual Garis di Peta: Garis Solid Tebal Utama — Warna Indigo/Biru
+  * Makna & Perilaku Hubungan: Pendalaman konsep secara langsung ke tingkat bahasan berikutnya di dalam rumpun yang sama.
+  * Contoh Pemetaan: Sistem Pernapasan -> Hemoglobin -> Respirasi Seluler
+[3] ------------------------------------------------------------
+  * Jenis Edge (Relation): 3. Application
+  * Gaya Visual Garis di Peta: Garis Cabang Bercorak — Warna Hijau Emerald
+  * Makna & Perilaku Hubungan: Penerapan konsep teoritis ke dalam fenomena nyata, kasus klinis, atau praktik sehari-hari.
+  * Contoh Pemetaan: Transpor Oksigen -> Penanganan Hipoksia / Latihan VO2 Max
+[4] ------------------------------------------------------------
+  * Jenis Edge (Relation): 4. Related Concept
+  * Gaya Visual Garis di Peta: Garis Titik-Titik Halus Dua Arah — Warna Cyan/Biru Muda
+  * Makna & Perilaku Hubungan: Keterkaitan konseptual sejajar antar-topik yang saling melengkapi tetapi bukan syarat mutlak.
+  * Contoh Pemetaan: Respirasi Seluler <-> Bioenergetika & Metabolisme Energi
+[5] ------------------------------------------------------------
+  * Jenis Edge (Relation): 5. Cross-Disciplinary
+  * Gaya Visual Garis di Peta: Garis Lengkung Portal Lintas-Region — Warna Ungu/Magenta
+  * Makna & Perilaku Hubungan: Jembatan yang menyeberangkan eksplorasi dari Region asal ke Region keilmuan lain (mencegah Filter Bubble).
+  * Contoh Pemetaan: Biologi Pernapasan (REG-01) -> Biomedical Engineering (REG-04)
+-----------------------------------------------------------------
+
+
+================================================================================
+3. FUNCTIONAL REQUIREMENT (FR)
+================================================================================
+
+
+[1] ------------------------------------------------------------
+  * Kode FR: FR-01
+  * Nama Kebutuhan Fungsional: Manajemen Ruang Eksplorasi (Knowledge Vault)
+  * Deskripsi Perilaku Sistem: Sistem harus mengharuskan pengguna membuat atau memilih sebuah Vault Eksplorasi (dengan nama dan identitas topik) sebelum memasukkan materi atau minat, sehingga setiap topik eksplorasi tersimpan terpisah.
+[2] ------------------------------------------------------------
+  * Kode FR: FR-02
+  * Nama Kebutuhan Fungsional: Input Eksplorasi Materi Pembelajaran (Mode A)
+  * Deskripsi Perilaku Sistem: Di dalam Vault, sistem harus menyediakan form input bagi pengguna untuk memasukkan mata pelajaran, judul bab, subbab, serta referensi tambahan opsional.
+[3] ------------------------------------------------------------
+  * Kode FR: FR-03
+  * Nama Kebutuhan Fungsional: Input Eksplorasi Minat & Tujuan (Mode B & Personalisasi)
+  * Deskripsi Perilaku Sistem: Sistem harus menyediakan input minat, motivasi, atau tujuan belajar pengguna, baik untuk mempersonalisasi arah cabang dari Mode A maupun untuk memulai Vault baru langsung dari minat/tujuan (Mode B).
+[4] ------------------------------------------------------------
+  * Kode FR: FR-04
+  * Nama Kebutuhan Fungsional: Penyusunan Modul Overview Fondasi di Dalam Vault
+  * Deskripsi Perilaku Sistem: Sistem harus menganalisis input awal Vault dan menyusun modul pengantar yang merangkum konsep inti, contoh penerapan, rumus/persamaan relevan, dan referensi dasar.
+[5] ------------------------------------------------------------
+  * Kode FR: FR-05
+  * Nama Kebutuhan Fungsional: Pemetaan Node ke Dalam 6 Knowledge Regions (Graph Builder)
+  * Deskripsi Perilaku Sistem: Sistem harus membangkitkan node konsep eksplorasi dan memetakan setiap node ke dalam salah satu dari 6 Knowledge Regions (REG-01 s.d. REG-06).
+[6] ------------------------------------------------------------
+  * Kode FR: FR-06
+  * Nama Kebutuhan Fungsional: Klasifikasi & Pembedaan 5 Jenis Edge Hubungan
+  * Deskripsi Perilaku Sistem: Sistem harus menghubungkan node menggunakan 5 jenis edge yang dibedakan secara fungsional dan visual: prerequisite, extension, application, related_concept, dan cross_disciplinary.
+[7] ------------------------------------------------------------
+  * Kode FR: FR-07
+  * Nama Kebutuhan Fungsional: Penyediaan Alasan Hubungan (Edge Reason) & Referensi Node
+  * Deskripsi Perilaku Sistem: Setiap edge wajib memuat atribut reason yang menjelaskan alasan ilmiah mengapa dua konsep saling terhubung, dan setiap node wajib memuat rujukan referensi pembelajaran.
+[8] ------------------------------------------------------------
+  * Kode FR: FR-08
+  * Nama Kebutuhan Fungsional: Validasi Struktur JSON, Edge, & Region (Validation Engine)
+  * Deskripsi Perilaku Sistem: Backend harus memvalidasi respons JSON dari LLM, memastikan seluruh source dan target pada edge merujuk ke ID node valid, memeriksa konsistensi kode region dan jenis relasi, serta menangani respons yang tidak valid.
+[9] ------------------------------------------------------------
+  * Kode FR: FR-09
+  * Nama Kebutuhan Fungsional: Visualisasi Regional Skill Tree & Perbedaan Garis Edge
+  * Deskripsi Perilaku Sistem: Frontend harus menampilkan peta pengetahuan interaktif yang memperlihatkan posisi node berdasarkan Knowledge Region-nya serta menampilkan gaya garis berbeda untuk kelima jenis edge.
+[10] ------------------------------------------------------------
+  * Kode FR: FR-10
+  * Nama Kebutuhan Fungsional: Inspeksi Catatan Node (Obsidian-style Note) & Alasan Hubungan
+  * Deskripsi Perilaku Sistem: Ketika pengguna mengklik sebuah node, sistem harus menampilkan panel catatan node yang berisi alasan hubungan dari node sebelumnya, modul penjelasan konsep, rumus/contoh, daftar node yang terhubung (incoming/outgoing links), dan referensi.
+[11] ------------------------------------------------------------
+  * Kode FR: FR-11
+  * Nama Kebutuhan Fungsional: Ekspansi Cabang Pengetahuan Bertahap (Progressive Expansion)
+  * Deskripsi Perilaku Sistem: Sistem harus memungkinkan pengguna memperluas (expand) node yang dipilih di dalam Vault untuk memetakan cabang konsep baru—baik di dalam Region yang sama maupun menyeberang ke Region lain.
+[12] ------------------------------------------------------------
+  * Kode FR: FR-12
+  * Nama Kebutuhan Fungsional: Penyesuaian Kedalaman Bahasa & Penyimpanan Status Vault
+  * Deskripsi Perilaku Sistem: Sistem harus menyediakan opsi tingkat keterbacaan penjelasan serta menyimpan status node yang telah dibuka/dipahami di dalam Vault pengguna secara lokal.
+-----------------------------------------------------------------
+
+
+================================================================================
+4. NON-FUNCTIONAL REQUIREMENT (NFR)
+================================================================================
+
+
+[1] ------------------------------------------------------------
+  * Kode NFR: NFR-01
+  * Aspek Kualitas: Kontrak Data JSON Terstruktur
+  * Spesifikasi Kebutuhan Non-Fungsional: Seluruh komunikasi data graf dan Vault antara Backend Orchestrator dan Frontend wajib menggunakan JSON terstruktur sesuai skema baku tanpa parsing teks bebas di sisi frontend.
+[2] ------------------------------------------------------------
+  * Kode NFR: NFR-02
+  * Aspek Kualitas: Usability & Pembatasan Beban Visual (Anti-Overload)
+  * Spesifikasi Kebutuhan Non-Fungsional: Meskipun sistem mendukung 6 Knowledge Regions dan topik fleksibel, pembangkitan awal di setiap Vault dibatasi pada 5–8 node inti terlebih dahulu agar kanvas tidak penuh sesak (Information Overload).
+[3] ------------------------------------------------------------
+  * Kode NFR: NFR-03
+  * Aspek Kualitas: Keandalan & Penanganan Error AI (Reliability)
+  * Spesifikasi Kebutuhan Non-Fungsional: Validation Engine wajib menangani kegagalan format output LLM secara aman (fallback atau perbaikan terstruktur) dan menyertakan contoh Vault pramuatan (preset) agar aplikasi selalu siap diuji.
+[4] ------------------------------------------------------------
+  * Kode NFR: NFR-04
+  * Aspek Kualitas: Aksesibilitas & Pengujian Tanpa Hambatan (Zero-Friction)
+  * Spesifikasi Kebutuhan Non-Fungsional: Aplikasi Web wajib sudah di-deploy, responsif, dan dapat langsung diuji oleh dewan juri (termasuk membuat dan membuka Vault) menggunakan penyimpanan browser (localStorage) tanpa paksaan registrasi berbayar.
+[5] ------------------------------------------------------------
+  * Kode NFR: NFR-05
+  * Aspek Kualitas: Ketersediaan Kuota API (Availability)
+  * Spesifikasi Kebutuhan Non-Fungsional: Layanan backend dan kuota API LLM wajib dijaga tetap aktif sejak batas submission (14 Nov 2026) hingga seluruh rangkaian penjurian selesai.
+[6] ------------------------------------------------------------
+  * Kode NFR: NFR-06
+  * Aspek Kualitas: Keamanan Kredensial (Security)
+  * Spesifikasi Kebutuhan Non-Fungsional: API key dan kredensial rahasia dilarang keras ditulis langsung (hardcoded) di dalam kode sumber; wajib disimpan di file .env (masuk .gitignore) dan dilengkapi .env.example.
+[7] ------------------------------------------------------------
+  * Kode NFR: NFR-07
+  * Aspek Kualitas: Transparansi AI & Dokumentasi Repositori
+  * Spesifikasi Kebutuhan Non-Fungsional: README.md wajib mendokumentasikan arsitektur sistem, panduan menjalankan di localhost, jenis model AI yang digunakan beserta bagian produk yang memanfaatkannya, dan atribusi pustaka pihak ketiga.
+[8] ------------------------------------------------------------
+  * Kode NFR: NFR-08
+  * Aspek Kualitas: Efisiensi Arsitektur MVP (Maintainability)
+  * Spesifikasi Kebutuhan Non-Fungsional: Pembangkitan graf lintas-region dilakukan secara dinamis (on-demand per Vault) menggunakan satu LLM API dan modul validator tanpa perlu membangun database statis seluruh mata pelajaran.
+-----------------------------------------------------------------
+
+
+================================================================================
+5. BUSINESS RULE (BR)
+================================================================================
+
+
+[1] ------------------------------------------------------------
+  * Kode BR: BR-01
+  * Nama Aturan Bisnis (Business Rule): Aturan Isolasi Konteks per Vault (Vault Isolation Rule)
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Setiap sesi eksplorasi baru wajib berada di dalam sebuah Vault. Node, edge, dan progres eksplorasi di dalam satu Vault terisolasi dari Vault lain agar peta pengetahuan antar-topik tidak tercampur secara acak.
+[2] ------------------------------------------------------------
+  * Kode BR: BR-02
+  * Nama Aturan Bisnis (Business Rule): Aturan Pemisahan Prasyarat vs Keterkaitan Konseptual
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Hubungan konseptual biasa TIDAK BOLEH otomatis diberi label prerequisite. Edge prerequisite hanya sah apabila Konsep A mutlak harus dipahami terlebih dahulu sebelum pengguna dapat memahami Konsep B.
+[3] ------------------------------------------------------------
+  * Kode BR: BR-03
+  * Nama Aturan Bisnis (Business Rule): Aturan Kewajiban Alasan Hubungan (Mandatory Edge Reason)
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Setiap edge yang menghubungkan dua node WAJIB memiliki penjelasan alasan (reason) yang spesifik. Hubungan yang tidak memiliki dasar keilmuan kuat dilarang dimasukkan ke dalam Vault.
+[4] ------------------------------------------------------------
+  * Kode BR: BR-04
+  * Nama Aturan Bisnis (Business Rule): Aturan Penempatan Region & Efek Penyebaran Lintas-Region (PoE Region Rule)
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Setiap node wajib memiliki tepat 1 atribut Knowledge Region utama (REG-01 s.d. REG-06). Apabila sebuah edge menghubungkan dua node yang berbeda Region, maka edge tersebut secara otomatis merepresentasikan penyebaran lintas-bidang (cross-region / cross_disciplinary).
+[5] ------------------------------------------------------------
+  * Kode BR: BR-05
+  * Nama Aturan Bisnis (Business Rule): Aturan Pencegahan Filter Bubble di Dalam Vault
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Dalam setiap Vault, sistem dilarang mengunci seluruh cabang hanya pada satu Region atau satu minat sempit; sistem wajib memetakan minimal 1 cabang yang menawarkan keterkaitan ke topik atau Region keilmuan lain yang relevan.
+[6] ------------------------------------------------------------
+  * Kode BR: BR-06
+  * Nama Aturan Bisnis (Business Rule): Aturan Struktur DAG, Anti-Duplikasi, & Integritas Edge
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Graf di dalam sebuah Vault wajib berbentuk Directed Acyclic Graph (DAG): urutan prerequisite tidak boleh membentuk siklus berulang, tidak boleh ada dua node berkonsep sama di satu Vault, dan setiap edge wajib menunjuk ke ID source/target yang valid.
+[7] ------------------------------------------------------------
+  * Kode BR: BR-07
+  * Nama Aturan Bisnis (Business Rule): Aturan Kesamaan Mesin Pemetaan Mode A dan Mode B
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Baik Vault yang dimulai dari Materi Kurikulum (Mode A) maupun dari Minat/Tujuan (Mode B) wajib diproses oleh mesin Graph Builder, sistem 6 Region, dan aturan validasi yang sama.
+[8] ------------------------------------------------------------
+  * Kode BR: BR-08
+  * Nama Aturan Bisnis (Business Rule): Aturan Sintesis Mandiri & Kepatuhan Hak Cipta (Copyright Rule)
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Catatan modul pada setiap node wajib berupa sintesis penjelasan konseptual mandiri yang dilengkapi referensi sumber terpercaya, dan dilarang menyalin mentah isi buku cetak berhak cipta.
+[9] ------------------------------------------------------------
+  * Kode BR: BR-09
+  * Nama Aturan Bisnis (Business Rule): Aturan Ekspansi Bertahap (Progressive Disclosure Rule)
+  * Ketentuan & Logika Aturan yang Mengikat Sistem: Pemetaan di dalam Vault tidak membangkitkan ratusan node sekaligus, melainkan dimulai dari gugus node inti di Starting Region dan berkembang secara bertahap mengikuti node yang dieksplorasi pengguna.
+-----------------------------------------------------------------
+
+
+================================================================================
+6. SPESIFIKASI FITUR INTI APLIKASI (TURUNAN FR, NFR, & BR)
+================================================================================
+
+Berdasarkan kebutuhan sistem dan Business Rule di atas, berikut adalah daftar fitur konkret yang diimplementasikan pada MVP:
+
+
+[1] ------------------------------------------------------------
+  * Kode Fitur: FEAT-01
+  * Nama Fitur Aplikasi: Obsidian-Style Vault Manager & Preset Switcher
+  * Spesifikasi Implementasi & Mekanisme Kerja: Sidebar/panel manajemen Vault untuk membuat Vault baru, berpindah antar-Vault yang tersimpan di localStorage, serta memuat 3 Preset Vault siap uji (Biologi Medis, Fisiologi Olahraga, dan Onkologi/Kanker).
+  * Acuan FR / BR: FR-01, BR-01, NFR-04
+[2] ------------------------------------------------------------
+  * Kode Fitur: FEAT-02
+  * Nama Fitur Aplikasi: Dual-Entry Vault Creator (Mode A & Mode B)
+  * Spesifikasi Implementasi & Mekanisme Kerja: Modal/form pembuatan Vault dengan tab Mode A (Input Mapel, Bab, Subbab + Minat Personal) dan Mode B (Input Bidang Minat, Topik Tujuan, & Motivasi).
+  * Acuan FR / BR: FR-02, FR-03, BR-07
+[3] ------------------------------------------------------------
+  * Kode Fitur: FEAT-03
+  * Nama Fitur Aplikasi: Vault Foundation Overview Module
+  * Spesifikasi Implementasi & Mekanisme Kerja: Panel ringkasan materi asal di dalam Vault yang menyajikan sintesis konsep utama, persamaan dasar, dan jembatan konsep sebelum pengguna menjelajahi cabang node.
+  * Acuan FR / BR: FR-04, BR-08
+[4] ------------------------------------------------------------
+  * Kode Fitur: FEAT-04
+  * Nama Fitur Aplikasi: PoE-Inspired Regional Skill Tree Canvas (6 Regions & 5 Edge Styles)
+  * Spesifikasi Implementasi & Mekanisme Kerja: Kanvas graf interaktif yang menampilkan 6 zona Knowledge Regions (REG-01 s.d. REG-06), merender 5 gaya garis edge berbeda (Amber dashed prerequisite, Indigo solid extension, Emerald application, Cyan dotted related, Purple cross-region), serta filter per Region/Relasi.
+  * Acuan FR / BR: FR-05, FR-06, FR-09, BR-04
+[5] ------------------------------------------------------------
+  * Kode Fitur: FEAT-05
+  * Nama Fitur Aplikasi: Fog of War & Exploration Telemetry Bar
+  * Spesifikasi Implementasi & Mekanisme Kerja: Node lanjutan pada Vault tampil dalam status Fog of War (redup/terkunci) dan terbuka saat diklik, dilengkapi penghitung progres (Node Terbuka, Node Dipahami, & Jumlah Region Terjamah).
+  * Acuan FR / BR: FR-12, NFR-02, BR-09
+[6] ------------------------------------------------------------
+  * Kode Fitur: FEAT-06
+  * Nama Fitur Aplikasi: Obsidian-Style Node Note Inspector & Edge Reason Box
+  * Spesifikasi Implementasi & Mekanisme Kerja: Panel kanan saat node diklik yang menampilkan: (1) Kotak Alasan Hubungan (mengapa node ini terhubung dengan node sebelumnya), (2) Backlinks / Incoming & Outgoing Concept Links, (3) Modul Penjelasan, Rumus, & Contoh Penerapan, serta (4) Referensi Literatur.
+  * Acuan FR / BR: FR-07, FR-10, BR-02, BR-03
+[7] ------------------------------------------------------------
+  * Kode Fitur: FEAT-07
+  * Nama Fitur Aplikasi: Multi-Level Explanation Toggle & Accessible Outline View
+  * Spesifikasi Implementasi & Mekanisme Kerja: Toggle 3 gaya bahasa penjelasan (Analogi Mudah, Standar SMA, Sains Lanjut) pada setiap catatan node, serta tombol beralih dari Skill Tree View ke Outline View (daftar terstruktur ramah mobile).
+  * Acuan FR / BR: FR-11, FR-12, NFR-04
+[8] ------------------------------------------------------------
+  * Kode Fitur: FEAT-08
+  * Nama Fitur Aplikasi: Progressive Node Expansion (+ Expand) & 1-Click Quick Check
+  * Spesifikasi Implementasi & Mekanisme Kerja: Tombol "+ Kembangkan Cabang dari Node Ini" yang memanggil AI untuk memekarkan node baru dari titik tersebut, serta 1 soal Cek Paham Cepat untuk menandai node sebagai Mastered.
+  * Acuan FR / BR: FR-11, FR-12, BR-05, BR-09
+[9] ------------------------------------------------------------
+  * Kode Fitur: FEAT-09
+  * Nama Fitur Aplikasi: Validation Engine & Structured JSON Inspector
+  * Spesifikasi Implementasi & Mekanisme Kerja: Lapisan validator di backend (beserta modal Inspect JSON & DAG Validator di UI) yang membuktikan tidak ada orphan edge, tidak ada siklus prerequisite, dan semua kode region/relasi valid.
+  * Acuan FR / BR: FR-08, NFR-01, BR-06
+-----------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+6.1. Batasan Aplikasi (Out-of-Scope MVP)
+--------------------------------------------------------------------------------
+Untuk menjaga disiplin scope dan kepatuhan etika, aplikasi MVP secara tegas DIBATASI agar TIDAK mencakup: (1) Upload/ekstraksi PDF buku cetak atau OCR otomatis, (2) AI Image Generation pada setiap node, (3) Kuis adaptif multi-soal yang kompleks atau Knowledge Tracing matematis, (4) Autentikasi akun berbayar/kompleks, dan (5) Penyalinan tekstual isi buku berhak cipta.
+
+
+================================================================================
+7. ARSITEKTUR TEKNIS APLIKASI (NEXT.JS FULL-STACK)
+================================================================================
+
+Aplikasi diimplementasikan menggunakan kerangka kerja Next.js (App Router + TypeScript) dalam satu repositori terpadu yang memisahkan lapisan Frontend Workspace, Backend Orchestrator API, dan Knowledge Intelligence Layer:
+
+
+[1] ------------------------------------------------------------
+  * Lapisan / Modul: Frontend Workspace
+  * Teknologi & Lokasi Kode: Next.js App Router (React 19, TypeScript, Tailwind CSS, Lucide Icons) — src/app/ & src/components/
+  * Fungsi & Tanggung Jawab: Mengelola state Vault di localStorage, merender kanvas SVG/HTML Regional Skill Tree & Outline View, serta menampilkan Node Note Inspector dan Validator Modal.
+[2] ------------------------------------------------------------
+  * Lapisan / Modul: Backend Orchestrator
+  * Teknologi & Lokasi Kode: Next.js Route Handlers — src/app/api/explore/route.ts & src/app/api/expand/route.ts
+  * Fungsi & Tanggung Jawab: Menerima input pembuatan Vault atau ekspansi node, menyusun prompt terstruktur berdasarkan Mode A/B dan minat pengguna, serta memanggil LLM Engine.
+[3] ------------------------------------------------------------
+  * Lapisan / Modul: LLM Engine & Fallback
+  * Teknologi & Lokasi Kode: Google Gemini API (gemini-2.5-flash via env GEMINI_API_KEY) + Smart Deterministic Engine — src/lib/ai-engine.ts
+  * Fungsi & Tanggung Jawab: Mengekstraksi konsep, menentukan Region (REG-01..06), menyusun penjelasan 3 level, alasan hubungan, dan soal cek paham. Dilengkapi fallback terstruktur apabila API key belum diisi atau kuota habis.
+[4] ------------------------------------------------------------
+  * Lapisan / Modul: Graph Builder & Validation Engine
+  * Teknologi & Lokasi Kode: TypeScript Schema & DAG Validator — src/lib/validator.ts & src/types/knowledge.ts
+  * Fungsi & Tanggung Jawab: Memvalidasi struktur JSON, menghapus node duplikat, memverifikasi keabsahan source/target pada setiap edge, memeriksa ketiadaan siklus pada relasi prerequisite, dan menandai penyebaran lintas-region.
+[5] ------------------------------------------------------------
+  * Lapisan / Modul: Knowledge Source & Preset Vaults
+  * Teknologi & Lokasi Kode: Curated Open References — src/lib/presets.ts & src/lib/regions.ts
+  * Fungsi & Tanggung Jawab: Menyimpan definisi 6 Knowledge Regions, warna/gaya 5 jenis edge, serta data Vault pramuatan berstandar referensi terbuka (OpenStax, Campbell, Weinberg) untuk pengujian instan.
+-----------------------------------------------------------------

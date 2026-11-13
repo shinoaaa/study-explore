@@ -84,7 +84,7 @@ export default function SkillTreeCanvas({
   const [regionVisualMode, setRegionVisualMode] =
     useState<RegionVisualMode>("hybrid");
   const [searchQuery, setSearchQuery] = useState("");
-  const [legendExpanded, setLegendExpanded] = useState(true);
+  const [legendExpanded, setLegendExpanded] = useState(false);
   const [hoveredEdge, setHoveredEdge] = useState<KnowledgeEdge | null>(null);
 
   // Pan & Zoom state
@@ -159,7 +159,7 @@ export default function SkillTreeCanvas({
   useEffect(() => {
     fitGraphToViewport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vault.id, regionFilter]);
+  }, [vault.id, regionFilter, vault.nodes.length]);
 
   const centerOnOrigin = () => {
     const origin =
@@ -569,7 +569,7 @@ export default function SkillTreeCanvas({
               })}
 
               {/* 5 Distinct Edge Styles */}
-              {visibleEdges.map((edge) => {
+              {visibleEdges.map((edge, edgeIdx) => {
                 const sNode = filteredNodeMap.get(edge.source);
                 const tNode = filteredNodeMap.get(edge.target);
                 if (!sNode || !tNode) return null;
@@ -591,9 +591,10 @@ export default function SkillTreeCanvas({
                   const dx = tNode.x - sNode.x;
                   const dy = tNode.y - sNode.y;
                   const L = Math.max(1, Math.hypot(dx, dy));
-                  const sign = dy >= 0 ? -1 : 1;
-                  const ctrlX = midX + sign * (-dy / L) * Math.min(85, L * 0.16);
-                  const ctrlY = midY + sign * (dx / L) * Math.min(85, L * 0.16);
+                  const sign = edgeIdx % 2 === 0 ? (dy >= 0 ? -1 : 1) : (dy >= 0 ? 1 : -1);
+                  const bow = Math.min(82, L * 0.14) + (edgeIdx % 3) * 16;
+                  const ctrlX = midX + sign * (-dy / L) * bow;
+                  const ctrlY = midY + sign * (dx / L) * bow;
                   const [x1, y1] = trimToCardEdge(
                     sNode.x,
                     sNode.y,
@@ -613,8 +614,10 @@ export default function SkillTreeCanvas({
                     relDef.hasArrow ? 9 : 5
                   );
                   pathData = `M ${x1} ${y1} Q ${ctrlX} ${ctrlY} ${x2} ${y2}`;
-                  midX = 0.25 * x1 + 0.5 * ctrlX + 0.25 * x2;
-                  midY = 0.25 * y1 + 0.5 * ctrlY + 0.25 * y2;
+                  const tPos = 0.36 + (edgeIdx % 3) * 0.14;
+                  const omt = 1 - tPos;
+                  midX = omt * omt * x1 + 2 * omt * tPos * ctrlX + tPos * tPos * x2;
+                  midY = omt * omt * y1 + 2 * omt * tPos * ctrlY + tPos * tPos * y2;
                 } else {
                   const [x1, y1] = trimToCardEdge(
                     sNode.x,
@@ -721,18 +724,18 @@ export default function SkillTreeCanvas({
                 >
                   <div
                     style={{ borderColor: `${reg.accentHex}55` }}
-                    className="inline-flex items-center gap-1.5 rounded-full border bg-white/95 px-2.5 py-1 text-[11px] font-bold shadow-sm"
+                    className="inline-flex min-w-0 items-center gap-1.5 rounded-full border bg-white/95 px-2.5 py-1 text-[11px] font-bold shadow-sm"
                   >
                     <span
                       style={{ backgroundColor: reg.accentHex }}
                       className="h-2.5 w-2.5 rounded-full shrink-0"
                     />
-                    <span style={{ color: reg.darkAccentHex }}>
+                    <span style={{ color: reg.darkAccentHex }} className="truncate">
                       {reg.code} · {reg.name}
                     </span>
                   </div>
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-bold border ${
+                    className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10.5px] font-bold border ${
                       isExpandedHere
                         ? "bg-[#FFA33A] text-[#3A2200] border-[#F59E0B]"
                         : "bg-white/95 text-[#6F7E93] border-[#DFE6F0]"
@@ -901,12 +904,16 @@ export default function SkillTreeCanvas({
             </div>
           )}
 
-          {/* Bottom-Left Edge Relations Legend Card */}
-          <div className="absolute bottom-3.5 left-3.5 z-20 w-[264px] rounded-2xl border border-[#DFE6F0] bg-white/95 backdrop-blur-sm px-3.5 py-2.5 shadow-sm">
+          {/* Bottom-Left Edge Relations Legend Card (Collapsible to preserve canvas space) */}
+          <div
+            className={`absolute bottom-3.5 left-3.5 z-20 rounded-2xl border border-[#DFE6F0] bg-white/95 backdrop-blur-sm shadow-sm transition-all ${
+              legendExpanded ? "w-[264px] px-3.5 py-2.5" : "px-3 py-2"
+            }`}
+          >
             <button
               type="button"
               onClick={() => setLegendExpanded((s) => !s)}
-              className="flex w-full items-center justify-between text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93]"
+              className="flex w-full items-center justify-between gap-2 text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93]"
             >
               <span>Edge Relations</span>
               {legendExpanded ? (

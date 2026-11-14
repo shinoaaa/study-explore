@@ -6,13 +6,22 @@
   color-scheme: light;
 }
 
+html.dark {
+  color-scheme: dark;
+}
+
 body {
   background-color: #f3f6fc;
   color: #17233c;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-/* Custom subtle light scrollbar for Trellis workspace */
+html.dark body {
+  background-color: #0b1120;
+  color: #f1f5f9;
+}
+
+/* Custom subtle scrollbar for Curiora workspace */
 ::-webkit-scrollbar {
   width: 7px;
   height: 7px;
@@ -22,13 +31,25 @@ body {
   background: #eaf0f8;
 }
 
+html.dark ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
 ::-webkit-scrollbar-thumb {
   background: #b9c7da;
   border-radius: 9999px;
 }
 
+html.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: #8ea3bf;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
 @keyframes pulse-glow-light {

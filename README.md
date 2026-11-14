@@ -1,5 +1,6 @@
-# Trellis — AI-Powered Knowledge Exploration Platform
+# Curiora — AI-Powered Knowledge Exploration Platform
 
+> **Tagline:** *Where Curiosity Finds Its Way*  
 > **Kompetisi:** LOGICODIX 2026 Hackathon Competition  
 > **Kategori:** Web Application  
 > **Subtema:** 1. Smart & Fun Education  
@@ -9,7 +10,7 @@
 
 ## 1. Identitas Tim & Proyek
 
-- **Nama Aplikasi:** Trellis
+- **Nama Aplikasi:** Curiora (*Curiosity Aurora*) — *Where Curiosity Finds Its Way*
 - **Subtema:** Smart & Fun Education
 - **Kategori:** Web
 - **Target Pengguna:** Pelajar SMA/SMK/MA dan Mahasiswa yang ingin mengeksplorasi materi pelajaran lebih dalam maupun membangun jalur belajar mandiri berdasarkan minat dan tujuan personal.
@@ -25,8 +26,8 @@
 3. **Keterbatasan Chatbot & Mind Map Biasa:**  
    Mesin pencari dan *chatbot* linier hanya menjawab apa yang ditanyakan, padahal pelajar yang baru mulai belajar sering kali *"tidak tahu apa yang belum mereka ketahui"*.
 
-**Solusi Trellis:**  
-Platform berbasis AI yang **memetakan** materi pembelajaran maupun ketertarikan pribadi ke dalam peta pengetahuan interaktif (*Interactive Knowledge Graph*). Menggabungkan konsep **Knowledge Vault** (ruang catatan terisolasi layaknya *Obsidian*) dengan visualisasi **Regional Skill Tree** (peta berkuadran lintas-bidang layaknya *Path of Exile*).
+**Solusi Curiora:**  
+Platform berbasis AI yang **memetakan** materi pembelajaran maupun ketertarikan pribadi ke dalam peta pengetahuan interaktif (*Interactive Knowledge Graph*). Menggabungkan konsep **Knowledge Vault** (ruang catatan terisolasi layaknya *Obsidian*) dengan visualisasi **Regional Skill Tree** (peta berkuadran lintas-bidang layaknya *Path of Exile*) dalam antarmuka adaptif Light/Dark Mode dan dwibahasa (EN/ID).
 
 ---
 
@@ -46,7 +47,7 @@ Dokumen ini sekaligus menjadi acuan batasan sistem (*system boundaries*) yang wa
   5. `REG-05`: **Formal Logic & Mathematics** (Matematika, Statistika, Probabilitas)
   6. `REG-06`: **Social, Economy & Humanities** (Psikologi, Ekonomi, Kebijakan Publik, Humaniora)
 - **NFR-09 (Region Containment & Hybrid Auto-Expanding Region Aura):** Setiap node wajib selalu berada di dalam batas wilayah Region-nya (tidak boleh keluar dari region). Secara visual wilayah Region tampil sebagai *Hybrid Soft Outward Aura* (dengan tombol toggle *Region Borders* opsional) yang otomatis membesar ke arah luar secara dinamis ketika node baru ditambahkan ke dalamnya.
-- **NFR-10 (Unified Light Mode Visual Consistency):** Seluruh antarmuka workspace—termasuk Dashboard, Create Vault, Library, Knowledge Tree Canvas, Outline View, dan Node Inspector—wajib diseragamkan menggunakan skema Light Mode terpadu.
+- **NFR-10 (Adaptive Light & Dark Mode + Bilingual EN/ID + Clean Surface):** Seluruh antarmuka workspace—termasuk Dashboard, Create Vault, Library, Knowledge Tree Canvas, Outline View, dan Concept Reader modal—mendukung pergantian **Light Mode / Dark Mode** secara real-time, dukungan bahasa **Inggris & Indonesia (`EN | ID`)**, serta menyembunyikan kode teknis internal (`REG-01`..`REG-06`, `Mode A`/`Mode B`) dari tampilan pengguna akhir agar antarmuka tetap bersih dan intuitif.
 - **NFR-11 (Unbounded Open Exploration / No Completion Cap):** Eksplorasi di dalam Vault bersifat terbuka tanpa batas akhir seperti Vault Obsidian. Sistem dilarang membatasi jumlah total node per Vault maupun menampilkan *progress bar* persentase (0–100% selesai); telemetri hanya mencatat jumlah node terpetakan, terbuka, dipahami, dan Region terjamah.
 - **BR-05 (Anti-Filter Bubble Rule):** Meskipun jalur disesuaikan dengan minat pengguna, setiap Vault wajib menyertakan minimal 1 cabang lintas disiplin (`cross_disciplinary` / lintas-Region) untuk membuka wawasan bidang baru.
 - **BR-06 (DAG & Anti-Orphan Validation):** Struktur graf wajib berupa *Directed Acyclic Graph* (DAG) tanpa siklus pada relasi `prerequisite`, tanpa duplikasi node, dan setiap `source`/`target` pada *edge* wajib merujuk ke ID node yang valid.
@@ -71,13 +72,13 @@ Untuk menjaga keakuratan hubungan konsep dan stabilitas aplikasi:
    - **Mode B (Dari Minat & Tujuan):** Input Bidang Minat, Topik Tujuan, dan Motivasi Belajar.
 3. **Modul Fondasi / Overview Materi Asal (`FEAT-03`):** Sintesis konsep kunci, rumus dasar, dan konteks pengantar di setiap Vault.
 4. **Regional Skill Tree Canvas & 5 Gaya Edge Berbeda (`FEAT-04`):**
-   - Kanvas graf *pan/zoom* bergaya *Hybrid Outward Region Aura* dengan filter 6 *Knowledge Regions* (`REG-01` s.d. `REG-06`), kontrol *toggle* `Region Borders` (`Soft Aura`), serta jaminan *Region Containment* (`NFR-09`).
+   - Kanvas graf *pan/zoom* penuh layar bergaya *Hybrid Outward Region Aura* (adaptif Light & Dark Mode) dengan filter 6 *Knowledge Regions* (internal `REG-01` s.d. `REG-06`), kontrol *toggle* `Region Borders` (`Soft Aura`), serta jaminan *Region Containment* (`NFR-09`).
    - 5 visualisasi garis *edge* berbeda: `prerequisite` (Amber putus-putus berarah), `extension` (Indigo solid), `application` (Emerald terapan), `related_concept` (Cyan titik-titik), dan `cross_disciplinary` (Ungu lengkung lintas-region).
 5. **Atmospheric Fog of War & Open Exploration Telemetry (`FEAT-05`):** Cabang lanjutan yang belum dijelajahi tampil terselubung kabut atmosferik (*Fog of War* + lencana `FOG`) dan terbuka mulus saat diklik, disertai telemetri terbuka tanpa progress bar batas akhir (jumlah node dipetakan, terbuka, dipahami, dan Region yang dijelajahi).
-6. **Node Note Inspector & Kotak Alasan Hubungan (`FEAT-06`):** Menampilkan alasan spesifik mengapa konsep terhubung (`reason`), tautan masuk/keluar (*backlinks* ala Obsidian), rumus, contoh penerapan, dan referensi sumber.
-7. **Toggle 3 Level Bahasa & Accessible Outline View (`FEAT-07`):** Ubah penjelasan node ke mode *Analogi Mudah*, *Standar SMA*, atau *Sains Lanjut*, serta beralih antara tampilan *Skill Tree* dan *Outline View* (ramah layar HP).
-8. **Progressive Node Expansion & 1-Click Quick Check (`FEAT-08`):** Mekarkan cabang konsep baru secara dinamis dari node mana pun (`+ Expand Cabang`) dan uji pemahaman dengan 1 pertanyaan refleksi cepat.
-9. **DAG Validation Engine & JSON Inspector (`FEAT-09`):** Validasi otomatis struktur JSON, ketiadaan siklus prasyarat, serta modal *Inspect JSON & Validator* untuk transparansi teknis.
+6. **Concept Reader Modal & Kotak Alasan Hubungan (`FEAT-06`):** Modal baca yang dapat diperbesar (*Enlarge/Compact*, tutup dengan `×` atau klik kanvas kosong) saat node diklik, menampilkan alasan spesifik mengapa konsep terhubung (`reason`), tautan masuk/keluar (*backlinks* ala Obsidian), prinsip utama, penerapan nyata, dan referensi sumber.
+7. **Multi-Level Penjelasan, Switcher Tema/Bahasa & Outline View (`FEAT-07`):** Toggle **Light/Dark Mode** dan **EN/ID**, ubah penjelasan node ke mode *Simple/Sederhana*, *Standard*, atau *Advanced/Lanjut*, serta beralih antara tampilan *Tree* dan *Outline View* (ramah layar HP).
+8. **Progressive Node Expansion & 1-Click Quick Check (`FEAT-08`):** Mekarkan cabang konsep baru secara dinamis dari node mana pun (`Expand This Node` / `Kembangkan Konsep Ini`) dan uji pemahaman dengan 1 pertanyaan refleksi cepat.
+9. **Backend DAG & Schema Validation Engine (`FEAT-09`):** Validasi otomatis di sisi server (`src/lib/validator.ts`) terhadap struktur JSON, keabsahan `source`/`target` edge, pemetaan region, dan ketiadaan siklus prasyarat sebelum graf dirender.
 
 ---
 
@@ -89,7 +90,7 @@ flowchart TD
         VM["Vault Manager (localStorage + 3 Presets)"]
         IN["Dual-Mode Input (Mode A: Materi | Mode B: Minat)"]
         ST["Regional Skill Tree Canvas (6 Regions & 5 Edge Styles)"]
-        NI["Obsidian-Style Node Inspector (3 Level Bahasa & Quick Check)"]
+        CR["Floating / Expandable Concept Reader (3 Level Bahasa & Quick Check)"]
     end
 
     subgraph Backend["2. Backend Orchestrator (/api/explore & /api/expand)"]
@@ -110,8 +111,8 @@ flowchart TD
     REF --> GB
     GB --> VE
     VE -->|Validated Structured JSON| ST
-    ST <--> NI
-    NI -->|Expand Node Request| OR
+    ST <--> CR
+    CR -->|Expand Node Request| OR
 ```
 
 ---
@@ -121,7 +122,7 @@ flowchart TD
 - **Framework:** Next.js (App Router, TypeScript)
 - **Styling & UI:** Tailwind CSS, Lucide React Icons, Custom SVG Directed Acyclic Graph Renderer
 - **AI / LLM Integration:** Google Gemini API (`gemini-2.5-flash` via REST API) + *Deterministic Domain Fallback Engine*
-- **State & Storage:** React Hooks + Browser `localStorage` (Zero-friction Vault persistence tanpa login)
+- **State & Storage:** React Hooks + Browser `localStorage` (Zero-friction Vault, Light/Dark Mode, & EN/ID preference persistence tanpa login)
 
 ---
 

@@ -1,12 +1,12 @@
 ================================================================================
 REKAP LENGKAP SPESIFIKASI, FITUR & ARSITEKTUR MVP
-Trellis — Knowledge Exploration Platform
+Curiora — Where Curiosity Finds Its Way
 Kompetisi: LOGICODIX 2026 | Subtema: Smart & Fun Education
 Sumber: Rumusan_Fitur_dan_Spesifikasi_MVP.docx
 ================================================================================
 
 DOKUMEN MASTER SPESIFIKASI & ARSITEKTUR MVP — LOGICODIX 2026
-Trellis — Knowledge Exploration Platform
+Curiora — Where Curiosity Finds Its Way
 
 Subtema Lomba: 1. Smart & Fun Education
 Struktur Dokumen: 1. Latar Belakang Masalah | 2. Rancangan Aplikasi | 3. Functional Requirement (FR) | 4. Non-Functional Requirement (NFR) | 5. Business Rule (BR) | 6. Spesifikasi Fitur & Batasan MVP | 7. Arsitektur Teknis Next.js
@@ -50,7 +50,7 @@ Berangkat dari cerita dan hipotesis permasalahan tersebut—yang juga terus diuj
 --------------------------------------------------------------------------------
 2.1. Konsep Produk & Positioning
 --------------------------------------------------------------------------------
-Produk yang dibangun adalah Trellis (AI-Powered Knowledge Exploration Platform): sebuah platform berbasis AI yang memetakan materi pembelajaran maupun ketertarikan pribadi pengguna ke dalam peta pengetahuan interaktif (Interactive Knowledge Graph) untuk membantu mereka menemukan, memahami, dan mengeksplorasi kemungkinan pengetahuan yang berkaitan dengan apa yang sedang atau ingin mereka pelajari.
+Produk yang dibangun adalah Curiora — Where Curiosity Finds Its Way (AI-Powered Knowledge Exploration Platform): sebuah platform berbasis AI yang memetakan materi pembelajaran maupun ketertarikan pribadi pengguna ke dalam peta pengetahuan interaktif (Interactive Knowledge Graph) untuk membantu mereka menemukan, memahami, dan mengeksplorasi kemungkinan pengetahuan yang berkaitan dengan apa yang sedang atau ingin mereka pelajari.
 
 Pengalaman pengguna menggabungkan dua filosofi utama:
 1) Konsep Knowledge Vault (terinspirasi dari Obsidian): Pengguna tidak langsung melempar input di ruang kosong, melainkan terlebih dahulu membuat sebuah "Vault Eksplorasi" (ruang kerja pengetahuan tersendiri, misalnya "Vault Biologi Medis" atau "Vault Riset Kanker"). Setiap Vault menyimpan peta graf, jejak eksplorasi node terbuka, dan modul catatan konsepnya masing-masing tanpa batasan jumlah node akhir (unbounded graph exploration).
@@ -258,8 +258,8 @@ Pengalaman pengguna menggabungkan dua filosofi utama:
   * Spesifikasi Kebutuhan Non-Fungsional: Setiap node wajib selalu tergabung dan dirender di dalam batas wilayah salah satu Knowledge Region-nya (REG-01 s.d. REG-06) tanpa boleh keluar dari area Region tersebut. Secara visual, setiap Region menggunakan Hybrid Soft Outward Region Aura dengan opsi toggle batas garis (Region Borders) serta pembesaran wilayah keluar secara dinamis mengikuti node baru dari hasil ekspansi bertahap (+ Expand).
 [10] ------------------------------------------------------------
   * Kode NFR: NFR-10
-  * Aspek Kualitas: Konsistensi Antarmuka Light Mode Terpadu (Visual Consistency)
-  * Spesifikasi Kebutuhan Non-Fungsional: Seluruh layar aplikasi—termasuk Dashboard, Form Create Vault, Library, hingga Kanvas Full-Screen Knowledge Tree, Outline View, dan Node Inspector—wajib diseragamkan dalam skema Light Mode terpadu agar perpindahan halaman terasa konsisten, bersih, dan nyaman dibaca.
+  * Aspek Kualitas: Konsistensi Antarmuka Adaptif Light/Dark Mode, Dwibahasa EN/ID & Kebersihan UI
+  * Spesifikasi Kebutuhan Non-Fungsional: Seluruh layar aplikasi—termasuk Dashboard, Form Create Vault, Library, hingga Kanvas Full-Screen Knowledge Tree, Outline View, dan Concept Reader modal—mendukung pergantian Light Mode & Dark Mode terpadu serta antarmuka dwibahasa Inggris/Indonesia (EN/ID). Kode internal seperti REG-01..06, Mode A/Mode B, serta dialog teknis pengembang disembunyikan dari layar pengguna agar aplikasi tetap bersih dan intuitif.
 [11] ------------------------------------------------------------
   * Kode NFR: NFR-11
   * Aspek Kualitas: Eksplorasi Terbuka Tanpa Batas Akhir (Unbounded Knowledge Exploration)
@@ -335,8 +335,8 @@ Berdasarkan kebutuhan sistem dan Business Rule di atas, berikut adalah daftar fi
   * Acuan FR / BR: FR-04, BR-08
 [4] ------------------------------------------------------------
   * Kode Fitur: FEAT-04
-  * Nama Fitur Aplikasi: PoE-Inspired Light-Mode Regional Skill Tree Canvas (Hybrid Soft Aura, Dynamic Regions & 5 Edge Styles)
-  * Spesifikasi Implementasi & Mekanisme Kerja: Kanvas graf interaktif seragam Light Mode dengan 6 Knowledge Regions (REG-01 s.d. REG-06) bergaya Hybrid Outward-Expanding Soft Aura + tombol toggle Region Borders (mematuhi aturan Region Containment sehingga node tidak pernah keluar dari wilayah Region saat cabang baru ditambahkan), 5 gaya garis edge berbeda, serta filter per Region/Relasi.
+  * Nama Fitur Aplikasi: PoE-Inspired Adaptive Regional Skill Tree Canvas (Light/Dark Mode, Hybrid Soft Aura & 5 Edge Styles)
+  * Spesifikasi Implementasi & Mekanisme Kerja: Kanvas graf penuh layar interaktif (adaptif Light & Dark Mode) dengan 6 rumpun keilmuan (Knowledge Regions) bergaya Hybrid Outward-Expanding Soft Aura + tombol toggle Region Borders (mematuhi aturan Region Containment sehingga node tidak pernah keluar dari wilayah Region saat cabang baru ditambahkan), 5 gaya garis edge berbeda, serta filter per Region/Relasi.
   * Acuan FR / BR: FR-05, FR-06, FR-09, BR-04, NFR-09, NFR-10
 [5] ------------------------------------------------------------
   * Kode Fitur: FEAT-05
@@ -350,8 +350,8 @@ Berdasarkan kebutuhan sistem dan Business Rule di atas, berikut adalah daftar fi
   * Acuan FR / BR: FR-07, FR-10, BR-02, BR-03
 [7] ------------------------------------------------------------
   * Kode Fitur: FEAT-07
-  * Nama Fitur Aplikasi: Multi-Level Explanation Toggle & Accessible Outline View
-  * Spesifikasi Implementasi & Mekanisme Kerja: Toggle 3 gaya bahasa penjelasan (Analogi Mudah, Standar SMA, Sains Lanjut) pada setiap catatan node, serta tombol beralih dari Skill Tree View ke Outline View (daftar terstruktur ramah mobile).
+  * Nama Fitur Aplikasi: Multi-Level Explanation, Theme/Language Switcher & Outline View
+  * Spesifikasi Implementasi & Mekanisme Kerja: Toggle Light/Dark Mode dan EN/ID di seluruh workspace, 3 gaya tingkat kedalaman penjelasan (Simple/Standard/Advanced) di dalam Concept Reader modal yang dapat diperbesar, serta tombol beralih antara Tree View dan Outline View ramah mobile.
   * Acuan FR / BR: FR-11, FR-12, NFR-04
 [8] ------------------------------------------------------------
   * Kode Fitur: FEAT-08
@@ -360,8 +360,8 @@ Berdasarkan kebutuhan sistem dan Business Rule di atas, berikut adalah daftar fi
   * Acuan FR / BR: FR-11, FR-12, BR-05, BR-09
 [9] ------------------------------------------------------------
   * Kode Fitur: FEAT-09
-  * Nama Fitur Aplikasi: Validation Engine & Structured JSON Inspector
-  * Spesifikasi Implementasi & Mekanisme Kerja: Lapisan validator di backend (beserta modal Inspect JSON & DAG Validator di UI) yang membuktikan tidak ada orphan edge, tidak ada siklus prerequisite, dan semua kode region/relasi valid.
+  * Nama Fitur Aplikasi: Backend DAG & Schema Validation Engine
+  * Spesifikasi Implementasi & Mekanisme Kerja: Lapisan validator otomatis di backend (src/lib/validator.ts) yang membuktikan tidak ada orphan edge, tidak ada siklus prerequisite, dan semua kode region/relasi valid sebelum peta ditampilkan ke pengguna.
   * Acuan FR / BR: FR-08, NFR-01, BR-06
 -----------------------------------------------------------------
 
@@ -382,7 +382,7 @@ Aplikasi diimplementasikan menggunakan kerangka kerja Next.js (App Router + Type
 [1] ------------------------------------------------------------
   * Lapisan / Modul: Frontend Workspace
   * Teknologi & Lokasi Kode: Next.js App Router (React 19, TypeScript, Tailwind CSS, Lucide Icons) — src/app/ & src/components/
-  * Fungsi & Tanggung Jawab: Mengelola state Vault di localStorage, merender kanvas SVG/HTML Regional Skill Tree & Outline View, serta menampilkan Node Note Inspector dan Validator Modal.
+  * Fungsi & Tanggung Jawab: Mengelola state Vault/Tema/Bahasa di localStorage, merender kanvas SVG/HTML Regional Skill Tree & Outline View dalam Light/Dark Mode serta dwibahasa EN/ID, dan menampilkan Concept Reader modal.
 [2] ------------------------------------------------------------
   * Lapisan / Modul: Backend Orchestrator
   * Teknologi & Lokasi Kode: Next.js Route Handlers — src/app/api/explore/route.ts & src/app/api/expand/route.ts

@@ -9,10 +9,10 @@ import {
 import NodeInspector from "@/components/NodeInspector";
 import OverviewModal from "@/components/OverviewModal";
 import SkillTreeCanvas from "@/components/SkillTreeCanvas";
-import ValidatorModal from "@/components/ValidatorModal";
 import { PRESET_VAULTS } from "@/lib/presets";
-import { KNOWLEDGE_REGIONS } from "@/lib/regions";
+import { EDGE_RELATIONS, KNOWLEDGE_REGIONS } from "@/lib/regions";
 import {
+  EdgeRelationType,
   KnowledgeVault,
   RegionCode,
   VaultInputContext,
@@ -21,20 +21,23 @@ import {
   ArrowRight,
   BookOpen,
   CheckCircle2,
-  Code2,
+  CloudFog,
   Compass,
   Database,
+  Eye,
   Folder,
   FolderPlus,
   GitBranch,
   HelpCircle,
   Home,
+  Keyboard,
   Layers,
+  Maximize2,
   Menu,
+  MousePointerClick,
   Network,
   RotateCcw,
   Search,
-  ShieldCheck,
   Sparkles,
   Trash2,
   X,
@@ -51,7 +54,7 @@ export default function HomePage() {
   const [activeVaultId, setActiveVaultId] = useState<string>(
     PRESET_VAULTS[0].id
   );
-  const [selectedNodeId, setSelectedNodeId] = useState<string>("n_respsel");
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -62,19 +65,14 @@ export default function HomePage() {
   // Modals & loading states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
-  const [isValidatorOpen, setIsValidatorOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
-  const [isFullCanvas, setIsFullCanvas] = useState(false);
   const [showEmptyDemo, setShowEmptyDemo] = useState(false);
 
-  // Expansion telemetry feedback
+  // Expansion feedback
   const [newlyAddedIds, setNewlyAddedIds] = useState<string[]>([]);
   const [expandedRegions, setExpandedRegions] = useState<RegionCode[]>([]);
   const [expandToast, setExpandToast] = useState<string | null>(null);
-  const [engineBadge, setEngineBadge] = useState<string>(
-    "Curated OpenStax/Campbell Preset · DAG Validator"
-  );
 
   // Hydrate persisted Vaults
   useEffect(() => {
@@ -87,10 +85,6 @@ export default function HomePage() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           setVaults(parsed);
           setActiveVaultId(parsed[0].id);
-          const defaultNode =
-            parsed[0].nodes.find((n: { id: string }) => n.id !== "root") ||
-            parsed[0].nodes[0];
-          if (defaultNode) setSelectedNodeId(defaultNode.id);
         }
       }
     } catch {
@@ -121,27 +115,23 @@ export default function HomePage() {
 
   const activeVault =
     vaults.find((v) => v.id === activeVaultId) || vaults[0] || PRESET_VAULTS[0];
-  const selectedNode =
-    activeVault.nodes.find((n) => n.id === selectedNodeId) ||
-    activeVault.nodes[0];
+  const selectedNode = selectedNodeId
+    ? activeVault.nodes.find((n) => n.id === selectedNodeId) || null
+    : null;
 
   const openVaultInTree = (vaultId: string) => {
     setActiveVaultId(vaultId);
-    const target = vaults.find((v) => v.id === vaultId);
-    if (target && target.nodes.length > 0) {
-      const preferred =
-        target.nodes.find((n) => n.id !== "root") || target.nodes[0];
-      setSelectedNodeId(preferred.id);
-    }
+    setSelectedNodeId(null);
     setNewlyAddedIds([]);
     setExpandedRegions([]);
     setActiveTab("tree");
     setMobileMenuOpen(false);
   };
 
-  const handleSelectNode = (nodeId: string) => {
+  const handleSelectNode = (nodeId: string | null) => {
     setSelectedNodeId(nodeId);
-    // Open Fog of War immediately when user clicks a shrouded frontier node
+    if (!nodeId) return;
+    // Lift Fog of War immediately when user clicks a shrouded frontier node
     const targetNode = activeVault.nodes.find((n) => n.id === nodeId);
     if (targetNode && !targetNode.explored) {
       const updatedVaults = vaults.map((v) => {
@@ -201,12 +191,7 @@ export default function HomePage() {
         const nextVaults = [createdVault, ...vaults];
         persistVaults(nextVaults);
         setActiveVaultId(createdVault.id);
-        setSelectedNodeId(createdVault.nodes[0]?.id || "root");
-        setEngineBadge(
-          data.engineUsed === "gemini-api"
-            ? "Google Gemini 2.5 Flash · DAG Validator"
-            : "Smart Deterministic Synthesis · DAG Validator"
-        );
+        setSelectedNodeId(null);
         setIsCreateOpen(false);
         setShowEmptyDemo(false);
         setActiveTab("tree");
@@ -243,18 +228,13 @@ export default function HomePage() {
         setExpandToast(
           `${newNodes.length} new branch${
             newNodes.length > 1 ? "es" : ""
-          } mapped · ${touchedRegs.join(" & ")} auto-expanded (NFR-09)`
+          } mapped · ${touchedRegs.join(" & ")} expanded`
         );
         setTimeout(() => setExpandToast(null), 5000);
 
         if (Array.isArray(data.addedNodeIds) && data.addedNodeIds[0]) {
           setSelectedNodeId(data.addedNodeIds[0]);
         }
-        setEngineBadge(
-          data.engineUsed === "gemini-api"
-            ? "Google Gemini 2.5 Flash · DAG Validator"
-            : "Smart Deterministic Synthesis · DAG Validator"
-        );
       }
     } finally {
       setIsExpanding(false);
@@ -267,18 +247,18 @@ export default function HomePage() {
     persistVaults(safeList);
     if (activeVaultId === vaultId) {
       setActiveVaultId(safeList[0].id);
-      setSelectedNodeId(safeList[0].nodes[0]?.id || "root");
+      setSelectedNodeId(null);
     }
   };
 
   const handleResetPresets = () => {
     persistVaults(PRESET_VAULTS);
     setActiveVaultId(PRESET_VAULTS[0].id);
-    setSelectedNodeId("n_respsel");
+    setSelectedNodeId(null);
     setShowEmptyDemo(false);
   };
 
-  // Global aggregate open metrics (no completion % caps per NFR-11!)
+  // Global aggregate activity metrics
   const totalMappedAllVaults = vaults.reduce(
     (sum, v) => sum + v.nodes.length,
     0
@@ -289,11 +269,6 @@ export default function HomePage() {
   );
   const globalRegionsExplored = Array.from(
     new Set(vaults.flatMap((v) => v.nodes.map((n) => n.region)))
-  );
-
-  // Active vault metrics
-  const activeRegions = Array.from(
-    new Set(activeVault.nodes.map((n) => n.region))
   );
 
   const filteredVaults = vaults.filter((v) => {
@@ -376,7 +351,7 @@ export default function HomePage() {
                 Trellis
               </div>
               <div className="text-[10.5px] font-medium text-[#8FA2BD]">
-                LOGICODIX 2026 · EduGraph
+                Your Knowledge Cosmos
               </div>
             </div>
           </div>
@@ -439,10 +414,10 @@ export default function HomePage() {
           <div className="rounded-xl bg-[#1E314D] p-3 text-xs">
             <div className="flex items-center gap-2 font-bold text-[#DCE6F5]">
               <Database className="h-4 w-4 text-[#60A5FA]" />
-              Saved in this browser
+              Saved on this device
             </div>
             <p className="mt-0.5 text-[11px] text-[#8FA2BD]">
-              Zero-friction · No sign-in required
+              Autosaved locally · Always ready
             </p>
           </div>
           <button
@@ -522,12 +497,15 @@ export default function HomePage() {
             {/* Hero Welcome & Transparent Pure-SVG Illustration */}
             <section className="relative pt-2">
               <div className="mb-4 max-w-xl">
-                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#17233C]">
-                  Your Knowledge Space
-                  <span className="inline-block ml-1.5 h-2.5 w-2.5 rounded-full bg-[#FFA33A] align-baseline" />
+                <h1 className="text-[26px] sm:text-4xl font-extrabold tracking-tight text-[#17233C]">
+                  Your Knowledge{" "}
+                  <span className="whitespace-nowrap">
+                    Cosmos
+                    <span className="inline-block ml-1.5 h-2.5 w-2.5 rounded-full bg-[#FFA33A] align-baseline" />
+                  </span>
                 </h1>
                 <p className="mt-1.5 text-base text-[#6F7E93]">
-                  Where curiosity becomes connected knowledge.
+                  Where curiosity grows into a universe of connected knowledge.
                 </p>
               </div>
 
@@ -544,9 +522,8 @@ export default function HomePage() {
                       Start a new exploration
                     </h2>
                     <p className="mt-1.5 text-sm text-[#E3EEFF]">
-                      Start from a learning material (Mode A) or follow your
-                      personal curiosity (Mode B) inside an unbounded Regional
-                      Skill Tree.
+                      Begin from a study material or follow your personal
+                      curiosity in a living, ever-expanding knowledge tree.
                     </p>
                     <div className="mt-5 flex flex-wrap items-center gap-3">
                       <button
@@ -660,7 +637,7 @@ export default function HomePage() {
               </div>
             ) : (
               <>
-                {/* 4 Open Activity Metrics (Zero Progress % Caps per NFR-11!) */}
+                {/* 4 Open Activity Metrics */}
                 <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="rounded-2xl border border-[#DFE6F0] bg-white p-4 flex items-center gap-3.5 shadow-sm">
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFF4E5] text-[#FFA33A]">
@@ -842,8 +819,8 @@ export default function HomePage() {
                   My Knowledge Vaults
                 </h1>
                 <p className="text-xs text-[#6F7E93]">
-                  Obsidian-style isolated workspaces — unlimited node growth per
-                  Vault (BR-01 &amp; NFR-11).
+                  Keep every study map organized in its own workspace — explore
+                  and branch out freely with zero limits.
                 </p>
               </div>
               <button
@@ -936,12 +913,11 @@ export default function HomePage() {
           <div className="mx-auto max-w-[1260px] px-4 sm:px-8 py-4 space-y-5">
             <div>
               <h1 className="text-2xl font-extrabold text-[#17233C]">
-                Explore Verified Preset Vaults
+                Explore Preset Vaults
               </h1>
               <p className="text-xs text-[#6F7E93]">
-                Curated open-reference DAG graphs (OpenStax Biology 2e, Campbell
-                12e, Guyton, Weinberg) showcasing identical Mode A inputs with
-                personalized branches plus Mode B curiosity paths.
+                Try curated science knowledge trees ready to open, read, and
+                expand freely from study chapters or personal questions.
               </p>
             </div>
 
@@ -1010,219 +986,283 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* TAB 4: KNOWLEDGE TREE WORKSPACE (Figma Screens 07, 08, 09, 10) */}
+        {/* TAB 4: KNOWLEDGE TREE WORKSPACE (Full-Screen Clean Canvas + Node Study Modal) */}
         {activeTab === "tree" && (
-          <div className="p-4 sm:p-5 space-y-4">
-            {/* Compact Context Strip above Canvas */}
-            <div className="rounded-2xl border border-[#DFE6F0] bg-white px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <select
-                  aria-label="Select Active Vault"
-                  value={activeVault.id}
-                  onChange={(e) => openVaultInTree(e.target.value)}
-                  className="rounded-xl border border-[#DFE6F0] bg-[#F3F6FC] px-3 py-1.5 text-xs font-extrabold text-[#17233C] focus:border-[#2F80ED] focus:outline-none"
-                >
-                  {vaults.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      Vault: {v.name}
-                    </option>
-                  ))}
-                </select>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF2FF] px-3 py-1 text-xs font-bold text-[#2F80ED]">
-                  {activeVault.inputContext.mode === "mode_a" ? (
-                    <>
-                      <BookOpen className="h-3.5 w-3.5" />
-                      Mode A · {activeVault.inputContext.subject}
-                    </>
-                  ) : (
-                    <>
-                      <Compass className="h-3.5 w-3.5" />
-                      Mode B · Curiosity Path
-                    </>
-                  )}
-                </span>
-                <span className="hidden xl:inline text-xs font-mono text-[#6F7E93]">
-                  Engine: {engineBadge}
-                </span>
-              </div>
+          <div className="relative w-full h-[calc(100vh-56px)] lg:h-screen">
+            <SkillTreeCanvas
+              vault={activeVault}
+              vaults={vaults}
+              onSwitchVault={openVaultInTree}
+              onOpenOverview={() => setIsOverviewOpen(true)}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={handleSelectNode}
+              onUnlockAllFog={handleUnlockAllFog}
+              newlyAddedIds={newlyAddedIds}
+              expandedRegions={expandedRegions}
+            />
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsOverviewOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#EAF2FF] hover:bg-[#DCEAFE] px-3 py-1.5 text-xs font-bold text-[#2F80ED]"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Foundation Overview
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsValidatorOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] bg-white hover:border-[#2F80ED] px-3 py-1.5 text-xs font-bold text-[#17233C]"
-                >
-                  <Code2 className="h-3.5 w-3.5 text-[#0D9468]" />
-                  DAG Validator &amp; JSON
-                </button>
-              </div>
-            </div>
-
-            {/* Dynamic Expansion Success Toast (matching Figma Screen 10) */}
+            {/* Floating Expansion Toast (does not consume permanent canvas space) */}
             {expandToast && (
-              <div className="rounded-2xl border border-[#2F80ED] bg-white px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF3E0] text-[#FFA33A]">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-extrabold text-[#17233C]">
-                      {expandToast}
+              <div className="pointer-events-none fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-4 w-full max-w-lg flex justify-center">
+                <div className="pointer-events-auto rounded-2xl border border-[#2F80ED] bg-white/95 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between gap-4 shadow-xl">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#FFF3E0] text-[#FFA33A]">
+                      <Sparkles className="h-3.5 w-3.5" />
                     </div>
-                    <div className="text-[11px] text-[#6F7E93]">
-                      Validated acyclic DAG · every node remains strictly
-                      contained inside its expanded Region.
+                    <div>
+                      <div className="text-xs font-extrabold text-[#17233C]">
+                        {expandToast}
+                      </div>
+                      <div className="text-[11px] text-[#6F7E93]">
+                        New concepts organized smoothly inside their Region.
+                      </div>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandToast(null)}
+                    className="text-xs font-bold text-[#2F80ED] hover:underline shrink-0"
+                  >
+                    Dismiss
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setExpandToast(null)}
-                  className="text-xs font-bold text-[#2F80ED] hover:underline"
-                >
-                  Dismiss
-                </button>
               </div>
             )}
 
-            {/* Main Grid: SkillTreeCanvas + NodeInspector */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-              <div
-                className={isFullCanvas ? "lg:col-span-12" : "lg:col-span-8"}
-              >
-                <SkillTreeCanvas
-                  vault={activeVault}
-                  selectedNodeId={selectedNode.id}
-                  onSelectNode={handleSelectNode}
-                  onUnlockAllFog={handleUnlockAllFog}
-                  newlyAddedIds={newlyAddedIds}
-                  expandedRegions={expandedRegions}
-                  isFullCanvas={isFullCanvas}
-                  onToggleFullCanvas={() => setIsFullCanvas((s) => !s)}
-                />
+            {/* Node Material Modal (Appears only when a node is selected; Close unselects node) */}
+            <NodeInspector
+              vault={activeVault}
+              node={selectedNode}
+              onSelectNode={handleSelectNode}
+              onClose={() => setSelectedNodeId(null)}
+              onMarkMastered={handleMarkMastered}
+              onExpandNode={handleExpandNode}
+              isExpanding={isExpanding}
+            />
+          </div>
+        )}
+
+        {/* TAB 5: GETTING STARTED APP TUTORIAL & REFERENCE GUIDE */}
+        {activeTab === "guide" && (
+          <div className="mx-auto max-w-[1160px] px-4 sm:px-8 py-6 space-y-6">
+            {/* Hero Intro */}
+            <div className="rounded-3xl border border-[#DFE6F0] bg-white p-6 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+              <div className="space-y-1.5 max-w-2xl">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF2FF] px-3 py-0.5 text-[11px] font-bold text-[#2F80ED]">
+                  <HelpCircle className="h-3.5 w-3.5" />
+                  Trellis User Guide
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#17233C]">
+                  Getting Started with Trellis
+                </h1>
+                <p className="text-sm text-[#6F7E93]">
+                  Everything you need to know to map study topics, uncover hidden
+                  connections, and grow your personal Knowledge Cosmos step by
+                  step.
+                </p>
               </div>
-              <div
-                className={isFullCanvas ? "lg:col-span-12" : "lg:col-span-4"}
-              >
-                <NodeInspector
-                  vault={activeVault}
-                  node={selectedNode}
-                  onSelectNode={handleSelectNode}
-                  onMarkMastered={handleMarkMastered}
-                  onExpandNode={handleExpandNode}
-                  isExpanding={isExpanding}
-                />
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-4 py-2.5 text-xs font-bold text-white shadow-sm"
+                >
+                  <FolderPlus className="h-4 w-4" />
+                  + Create New Vault
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("tree")}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] hover:border-[#2F80ED] px-4 py-2.5 text-xs font-bold text-[#17233C]"
+                >
+                  <Network className="h-4 w-4 text-[#2F80ED]" />
+                  Open Tree Canvas
+                </button>
               </div>
             </div>
 
-            {/* 6 Knowledge Regions Reference Strip */}
-            <section className="rounded-2xl border border-[#DFE6F0] bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-[#6F7E93]">
-                  <ShieldCheck className="h-4 w-4 text-[#0D9468]" />
-                  6 Knowledge Regions Compass (Path of Exile Quadrants ·{" "}
-                  {activeRegions.length}/6 Active)
-                </span>
+            {/* 4-Step Practical Tutorial */}
+            <section className="space-y-3">
+              <h2 className="text-base font-extrabold text-[#17233C]">
+                How to Explore in 4 Simple Steps
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  {
+                    step: "Step 1",
+                    title: "Create or Open a Vault",
+                    desc: "Click + Create New Vault and pick From Material (when studying a textbook or chapter) or From Interest (when following a curiosity question). Not sure yet? Open a ready-made Preset first.",
+                    tip: "Action: + Create New Vault",
+                    icon: <FolderPlus className="h-5 w-5 text-[#2F80ED]" />,
+                    bg: "bg-[#EAF2FF]",
+                  },
+                  {
+                    step: "Step 2",
+                    title: "Navigate & Lift the Fog",
+                    desc: "Drag the canvas to pan, use scroll or +/- to zoom, and click any hazy node labeled FOG to unlock it. Switch between Aura: Soft, Aura: Pure, Borders: Solid, or Outline list anytime.",
+                    tip: "Action: Click FOG node · Aura toggle",
+                    icon: <CloudFog className="h-5 w-5 text-[#0D9468]" />,
+                    bg: "bg-[#ECFDF5]",
+                  },
+                  {
+                    step: "Step 3",
+                    title: "Read & Test in the Modal",
+                    desc: "Click any node to open its Concept Reader modal. Enlarge it for focused reading, switch between Easy Analogy, Standard, and Advanced depth, then test yourself with Quick Check.",
+                    tip: "Action: Click Enlarge (⤢) or × / Canvas to close",
+                    icon: <Maximize2 className="h-5 w-5 text-[#7C3AED]" />,
+                    bg: "bg-[#F5F3FF]",
+                  },
+                  {
+                    step: "Step 4",
+                    title: "Expand Without Limits",
+                    desc: "Want to dive deeper from any concept? Click Expand This Node inside its study modal to generate new branches and cross-disciplinary bridges automatically.",
+                    tip: "Action: Expand This Node",
+                    icon: <Sparkles className="h-5 w-5 text-[#FFA33A]" />,
+                    bg: "bg-[#FFF4E5]",
+                  },
+                ].map((card) => (
+                  <div
+                    key={card.step}
+                    className="rounded-2xl border border-[#DFE6F0] bg-white p-5 flex flex-col justify-between gap-3 shadow-sm"
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.bg}`}
+                        >
+                          {card.icon}
+                        </div>
+                        <span className="rounded-full bg-[#F3F6FC] px-2.5 py-0.5 text-[10.5px] font-bold text-[#6F7E93]">
+                          {card.step}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-extrabold text-[#17233C]">
+                        {card.title}
+                      </h3>
+                      <p className="text-xs leading-relaxed text-[#6F7E93]">
+                        {card.desc}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-[#F8FAFC] border border-[#DFE6F0] px-3 py-1.5 text-[11px] font-semibold text-[#17233C]">
+                      {card.tip}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
-                {Object.values(KNOWLEDGE_REGIONS).map((reg) => {
-                  const count = activeVault.nodes.filter(
-                    (n) => n.region === reg.code
-                  ).length;
-                  return (
+            </section>
+
+            {/* Understanding Connection Lines & Regions */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* 6 Knowledge Regions Guide (moved cleanly out of Tree canvas!) */}
+              <section className="lg:col-span-7 rounded-2xl border border-[#DFE6F0] bg-white p-5 space-y-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm font-extrabold text-[#17233C] flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-[#2F80ED]" />
+                      Understanding the 6 Knowledge Regions
+                    </h2>
+                    <p className="text-xs text-[#6F7E93] mt-0.5">
+                      Every concept belongs to a domain region on the map so you
+                      can see how topics cross between different fields.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {Object.values(KNOWLEDGE_REGIONS).map((reg) => (
                     <div
                       key={reg.code}
-                      className={`rounded-xl border p-3 text-xs transition-all ${
-                        count > 0
-                          ? "border-[#DFE6F0] bg-[#F8FAFC]"
-                          : "border-[#DFE6F0] bg-white opacity-55"
-                      }`}
+                      className="rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] p-3 text-xs space-y-1"
                     >
-                      <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center justify-between gap-2">
                         <span
                           className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${reg.badgeClass}`}
                         >
                           {reg.code}
                         </span>
-                        <span className="font-mono text-[11px] font-bold text-[#6F7E93]">
-                          {count} node{count !== 1 ? "s" : ""}
+                        <span className="font-bold text-[#17233C] truncate">
+                          {reg.shortName}
                         </span>
                       </div>
-                      <div className="font-extrabold text-[#17233C]">
-                        {reg.shortName}
-                      </div>
-                      <p className="mt-0.5 text-[11px] text-[#6F7E93] line-clamp-2">
+                      <p className="text-[11px] leading-relaxed text-[#6F7E93]">
                         {reg.description}
                       </p>
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          </div>
-        )}
-
-        {/* TAB 5: GETTING STARTED GUIDE */}
-        {activeTab === "guide" && (
-          <div className="mx-auto max-w-[1000px] px-4 sm:px-8 py-6 space-y-5">
-            <div>
-              <h1 className="text-2xl font-extrabold text-[#17233C]">
-                Getting Started with Trellis
-              </h1>
-              <p className="text-sm text-[#6F7E93] mt-1">
-                Combining Obsidian-style Knowledge Vaults with a Path of
-                Exile–inspired Regional Skill Tree.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                {
-                  step: "1. Choose Mode A or Mode B",
-                  desc: "Start a Vault from your school textbook chapter (Mode A) or jump directly from a curious question or career goal (Mode B).",
-                  icon: <BookOpen className="h-5 w-5 text-[#2F80ED]" />,
-                },
-                {
-                  step: "2. Explore Across 6 Regions",
-                  desc: "Click any hazy Fog of War node to reveal it. Use the Soft Aura toggle to inspect cross-region bridges without filter bubbles.",
-                  icon: <GitBranch className="h-5 w-5 text-[#0D9468]" />,
-                },
-                {
-                  step: "3. Expand Without Limits",
-                  desc: "Click Expand This Node anywhere to generate deeper validated branches. Regions grow outward smoothly without completion caps.",
-                  icon: <Sparkles className="h-5 w-5 text-[#FFA33A]" />,
-                },
-              ].map((card) => (
-                <div
-                  key={card.step}
-                  className="rounded-2xl border border-[#DFE6F0] bg-white p-5 space-y-2.5 shadow-sm"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F3F6FC]">
-                    {card.icon}
-                  </div>
-                  <h2 className="text-sm font-extrabold text-[#17233C]">
-                    {card.step}
-                  </h2>
-                  <p className="text-xs leading-relaxed text-[#6F7E93]">
-                    {card.desc}
-                  </p>
+                  ))}
                 </div>
-              ))}
+              </section>
+
+              {/* 5 Connection Styles + Tips */}
+              <section className="lg:col-span-5 space-y-4">
+                <div className="rounded-2xl border border-[#DFE6F0] bg-white p-5 space-y-3 shadow-sm">
+                  <h2 className="text-sm font-extrabold text-[#17233C] flex items-center gap-2">
+                    <GitBranch className="h-4 w-4 text-[#4F46E5]" />
+                    Reading Connection Lines
+                  </h2>
+                  <div className="space-y-2.5">
+                    {(Object.keys(EDGE_RELATIONS) as EdgeRelationType[]).map(
+                      (rt) => {
+                        const rel = EDGE_RELATIONS[rt];
+                        return (
+                          <div
+                            key={rt}
+                            className="rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] p-2.5 flex items-start gap-3"
+                          >
+                            <span
+                              style={{
+                                borderColor: rel.strokeColor,
+                                borderStyle: rel.dashArray ? "dashed" : "solid",
+                              }}
+                              className="mt-2 inline-block w-7 shrink-0 border-t-2"
+                            />
+                            <div className="min-w-0">
+                              <div className="text-xs font-extrabold text-[#17233C]">
+                                {rel.shortLabel}
+                              </div>
+                              <p className="text-[11px] leading-snug text-[#6F7E93]">
+                                {rel.description}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-[#DFE6F0] bg-white p-5 space-y-2.5 shadow-sm">
+                  <h2 className="text-sm font-extrabold text-[#17233C] flex items-center gap-2">
+                    <Keyboard className="h-4 w-4 text-[#FFA33A]" />
+                    Quick Controls &amp; Shortcuts
+                  </h2>
+                  <ul className="space-y-1.5 text-xs text-[#6F7E93]">
+                    <li className="flex items-center gap-2">
+                      <MousePointerClick className="h-3.5 w-3.5 text-[#2F80ED] shrink-0" />
+                      <span>
+                        Click an empty canvas area or press{" "}
+                        <strong className="text-[#17233C]">Esc</strong> to close
+                        and unselect the active node modal.
+                      </span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Search className="h-3.5 w-3.5 text-[#2F80ED] shrink-0" />
+                      <span>
+                        Press{" "}
+                        <strong className="text-[#17233C]">Ctrl + K</strong> on
+                        the dashboard to jump straight to searching your Vaults.
+                      </span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Eye className="h-3.5 w-3.5 text-[#2F80ED] shrink-0" />
+                      <span>
+                        Toggle <strong className="text-[#17233C]">Aura</strong>{" "}
+                        in the tree topbar to switch between soft glows and
+                        crisp territory borders.
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+              </section>
             </div>
-            <button
-              type="button"
-              onClick={() => setActiveTab("tree")}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-5 py-2.5 text-xs font-bold text-white"
-            >
-              Jump to Interactive Knowledge Tree →
-            </button>
           </div>
         )}
       </main>
@@ -1237,11 +1277,6 @@ export default function HomePage() {
       <OverviewModal
         isOpen={isOverviewOpen}
         onClose={() => setIsOverviewOpen(false)}
-        vault={activeVault}
-      />
-      <ValidatorModal
-        isOpen={isValidatorOpen}
-        onClose={() => setIsValidatorOpen(false)}
         vault={activeVault}
       />
     </div>

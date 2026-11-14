@@ -66,19 +66,14 @@ Untuk menjaga keakuratan hubungan konsep dan stabilitas aplikasi:
 
 ## 4. Fitur Utama yang Diimplementasikan
 
-1. **Obsidian-Style Knowledge Vault Manager (`FEAT-01`):** Buat, pilih, simpan, dan kelola banyak ruang eksplorasi (*Vault*) di browser (`localStorage`), lengkap dengan 3 *Preset Vault* tervalidasi (*Biologi Medis*, *Fisiologi Olahraga*, dan *Riset Onkologi/Kanker*).
-2. **Dual-Entry Exploration Input (`FEAT-02`):**
-   - **Mode A (Dari Materi Kurikulum):** Input Mata Pelajaran, Bab, Subbab + Minat Personal.
-   - **Mode B (Dari Minat & Tujuan):** Input Bidang Minat, Topik Tujuan, dan Motivasi Belajar.
-3. **Modul Fondasi / Overview Materi Asal (`FEAT-03`):** Sintesis konsep kunci, rumus dasar, dan konteks pengantar di setiap Vault.
-4. **Regional Skill Tree Canvas & 5 Gaya Edge Berbeda (`FEAT-04`):**
-   - Kanvas graf *pan/zoom* penuh layar bergaya *Hybrid Outward Region Aura* (adaptif Light & Dark Mode) dengan filter 6 *Knowledge Regions* (internal `REG-01` s.d. `REG-06`), kontrol *toggle* `Region Borders` (`Soft Aura`), serta jaminan *Region Containment* (`NFR-09`).
-   - 5 visualisasi garis *edge* berbeda: `prerequisite` (Amber putus-putus berarah), `extension` (Indigo solid), `application` (Emerald terapan), `related_concept` (Cyan titik-titik), dan `cross_disciplinary` (Ungu lengkung lintas-region).
-5. **Atmospheric Fog of War & Open Exploration Telemetry (`FEAT-05`):** Cabang lanjutan yang belum dijelajahi tampil terselubung kabut atmosferik (*Fog of War* + lencana `FOG`) dan terbuka mulus saat diklik, disertai telemetri terbuka tanpa progress bar batas akhir (jumlah node dipetakan, terbuka, dipahami, dan Region yang dijelajahi).
-6. **Concept Reader Modal & Kotak Alasan Hubungan (`FEAT-06`):** Modal baca yang dapat diperbesar (*Enlarge/Compact*, tutup dengan `×` atau klik kanvas kosong) saat node diklik, menampilkan alasan spesifik mengapa konsep terhubung (`reason`), tautan masuk/keluar (*backlinks* ala Obsidian), prinsip utama, penerapan nyata, dan referensi sumber.
-7. **Multi-Level Penjelasan, Switcher Tema/Bahasa & Outline View (`FEAT-07`):** Toggle **Light/Dark Mode** dan **EN/ID**, ubah penjelasan node ke mode *Simple/Sederhana*, *Standard*, atau *Advanced/Lanjut*, serta beralih antara tampilan *Tree* dan *Outline View* (ramah layar HP).
-8. **Progressive Node Expansion & 1-Click Quick Check (`FEAT-08`):** Mekarkan cabang konsep baru secara dinamis dari node mana pun (`Expand This Node` / `Kembangkan Konsep Ini`) dan uji pemahaman dengan 1 pertanyaan refleksi cepat.
-9. **Backend DAG & Schema Validation Engine (`FEAT-09`):** Validasi otomatis di sisi server (`src/lib/validator.ts`) terhadap struktur JSON, keabsahan `source`/`target` edge, pemetaan region, dan ketiadaan siklus prasyarat sebelum graf dirender.
+1. **Identity-First Vault Manager (`FEAT-01`):** Buat Vault baru secara ringkas dari identitas (*Vault Name*, *Main Interest*, *Short Description*, *Focus Question*, *Learning Goal*, *Related Interests* tags, dan *Preferred Starting Depth*), filter **`All Vaults` | `★ Has Favorites`**, kelola di `localStorage`, serta jelajahi 3 *Preset Vault* (*Biologi Medis*, *Fisiologi Olahraga*, dan *Riset Onkologi/Kanker*).
+2. **Inside-Vault Hub (`Overview` | `Knowledge Tree` | `Knowledge Library`):** Navigasi terpadu `VaultSubNav` di dalam Vault dengan penukar Vault aktif, hitungan sumber/catatan/favorit/`to review`, editor identitas inline (*Edit Identity*), daftar **Learning Sources**, **Starred Favorites ★**, dan riwayat eksplorasi.
+3. **Flexible Multi-Source Add Exploration (`FEAT-02`):** Tambah eksplorasi kapan saja di dalam Vault (`+ Add Exploration`), terisi otomatis dari identitas Vault, mendukung jalur **From Material** maupun **From Curiosity**, memilih sumber baru atau sumber tersimpan (*existing source*), serta opsi **Save Source Only** atau **Add Exploration & Map**.
+4. **Persistent Knowledge Library, Safe Editing & Revision History:** Workspace dua-panel untuk membaca sumber materi dan catatan konsep, menandai **Favorites ★** di seluruh layar, menulis catatan/anotasi pribadi (**`User Edited`**), meminta **`Ask AI Revise`** dengan pratinjau diff sebelum disimpan (`/api/revise-note`), meninjau **`Revision History`** (`v1`..`vn`) beserta **Restore** non-destruktif, serta perlindungan otomatis **`Needs Review`** jika eksplorasi baru bersinggungan dengan catatan yang sudah disunting pengguna.
+5. **Regional Skill Tree Canvas & 5 Gaya Edge Berbeda (`FEAT-04`):** Kanvas graf *pan/zoom* penuh layar bergaya *Hybrid Outward Region Aura* (adaptif Light & Dark Mode) dengan filter 6 *Knowledge Regions*, *toggle* `Region Borders`, jaminan *Region Containment*, serta 5 gaya garis *edge* (`prerequisite`, `extension`, `application`, `related_concept`, `cross_disciplinary`).
+6. **Atmospheric Fog of War, Favorites ★ & Open Exploration Telemetry (`FEAT-05`):** Cabang yang belum dibuka tampil terselubung kabut *Fog of War* dan terbuka saat diklik; lencana status bersih (`User Source`, `AI Generated`, `User Edited`, `Needs Review`, `Reviewed`, `Favorite ★`), serta metrik hitungan terbuka tanpa bar persentase target akhir.
+7. **Bidirectional Concept Reader Modal <-> Knowledge Library (`FEAT-06`):** Modal baca node (*Enlarge/Compact*, tombol `★`, `Edit Note`, dan `Open in Library`), alasan ilmiah keterkaitan konsep (`reason`), *backlinks*, serta lompatan dua arah antara **Knowledge Tree** (`View in Knowledge Tree →`) dan **Knowledge Library** termasuk di **Outline View**.
+8. **Bilingual EN/ID, Light/Dark Mode & Progressive Expansion (`FEAT-07`–`FEAT-09`):** Beralih tema **Light/Dark** dan bahasa **EN/ID**, 3 tingkat kedalaman penjelasan (*Simple/Standard/Deep*), *1-Click Quick Check*, pemekaran cabang `/api/expand`, serta validasi DAG otomatis (`src/lib/validator.ts`).
 
 ---
 
@@ -87,14 +82,14 @@ Untuk menjaga keakuratan hubungan konsep dan stabilitas aplikasi:
 ```mermaid
 flowchart TD
     subgraph Frontend["1. Frontend Workspace (Next.js App Router)"]
-        VM["Vault Manager (localStorage + 3 Presets)"]
-        IN["Dual-Mode Input (Mode A: Materi | Mode B: Minat)"]
-        ST["Regional Skill Tree Canvas (6 Regions & 5 Edge Styles)"]
-        CR["Floating / Expandable Concept Reader (3 Level Bahasa & Quick Check)"]
+        VM["Vault Manager (Identity-First + Favorites Filter)"]
+        OV["Inside-Vault Hub (Overview + Add Exploration Modal)"]
+        ST["Regional Skill Tree Canvas + Concept Reader (★ & Backlinks)"]
+        KL["Knowledge Library (Sources, Annotations, AI Diff Preview & History)"]
     end
 
-    subgraph Backend["2. Backend Orchestrator (/api/explore & /api/expand)"]
-        OR["Context & Prompt Orchestrator"]
+    subgraph Backend["2. Backend Orchestrator (/api/explore, /api/expand & /api/revise-note)"]
+        OR["Context, Merge & Safe-Revision Orchestrator"]
     end
 
     subgraph Intelligence["3. Knowledge Intelligence Layer"]
@@ -104,15 +99,17 @@ flowchart TD
         REF["Reference Layer (OpenStax, Campbell, Guyton, Peer-Reviewed)"]
     end
 
-    VM --> IN
-    IN -->|JSON Request| OR
+    VM --> OV
+    OV -->|Add Exploration / Source| OR
     OR --> LLM
     LLM --> REF
     REF --> GB
     GB --> VE
-    VE -->|Validated Structured JSON| ST
-    ST <--> CR
-    CR -->|Expand Node Request| OR
+    VE -->|Non-Destructive Merge JSON| ST
+    ST <--> KL
+    OV <--> KL
+    ST -->|Expand Node Request| OR
+    KL -->|Safe Diff Preview Request| OR
 ```
 
 ---
@@ -162,8 +159,9 @@ flowchart TD
 
 - **Model AI yang Digunakan:** Google Gemini (`gemini-2.5-flash`).
 - **Bagian Produk yang Memanfaatkan AI:**
-  1. `/api/explore`: Menganalisis input Mode A (Materi Kurikulum) atau Mode B (Minat & Tujuan), menyusun *Foundation Overview Module*, memetakan node konsep ke dalam 6 *Knowledge Regions*, mengklasifikasikan 5 jenis *edge*, serta menyusun 3 tingkat penjelasan bahasa dan 1 soal *Quick Check*.
+  1. `/api/explore`: Memproses permintaan *Add Exploration* (`From Material` atau `From Curiosity`) di dalam Vault, menyusun atau memperluas peta pengetahuan ke dalam 6 *Knowledge Regions*, mengklasifikasikan 5 jenis *edge*, serta melakukan *non-destructive merge* yang menjaga catatan **`User Edited`** dan menandai **`Needs Review`** bila perlu.
   2. `/api/expand`: Memekarkan cabang konsep baru secara kontekstual dari node yang dipilih pengguna di dalam Vault.
+  3. `/api/revise-note`: Menghasilkan pratinjau revisi catatan yang diminta pengguna di **Knowledge Library** tanpa menimpa teks sebelum pengguna mengklik *Apply Revision*.
 - **Atribusi Referensi Materi Terbuka:**
   - *OpenStax Biology 2e* (Rice University, CC BY 4.0 License)
   - *Campbell Biology 12th Edition* & *Guyton and Hall Textbook of Medical Physiology* (Rujukan bibliografi konsep)

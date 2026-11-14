@@ -400,3 +400,16 @@ Aplikasi diimplementasikan menggunakan kerangka kerja Next.js (App Router + Type
   * Teknologi & Lokasi Kode: Curated Open References — src/lib/presets.ts & src/lib/regions.ts
   * Fungsi & Tanggung Jawab: Menyimpan definisi 6 Knowledge Regions, warna/gaya 5 jenis edge, serta data Vault pramuatan berstandar referensi terbuka (OpenStax, Campbell, Weinberg) untuk pengujian instan.
 -----------------------------------------------------------------
+
+
+================================================================================
+8. PEMBARUAN SIKLUS HIDUP VAULT & KNOWLEDGE LIBRARY
+================================================================================
+
+Untuk menyelaraskan implementasi aplikasi web dan prototipe UI Figma dengan spesifikasi siklus hidup Vault terbaru:
+  * Pembuatan Vault Sederhana (Identity-First): Create New Vault difokuskan pada identitas topik (Vault Name, Main Interest, Short Description, Focus Question, Learning Goal, Related Interests, Preferred Starting Depth) dan langsung mendarat ke halaman Vault Overview.
+  * Inside-Vault Workspace Hub: VaultSubNav menyediakan switcher Vault serta tab Overview | Knowledge Tree | Knowledge Library dan tombol + Add Exploration di dalam Vault.
+  * Add Exploration Fleksibel Multi-Sumber: Terisi otomatis dari identitas Vault (dengan tombol Use Vault Defaults), mendukung jalur From Material dan From Curiosity, sumber baru atau sumber tersimpan, serta aksi Save Source Only maupun Add Exploration & Map.
+  * Knowledge Library & Favorit ★: Daftar terpadu All | Source Materials | AI Notes | ★ Favorites lengkap dengan filter All Statuses | Needs Review | User Edited, pengurutan Favorites First, serta lencana bersih User Source, AI Generated, User Edited, Needs Review, Reviewed, dan Favorite ★.
+  * Penyuntingan Aman, AI Revise Diff & Revision History: Mendukung Edit Manual + Personal Annotation, pratinjau diff sebelum menerapkan saran AI (/api/revise-note), riwayat versi v1..vn dengan Restore non-destruktif, serta perlindungan catatan User Edited melalui merge non-destruktif yang memunculkan tanda Needs Review + tombol Mark Reviewed.
+  * Keterhubungan Tree <-> Knowledge Library: Navigasi dua arah langsung antara Node Study modal / Outline View dan item catatan di Knowledge Library.

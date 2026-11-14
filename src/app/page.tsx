@@ -1,14 +1,24 @@
 "use client";
 
+import AddExplorationModal, {
+  AddExplorationSubmitData,
+} from "@/components/AddExplorationModal";
 import CreateVaultModal from "@/components/CreateVaultModal";
 import {
   CurioraLogo,
   EmptyExplorerVector,
   HeroLearnerVector,
 } from "@/components/Illustrations";
+import KnowledgeLibraryView, {
+  LibraryFilterTab,
+  LibrarySelection,
+  LibraryStatusFilter,
+} from "@/components/KnowledgeLibraryView";
 import NodeInspector from "@/components/NodeInspector";
 import OverviewModal from "@/components/OverviewModal";
 import SkillTreeCanvas from "@/components/SkillTreeCanvas";
+import VaultOverviewView from "@/components/VaultOverviewView";
+import VaultSubNav, { VaultWorkspaceTab } from "@/components/VaultSubNav";
 import {
   edgeDescription,
   edgeShortLabel,
@@ -22,10 +32,22 @@ import {
 import { PRESET_VAULTS } from "@/lib/presets";
 import { EDGE_RELATIONS, KNOWLEDGE_REGIONS } from "@/lib/regions";
 import {
+  appendRevisionToNode,
+  countVaultFavorites,
+  countVaultNeedsReview,
+  createEmptyVault,
+  deriveVaultIdentity,
+  normalizeVault,
+} from "@/lib/vault-storage";
+import {
   EdgeRelationType,
+  ExplanationLevels,
   KnowledgeVault,
+  LearningSource,
+  NodeRevision,
   RegionCode,
-  VaultInputContext,
+  SourceFormat,
+  VaultIdentity,
 } from "@/types/knowledge";
 import {
   ArrowRight,
@@ -49,6 +71,7 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  Star,
   Sun,
   Trash2,
   X,
@@ -62,78 +85,72 @@ const LEGACY_THEME_KEY = "trellis_theme_v1";
 const LANG_KEY = "curiora_lang_v1";
 const LEGACY_LANG_KEY = "trellis_lang_v1";
 
-type AppTab = "home" | "vaults" | "presets" | "tree" | "guide";
-
-function cleanLegacyText(text?: string): string {
-  if (!text) return "";
-  return text
-    .replace(/\s*\(REG-0[1-6]\)/g, "")
-    .replace(/\bREG-0[1-6]\s*[·:\-–]?\s*/g, "")
-    .replace(/Lintas-Region/g, "Lintas-Bidang")
-    .replace(/\bd\(([^)]*?)\s+[&/+-]+\s*\)\/dt/g, "d($1)/dt")
-    .replace(/^(Pendalaman:\s*Dinamika\s*){2,}/i, "Pendalaman: Dinamika ")
-    .replace(/^(Deeper Dynamics:\s*){2,}/i, "Deeper Dynamics: ");
-}
-
-function sanitizeNode(
-  node: KnowledgeVault["nodes"][number]
-): KnowledgeVault["nodes"][number] {
-  return {
-    ...node,
-    title: cleanLegacyText(node.title),
-    summary: cleanLegacyText(node.summary),
-    formula: node.formula ? cleanLegacyText(node.formula) : node.formula,
-    application: cleanLegacyText(node.application),
-    reference: cleanLegacyText(node.reference),
-    levels: {
-      simple: cleanLegacyText(node.levels.simple),
-      standard: cleanLegacyText(node.levels.standard),
-      deep: cleanLegacyText(node.levels.deep),
-    },
-  };
-}
-
-function sanitizeEdge(
-  edge: KnowledgeVault["edges"][number]
-): KnowledgeVault["edges"][number] {
-  return {
-    ...edge,
-    reason: cleanLegacyText(edge.reason),
-  };
-}
+type AppTab =
+  | "home"
+  | "vaults"
+  | "presets"
+  | "overview"
+  | "tree"
+  | "library"
+  | "guide";
 
 function mergePresetUpdates(cached: KnowledgeVault[]): KnowledgeVault[] {
   const presetMap = new Map(PRESET_VAULTS.map((p) => [p.id, p]));
   return cached.map((v) => {
     const fresh = presetMap.get(v.id);
     if (!fresh) {
-      return {
-        ...v,
-        name: cleanLegacyText(v.name),
-        nodes: v.nodes.map(sanitizeNode),
-        edges: v.edges.map(sanitizeEdge),
-      };
+      return normalizeVault(v);
     }
-    const oldNodeMap = new Map(v.nodes.map((n) => [n.id, n]));
+    const oldNodeMap = new Map((v.nodes || []).map((n) => [n.id, n]));
     const freshNodeIds = new Set(fresh.nodes.map((n) => n.id));
     const mergedNodes = fresh.nodes.map((fn) => {
       const old = oldNodeMap.get(fn.id);
-      return old ? { ...fn, explored: old.explored, mastered: old.mastered } : fn;
+      if (!old) return fn;
+      return {
+        ...fn,
+        explored: old.explored,
+        mastered: old.mastered,
+        isFavorite:
+          old.isFavorite !== undefined ? old.isFavorite : fn.isFavorite,
+        origin: old.origin || fn.origin,
+        userAnnotation: old.userAnnotation,
+        reviewStatus: old.reviewStatus,
+        reviewReason: old.reviewReason,
+        summary: old.origin === "user_edited" ? old.summary : fn.summary,
+        levels: old.origin === "user_edited" ? old.levels : fn.levels,
+        formula: old.origin === "user_edited" ? old.formula : fn.formula,
+        application:
+          old.origin === "user_edited" ? old.application : fn.application,
+        revisions:
+          Array.isArray(old.revisions) && old.revisions.length > 0
+            ? old.revisions
+            : fn.revisions,
+        sourceIds:
+          Array.isArray(old.sourceIds) && old.sourceIds.length > 0
+            ? old.sourceIds
+            : fn.sourceIds,
+      };
     });
-    const extraNodes = v.nodes
-      .filter((n) => !freshNodeIds.has(n.id))
-      .map(sanitizeNode);
+    const extraNodes = (v.nodes || []).filter((n) => !freshNodeIds.has(n.id));
     const freshEdgeIds = new Set(fresh.edges.map((e) => e.id));
-    const extraEdges = v.edges
-      .filter((e) => !freshEdgeIds.has(e.id))
-      .map(sanitizeEdge);
-    return {
+    const extraEdges = (v.edges || []).filter((e) => !freshEdgeIds.has(e.id));
+
+    return normalizeVault({
       ...v,
-      name: fresh.name,
+      name: v.identity ? v.name : fresh.name,
+      identity: v.identity || fresh.identity,
+      learningSources:
+        Array.isArray(v.learningSources) && v.learningSources.length > 0
+          ? v.learningSources
+          : fresh.learningSources,
+      explorations:
+        Array.isArray(v.explorations) && v.explorations.length > 0
+          ? v.explorations
+          : fresh.explorations,
       overview: fresh.overview,
       nodes: [...mergedNodes, ...extraNodes],
       edges: [...fresh.edges, ...extraEdges],
-    };
+    });
   });
 }
 
@@ -152,16 +169,29 @@ export default function HomePage() {
 
   // Filters & search
   const [vaultSearch, setVaultSearch] = useState("");
+  const [vaultsFavoritesOnly, setVaultsFavoritesOnly] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Knowledge Library navigation state
+  const [librarySelection, setLibrarySelection] =
+    useState<LibrarySelection | null>(null);
+  const [libraryFilter, setLibraryFilter] = useState<LibraryFilterTab>("all");
+  const [libraryStatusFilter, setLibraryStatusFilter] =
+    useState<LibraryStatusFilter>("all");
+  const [addSourceTrigger, setAddSourceTrigger] = useState(0);
 
   // Modals & loading states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isAddExplorationOpen, setIsAddExplorationOpen] = useState(false);
+  const [explorationSourceId, setExplorationSourceId] = useState<
+    string | undefined
+  >(undefined);
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isAddingExploration, setIsAddingExploration] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
   const [showEmptyDemo, setShowEmptyDemo] = useState(false);
 
-  // Expansion feedback
+  // Feedback state
   const [newlyAddedIds, setNewlyAddedIds] = useState<string[]>([]);
   const [expandedRegions, setExpandedRegions] = useState<RegionCode[]>([]);
   const [expandToast, setExpandToast] = useState<string | null>(null);
@@ -250,13 +280,73 @@ export default function HomePage() {
     ? activeVault.nodes.find((n) => n.id === selectedNodeId) || null
     : null;
 
-  const openVaultInTree = (vaultId: string) => {
+  const openVaultOverview = (vaultId: string) => {
     setActiveVaultId(vaultId);
     setSelectedNodeId(null);
     setNewlyAddedIds([]);
     setExpandedRegions([]);
+    setActiveTab("overview");
+    setMobileMenuOpen(false);
+  };
+
+  const openVaultInTree = (vaultId: string, focusNodeId?: string) => {
+    setActiveVaultId(vaultId);
+    setSelectedNodeId(focusNodeId || null);
+    setNewlyAddedIds([]);
+    setExpandedRegions([]);
     setActiveTab("tree");
     setMobileMenuOpen(false);
+  };
+
+  const openVaultInLibrary = (
+    vaultId: string,
+    options?: {
+      itemType?: "node" | "source";
+      itemId?: string;
+      startInEditMode?: boolean;
+      filter?: LibraryFilterTab;
+      statusFilter?: LibraryStatusFilter;
+      openAddSource?: boolean;
+    }
+  ) => {
+    setActiveVaultId(vaultId);
+    setLibraryFilter(options?.filter || "all");
+    setLibraryStatusFilter(options?.statusFilter || "all");
+    if (!options?.openAddSource) {
+      setAddSourceTrigger(0);
+    }
+    if (options?.itemType && options.itemId) {
+      setLibrarySelection({
+        itemType: options.itemType,
+        itemId: options.itemId,
+        startInEditMode: options.startInEditMode,
+      });
+    } else {
+      setLibrarySelection(null);
+    }
+    setActiveTab("library");
+    setMobileMenuOpen(false);
+  };
+
+  const handleSelectVaultTab = (tab: VaultWorkspaceTab) => {
+    setAddSourceTrigger(0);
+    if (tab === "overview") setActiveTab("overview");
+    else if (tab === "tree") setActiveTab("tree");
+    else setActiveTab("library");
+  };
+
+  const handleOpenAddExploration = (sourceId?: string) => {
+    setExplorationSourceId(sourceId);
+    setIsAddExplorationOpen(true);
+  };
+
+  const updateActiveVault = (
+    updater: (vault: KnowledgeVault) => KnowledgeVault
+  ) => {
+    const nextVaults = vaults.map((v) =>
+      v.id === activeVault.id ? updater(v) : v
+    );
+    persistVaults(nextVaults);
   };
 
   const handleSelectNode = (nodeId: string | null) => {
@@ -264,70 +354,279 @@ export default function HomePage() {
     if (!nodeId) return;
     const targetNode = activeVault.nodes.find((n) => n.id === nodeId);
     if (targetNode && !targetNode.explored) {
-      const updatedVaults = vaults.map((v) => {
-        if (v.id !== activeVault.id) return v;
-        return {
-          ...v,
-          updatedAt: new Date().toISOString(),
-          nodes: v.nodes.map((n) =>
-            n.id === nodeId ? { ...n, explored: true } : n
-          ),
-        };
-      });
-      persistVaults(updatedVaults);
+      updateActiveVault((v) => ({
+        ...v,
+        updatedAt: new Date().toISOString(),
+        nodes: v.nodes.map((n) =>
+          n.id === nodeId ? { ...n, explored: true } : n
+        ),
+      }));
     }
   };
 
   const handleUnlockAllFog = () => {
-    const updatedVaults = vaults.map((v) => {
-      if (v.id !== activeVault.id) return v;
-      return {
-        ...v,
-        updatedAt: new Date().toISOString(),
-        nodes: v.nodes.map((n) => ({ ...n, explored: true })),
-      };
-    });
-    persistVaults(updatedVaults);
+    updateActiveVault((v) => ({
+      ...v,
+      updatedAt: new Date().toISOString(),
+      nodes: v.nodes.map((n) => ({ ...n, explored: true })),
+    }));
   };
 
   const handleMarkMastered = (nodeId: string) => {
-    const updatedVaults = vaults.map((v) => {
-      if (v.id !== activeVault.id) return v;
-      return {
-        ...v,
-        updatedAt: new Date().toISOString(),
-        nodes: v.nodes.map((n) =>
-          n.id === nodeId ? { ...n, explored: true, mastered: true } : n
-        ),
-      };
-    });
-    persistVaults(updatedVaults);
+    updateActiveVault((v) => ({
+      ...v,
+      updatedAt: new Date().toISOString(),
+      nodes: v.nodes.map((n) =>
+        n.id === nodeId ? { ...n, explored: true, mastered: true } : n
+      ),
+    }));
   };
 
-  const handleCreateVault = async (
+  const handleToggleFavoriteNode = (nodeId: string) => {
+    updateActiveVault((v) => ({
+      ...v,
+      updatedAt: new Date().toISOString(),
+      nodes: v.nodes.map((n) =>
+        n.id === nodeId ? { ...n, isFavorite: !n.isFavorite } : n
+      ),
+    }));
+  };
+
+  const handleToggleFavoriteSource = (sourceId: string) => {
+    updateActiveVault((v) => ({
+      ...v,
+      updatedAt: new Date().toISOString(),
+      learningSources: (v.learningSources || []).map((s) =>
+        s.id === sourceId ? { ...s, isFavorite: !s.isFavorite } : s
+      ),
+    }));
+  };
+
+  const handleUpdateVaultIdentity = (
     vaultName: string,
-    inputContext: VaultInputContext
+    identity: VaultIdentity
   ) => {
-    setIsCreating(true);
+    updateActiveVault((v) => ({
+      ...v,
+      name: vaultName,
+      updatedAt: new Date().toISOString(),
+      identity,
+      overview: {
+        ...v.overview,
+        title: v.nodes.length === 0 ? vaultName : v.overview.title,
+        summary:
+          v.nodes.length === 0 && identity.shortDescription
+            ? identity.shortDescription
+            : v.overview.summary,
+      },
+      inputContext: {
+        ...v.inputContext,
+        interestDomain: identity.mainInterest,
+        targetGoal: identity.focusQuestion || identity.learningGoal || vaultName,
+        motivation: identity.learningGoal,
+      },
+    }));
+  };
+
+  const handleSaveNodeEdit = (
+    nodeId: string,
+    payload: {
+      summary: string;
+      levels: ExplanationLevels;
+      formula: string;
+      application: string;
+      userAnnotation: string;
+      kind: "manual_edit" | "ai_revise_accepted";
+      label: string;
+    }
+  ) => {
+    updateActiveVault((v) => ({
+      ...v,
+      updatedAt: new Date().toISOString(),
+      nodes: v.nodes.map((n) =>
+        n.id === nodeId
+          ? appendRevisionToNode(n, {
+              ...payload,
+              origin: "user_edited",
+              reviewStatus: "reviewed",
+              reviewReason: undefined,
+            })
+          : n
+      ),
+    }));
+  };
+
+  const handleMarkNodeReviewed = (nodeId: string) => {
+    updateActiveVault((v) => ({
+      ...v,
+      updatedAt: new Date().toISOString(),
+      nodes: v.nodes.map((n) =>
+        n.id === nodeId
+          ? { ...n, reviewStatus: "reviewed", reviewReason: undefined }
+          : n
+      ),
+    }));
+  };
+
+  const handleRestoreRevision = (nodeId: string, revision: NodeRevision) => {
+    updateActiveVault((v) => ({
+      ...v,
+      updatedAt: new Date().toISOString(),
+      nodes: v.nodes.map((n) =>
+        n.id === nodeId
+          ? appendRevisionToNode(n, {
+              kind: "restored",
+              label:
+                lang === "en"
+                  ? `Restored v${revision.version}`
+                  : `Pulihkan v${revision.version}`,
+              summary: revision.summary,
+              levels: revision.levels,
+              formula: revision.formula,
+              application: revision.application,
+              userAnnotation: revision.userAnnotation,
+              origin: "user_edited",
+              reviewStatus: "reviewed",
+            })
+          : n
+      ),
+    }));
+  };
+
+  const handleSaveSource = (srcInput: {
+    id?: string;
+    title: string;
+    format: SourceFormat;
+    chapterOrSection: string;
+    excerptOrNotes: string;
+    focusQuestion: string;
+  }): LearningSource => {
+    const now = new Date().toISOString();
+    const existing = srcInput.id
+      ? (activeVault.learningSources || []).find((s) => s.id === srcInput.id)
+      : undefined;
+
+    const saved: LearningSource = existing
+      ? {
+          ...existing,
+          title: srcInput.title,
+          format: srcInput.format,
+          chapterOrSection: srcInput.chapterOrSection || undefined,
+          excerptOrNotes: srcInput.excerptOrNotes,
+          focusQuestion: srcInput.focusQuestion,
+          updatedAt: now,
+        }
+      : {
+          id: `src-${Date.now()}`,
+          title: srcInput.title,
+          format: srcInput.format,
+          chapterOrSection: srcInput.chapterOrSection || undefined,
+          excerptOrNotes: srcInput.excerptOrNotes,
+          focusQuestion: srcInput.focusQuestion,
+          origin: "user_source",
+          isFavorite: false,
+          createdAt: now,
+          updatedAt: now,
+          linkedNodeIds: [],
+        };
+
+    updateActiveVault((v) => {
+      const current = v.learningSources || [];
+      const nextSources = existing
+        ? current.map((s) => (s.id === saved.id ? saved : s))
+        : [saved, ...current];
+      return {
+        ...v,
+        updatedAt: now,
+        learningSources: nextSources,
+      };
+    });
+
+    return saved;
+  };
+
+  // Step 1 of Vault lifecycle: create Vault with identity only -> open inside Vault Overview
+  const handleCreateVault = (vaultName: string, identity: VaultIdentity) => {
+    const createdVault = createEmptyVault({ vaultName, identity, lang });
+    const nextVaults = [createdVault, ...vaults];
+    persistVaults(nextVaults);
+    setActiveVaultId(createdVault.id);
+    setSelectedNodeId(null);
+    setIsCreateOpen(false);
+    setShowEmptyDemo(false);
+    setActiveTab("overview");
+  };
+
+  // Step 2: add Exploration inside active Vault (From Material or From Curiosity)
+  const handleSubmitExploration = async (data: AddExplorationSubmitData) => {
+    if (data.saveSourceOnly) {
+      const saved = handleSaveSource({
+        title: data.title,
+        format: data.sourceFormat,
+        chapterOrSection: data.chapterOrSection,
+        excerptOrNotes: data.excerptOrNotes,
+        focusQuestion: data.focusQuestion,
+      });
+      setIsAddExplorationOpen(false);
+      openVaultInLibrary(activeVault.id, {
+        itemType: "source",
+        itemId: saved.id,
+        filter: "sources",
+      });
+      return;
+    }
+
+    setIsAddingExploration(true);
     try {
       const res = await fetch("/api/explore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vaultName, inputContext, lang }),
+        body: JSON.stringify({
+          vault: activeVault,
+          explorationInput: data,
+          lang,
+        }),
       });
-      const data = await res.json();
-      if (data?.ok && data.vault) {
-        const createdVault: KnowledgeVault = data.vault;
-        const nextVaults = [createdVault, ...vaults];
+      const json = await res.json();
+      if (json?.ok && json.vault) {
+        const updatedVault = normalizeVault(json.vault);
+        const nextVaults = vaults.map((v) =>
+          v.id === activeVault.id ? updatedVault : v
+        );
         persistVaults(nextVaults);
-        setActiveVaultId(createdVault.id);
-        setSelectedNodeId(null);
-        setIsCreateOpen(false);
-        setShowEmptyDemo(false);
+
+        const addedIds: string[] = Array.isArray(json.addedNodeIds)
+          ? json.addedNodeIds
+          : [];
+        const newNodes = updatedVault.nodes.filter((n) =>
+          addedIds.includes(n.id)
+        );
+        const touchedRegs = Array.from(new Set(newNodes.map((n) => n.region)));
+
+        setNewlyAddedIds(addedIds);
+        setExpandedRegions(touchedRegs);
+        setIsAddExplorationOpen(false);
         setActiveTab("tree");
+        if (addedIds[0]) {
+          setSelectedNodeId(addedIds[0]);
+        }
+
+        const reviewFlagCount = Array.isArray(json.flaggedReviewIds)
+          ? json.flaggedReviewIds.length
+          : 0;
+        const baseMsg =
+          newNodes.length === 1
+            ? t.tree.branchSingleAdded
+            : `${newNodes.length} ${t.tree.branchesAdded}`;
+        setExpandToast(
+          reviewFlagCount > 0
+            ? `${baseMsg} · ${reviewFlagCount} ${t.vaultBar.needsReview}`
+            : baseMsg
+        );
+        setTimeout(() => setExpandToast(null), 5000);
       }
     } finally {
-      setIsCreating(false);
+      setIsAddingExploration(false);
     }
   };
 
@@ -346,7 +645,7 @@ export default function HomePage() {
       });
       const data = await res.json();
       if (data?.ok && data.vault) {
-        const updatedVault: KnowledgeVault = data.vault;
+        const updatedVault: KnowledgeVault = normalizeVault(data.vault);
         const nextVaults = vaults.map((v) =>
           v.id === activeVault.id ? updatedVault : v
         );
@@ -408,12 +707,17 @@ export default function HomePage() {
   );
 
   const filteredVaults = vaults.filter((v) => {
+    if (vaultsFavoritesOnly && countVaultFavorites(v) === 0) {
+      return false;
+    }
     const q = vaultSearch.trim().toLowerCase();
     if (!q) return true;
+    const identity = deriveVaultIdentity(v);
     return (
       v.name.toLowerCase().includes(q) ||
-      v.inputContext.interestDomain.toLowerCase().includes(q) ||
-      (v.inputContext.chapter || "").toLowerCase().includes(q)
+      identity.mainInterest.toLowerCase().includes(q) ||
+      identity.focusQuestion.toLowerCase().includes(q) ||
+      identity.relatedInterests.some((tag) => tag.toLowerCase().includes(q))
     );
   });
 
@@ -540,20 +844,32 @@ export default function HomePage() {
             </div>
             <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
               {vaults.slice(0, 6).map((v) => {
-                const isCur = v.id === activeVault.id && activeTab === "tree";
+                const isCur =
+                  v.id === activeVault.id &&
+                  (activeTab === "overview" ||
+                    activeTab === "tree" ||
+                    activeTab === "library");
+                const vFavs = countVaultFavorites(v);
                 return (
                   <button
                     type="button"
                     key={v.id}
-                    onClick={() => openVaultInTree(v.id)}
-                    className={`w-full flex items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-medium transition-all ${
+                    onClick={() => openVaultOverview(v.id)}
+                    className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-medium transition-all ${
                       isCur
                         ? "bg-white/10 text-white font-bold"
                         : "text-[#B4C2D6] hover:bg-white/5 hover:text-white"
                     }`}
                   >
-                    <Folder className="h-3.5 w-3.5 shrink-0 text-[#60A5FA]" />
-                    <span className="truncate">{v.name}</span>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <Folder className="h-3.5 w-3.5 shrink-0 text-[#60A5FA]" />
+                      <span className="truncate">{v.name}</span>
+                    </span>
+                    {vFavs > 0 && (
+                      <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-[#F59E0B]">
+                        ★ {vFavs}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -629,7 +945,7 @@ export default function HomePage() {
       {/* Main Content Stage */}
       <main className="flex-1 min-w-0">
         {/* Top Utility Search & Actions Strip */}
-        {activeTab !== "tree" && (
+        {!["overview", "tree", "library"].includes(activeTab) && (
           <div className="mx-auto max-w-[1260px] px-4 sm:px-8 pt-5 pb-2 flex flex-wrap items-center justify-between gap-3">
             <div className="relative flex-1 max-w-md">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C9AAE]" />
@@ -893,12 +1209,12 @@ export default function HomePage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {vaults.slice(0, 2).map((v) => {
+                      const identity = deriveVaultIdentity(v);
                       const reg =
                         KNOWLEDGE_REGIONS[v.overview.startingRegion] ||
                         KNOWLEDGE_REGIONS["REG-01"];
-                      const vRegions = Array.from(
-                        new Set(v.nodes.map((n) => n.region))
-                      ).length;
+                      const vSources = (v.learningSources || []).length;
+                      const vFavs = countVaultFavorites(v);
                       const vMastered = v.nodes.filter((n) => n.mastered).length;
                       return (
                         <div
@@ -911,8 +1227,9 @@ export default function HomePage() {
                                 {v.name}
                               </h3>
                               <p className="text-xs text-[#6F7E93] dark:text-slate-400 truncate">
-                                {regionName(reg.code, lang)} · {v.nodes.length}{" "}
-                                {t.home.mapped} · {vRegions} {t.home.regions}
+                                {identity.mainInterest} · {vSources}{" "}
+                                {t.home.sources} · {v.nodes.length}{" "}
+                                {t.home.mapped}
                               </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5">
@@ -921,11 +1238,12 @@ export default function HomePage() {
                               >
                                 {regionShortName(reg.code, lang)}
                               </span>
-                              <span className="rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 px-2.5 py-0.5 text-[11px] font-bold text-[#2F80ED] dark:text-blue-300">
-                                {v.inputContext.mode === "mode_a"
-                                  ? t.home.modeMaterial
-                                  : t.home.modeCuriosity}
-                              </span>
+                              {vFavs > 0 && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#FFFBEB] dark:bg-amber-950/60 border border-[#FDE68A] dark:border-amber-800 px-2.5 py-0.5 text-[11px] font-bold text-[#B45309] dark:text-amber-300">
+                                  <Star className="h-3 w-3 fill-[#F59E0B] text-[#F59E0B]" />
+                                  {vFavs}
+                                </span>
+                              )}
                               <span className="text-[11px] font-semibold text-[#0D9468] dark:text-emerald-400">
                                 · {vMastered} {t.home.mastered}
                               </span>
@@ -934,7 +1252,7 @@ export default function HomePage() {
 
                           <button
                             type="button"
-                            onClick={() => openVaultInTree(v.id)}
+                            onClick={() => openVaultOverview(v.id)}
                             className="shrink-0 rounded-xl bg-[#EAF2FF] dark:bg-blue-950/60 hover:bg-[#2F80ED] text-[#2F80ED] dark:text-blue-300 hover:text-white px-4 py-2.5 text-xs font-bold transition-all"
                           >
                             {t.home.continueBtn} →
@@ -966,7 +1284,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           key={pv.id}
-                          onClick={() => openVaultInTree(pv.id)}
+                          onClick={() => openVaultOverview(pv.id)}
                           className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] hover:border-[#2F80ED] p-4 text-left flex items-center justify-between gap-3 shadow-sm transition-all"
                         >
                           <div className="min-w-0">
@@ -997,9 +1315,35 @@ export default function HomePage() {
         {activeTab === "vaults" && (
           <div className="mx-auto max-w-[1260px] px-4 sm:px-8 py-4 space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h1 className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
-                {t.vaults.title}
-              </h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
+                  {t.vaults.title}
+                </h1>
+                <div className="inline-flex rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-[#111827] p-1">
+                  <button
+                    type="button"
+                    onClick={() => setVaultsFavoritesOnly(false)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                      !vaultsFavoritesOnly
+                        ? "bg-[#2F80ED] text-white"
+                        : "text-[#6F7E93] dark:text-slate-300 hover:text-[#17233C] dark:hover:text-white"
+                    }`}
+                  >
+                    {t.vaults.allFilter}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVaultsFavoritesOnly(true)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                      vaultsFavoritesOnly
+                        ? "bg-[#FFFBEB] dark:bg-amber-950/70 text-[#B45309] dark:text-amber-300"
+                        : "text-[#6F7E93] dark:text-slate-300 hover:text-[#17233C] dark:hover:text-white"
+                    }`}
+                  >
+                    {t.vaults.favoritesFilter}
+                  </button>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
@@ -1010,84 +1354,108 @@ export default function HomePage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredVaults.map((v) => {
-                const reg =
-                  KNOWLEDGE_REGIONS[v.overview.startingRegion] ||
-                  KNOWLEDGE_REGIONS["REG-01"];
-                const vOpened = v.nodes.filter((n) => n.explored).length;
-                const vMastered = v.nodes.filter((n) => n.mastered).length;
-                const vRegs = Array.from(
-                  new Set(v.nodes.map((n) => n.region))
-                ).length;
+            {filteredVaults.length === 0 ? (
+              <div className="rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-10 text-center space-y-3">
+                <Star className="h-7 w-7 mx-auto text-[#F59E0B]" />
+                <p className="text-sm font-bold text-[#17233C] dark:text-slate-100">
+                  {t.vaults.emptyFavorites}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredVaults.map((v) => {
+                  const identity = deriveVaultIdentity(v);
+                  const reg =
+                    KNOWLEDGE_REGIONS[v.overview.startingRegion] ||
+                    KNOWLEDGE_REGIONS["REG-01"];
+                  const vSources = (v.learningSources || []).length;
+                  const vFavs = countVaultFavorites(v);
+                  const vReview = countVaultNeedsReview(v);
+                  const vMastered = v.nodes.filter((n) => n.mastered).length;
 
-                return (
-                  <div
-                    key={v.id}
-                    className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 flex flex-col justify-between gap-4 shadow-sm hover:border-[#2F80ED]/60 transition-all"
-                  >
-                    <div className="space-y-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <span
-                          className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${reg.badgeClass}`}
-                        >
-                          {regionShortName(reg.code, lang)}
-                        </span>
-                        <span className="rounded-full bg-[#F3F6FC] dark:bg-slate-800 px-2.5 py-0.5 text-[11px] font-bold text-[#6F7E93] dark:text-slate-300">
-                          {v.inputContext.mode === "mode_a"
-                            ? t.home.modeMaterial
-                            : t.home.modeCuriosity}
-                        </span>
+                  return (
+                    <div
+                      key={v.id}
+                      className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 flex flex-col justify-between gap-4 shadow-sm hover:border-[#2F80ED]/60 transition-all"
+                    >
+                      <div className="space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span
+                            className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${reg.badgeClass}`}
+                          >
+                            {regionShortName(reg.code, lang)}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {vFavs > 0 && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#FFFBEB] dark:bg-amber-950/60 border border-[#FDE68A] dark:border-amber-800 px-2 py-0.5 text-[11px] font-bold text-[#B45309] dark:text-amber-300">
+                                <Star className="h-3 w-3 fill-[#F59E0B] text-[#F59E0B]" />
+                                {vFavs}
+                              </span>
+                            )}
+                            {vReview > 0 && (
+                              <span className="rounded-full bg-[#FFF7ED] dark:bg-orange-950/60 border border-[#FED7AA] dark:border-orange-800 px-2 py-0.5 text-[10.5px] font-bold text-[#C2410C] dark:text-orange-300">
+                                {vReview} {t.vaults.needsReviewCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <h3 className="text-base font-extrabold text-[#17233C] dark:text-slate-100">
+                          {v.name}
+                        </h3>
+                        <p className="text-xs font-semibold text-[#2F80ED] dark:text-blue-400 truncate">
+                          {identity.mainInterest}
+                        </p>
+                        <p className="text-xs text-[#6F7E93] dark:text-slate-400 line-clamp-2">
+                          {identity.shortDescription || v.overview.summary}
+                        </p>
                       </div>
 
-                      <h3 className="text-base font-extrabold text-[#17233C] dark:text-slate-100">
-                        {v.name}
-                      </h3>
-                      <p className="text-xs text-[#6F7E93] dark:text-slate-400 line-clamp-2">
-                        {v.overview.summary}
-                      </p>
-                    </div>
+                      <div className="space-y-3 pt-2 border-t border-[#DFE6F0] dark:border-slate-800">
+                        <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6F7E93] dark:text-slate-400">
+                          <span>
+                            {vSources} {t.home.sources}
+                          </span>
+                          <span>
+                            {v.nodes.length} {t.home.mapped}
+                          </span>
+                          <span className="text-[#0D9468] dark:text-emerald-400">
+                            {vMastered} {t.home.mastered}
+                          </span>
+                        </div>
 
-                    <div className="space-y-3 pt-2 border-t border-[#DFE6F0] dark:border-slate-800">
-                      <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6F7E93] dark:text-slate-400">
-                        <span>
-                          {v.nodes.length} {t.home.mapped}
-                        </span>
-                        <span>
-                          {vOpened} {t.home.opened}
-                        </span>
-                        <span className="text-[#0D9468] dark:text-emerald-400">
-                          {vMastered} {t.home.mastered}
-                        </span>
-                        <span>
-                          {vRegs} {t.home.regions}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openVaultInTree(v.id)}
-                          className="flex-1 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] py-2 px-3 text-xs font-bold text-white transition-all"
-                        >
-                          {t.vaults.openTree} →
-                        </button>
-                        {!v.isPreset && (
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => handleDeleteVault(v.id)}
-                            title={t.vaults.deleteTitle}
-                            className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 p-2 text-[#6F7E93] dark:text-slate-400 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400"
+                            onClick={() => openVaultOverview(v.id)}
+                            className="flex-1 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] py-2 px-3 text-xs font-bold text-white transition-all"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {t.vaults.openVault} →
                           </button>
-                        )}
+                          <button
+                            type="button"
+                            onClick={() => openVaultInTree(v.id)}
+                            className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] py-2 px-3 text-xs font-bold text-[#17233C] dark:text-slate-100 transition-colors"
+                          >
+                            {t.vaults.openTree}
+                          </button>
+                          {!v.isPreset && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteVault(v.id)}
+                              title={t.vaults.deleteTitle}
+                              className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 p-2 text-[#6F7E93] dark:text-slate-400 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1114,9 +1482,7 @@ export default function HomePage() {
                           {regionShortName(reg.code, lang)}
                         </span>
                         <span className="rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 px-2.5 py-0.5 text-[11px] font-bold text-[#2F80ED] dark:text-blue-300">
-                          {pv.inputContext.mode === "mode_a"
-                            ? t.home.modeMaterial
-                            : t.home.modeCuriosity}
+                          {pv.nodes.length} {t.home.concepts}
                         </span>
                       </div>
 
@@ -1140,10 +1506,17 @@ export default function HomePage() {
                     <div className="flex items-center gap-2 pt-2 border-t border-[#DFE6F0] dark:border-slate-800">
                       <button
                         type="button"
-                        onClick={() => openVaultInTree(pv.id)}
+                        onClick={() => openVaultOverview(pv.id)}
                         className="flex-1 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] py-2.5 px-4 text-xs font-bold text-white"
                       >
-                        {t.presets.openTree} →
+                        {t.presets.openVault} →
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openVaultInTree(pv.id)}
+                        className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-[#F3F6FC] dark:hover:bg-slate-700 py-2.5 px-3 text-xs font-bold text-[#17233C] dark:text-slate-100"
+                      >
+                        {t.presets.openTree}
                       </button>
                       <button
                         type="button"
@@ -1163,37 +1536,151 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* TAB 4: KNOWLEDGE TREE WORKSPACE */}
-        {activeTab === "tree" && (
-          <div className="relative w-full h-[calc(100vh-56px)] lg:h-screen">
-            <SkillTreeCanvas
+        {/* TAB 4A: VAULT OVERVIEW WORKSPACE */}
+        {activeTab === "overview" && (
+          <div className="min-h-screen flex flex-col">
+            <VaultSubNav
               vault={activeVault}
               vaults={vaults}
-              onSwitchVault={openVaultInTree}
-              onOpenOverview={() => setIsOverviewOpen(true)}
-              selectedNodeId={selectedNodeId}
-              onSelectNode={handleSelectNode}
-              onUnlockAllFog={handleUnlockAllFog}
-              newlyAddedIds={newlyAddedIds}
-              expandedRegions={expandedRegions}
+              activeVaultTab="overview"
+              onSelectVaultTab={handleSelectVaultTab}
+              onSwitchVault={(vid) => openVaultOverview(vid)}
+              onOpenAddExploration={() => handleOpenAddExploration()}
+              onJumpToNeedsReview={() =>
+                openVaultInLibrary(activeVault.id, {
+                  filter: "notes",
+                  statusFilter: "needs_review",
+                })
+              }
               lang={lang}
-              theme={theme}
-              onToggleTheme={toggleTheme}
-              onToggleLang={toggleLang}
-            >
-              {/* Floating Node Study Modal (anchored inside canvas below topbar) */}
-              <NodeInspector
+            />
+            <VaultOverviewView
+              vault={activeVault}
+              onUpdateIdentity={handleUpdateVaultIdentity}
+              onOpenAddExploration={() => handleOpenAddExploration()}
+              onOpenAddSourceModal={() => {
+                setAddSourceTrigger((c) => c + 1);
+                openVaultInLibrary(activeVault.id, {
+                  filter: "sources",
+                  openAddSource: true,
+                });
+              }}
+              onOpenTree={(nid) => openVaultInTree(activeVault.id, nid)}
+              onOpenLibrary={(opts) =>
+                openVaultInLibrary(activeVault.id, opts)
+              }
+              onToggleFavoriteNode={handleToggleFavoriteNode}
+              onToggleFavoriteSource={handleToggleFavoriteSource}
+              lang={lang}
+            />
+          </div>
+        )}
+
+        {/* TAB 4B: VAULT KNOWLEDGE LIBRARY */}
+        {activeTab === "library" && (
+          <div className="min-h-screen flex flex-col">
+            <VaultSubNav
+              vault={activeVault}
+              vaults={vaults}
+              activeVaultTab="library"
+              onSelectVaultTab={handleSelectVaultTab}
+              onSwitchVault={(vid) => openVaultInLibrary(vid)}
+              onOpenAddExploration={() => handleOpenAddExploration()}
+              onJumpToNeedsReview={() =>
+                openVaultInLibrary(activeVault.id, {
+                  filter: "notes",
+                  statusFilter: "needs_review",
+                })
+              }
+              lang={lang}
+            />
+            <KnowledgeLibraryView
+              vault={activeVault}
+              initialSelection={librarySelection}
+              initialFilter={libraryFilter}
+              initialStatusFilter={libraryStatusFilter}
+              onToggleFavoriteNode={handleToggleFavoriteNode}
+              onToggleFavoriteSource={handleToggleFavoriteSource}
+              onSaveNodeEdit={handleSaveNodeEdit}
+              onMarkNodeReviewed={handleMarkNodeReviewed}
+              onRestoreRevision={handleRestoreRevision}
+              onSaveSource={handleSaveSource}
+              onViewInTree={(nid) => openVaultInTree(activeVault.id, nid)}
+              onOpenAddExploration={(sid) => handleOpenAddExploration(sid)}
+              openAddSourceTrigger={addSourceTrigger}
+              lang={lang}
+            />
+          </div>
+        )}
+
+        {/* TAB 4C: KNOWLEDGE TREE WORKSPACE */}
+        {activeTab === "tree" && (
+          <div className="relative flex flex-col w-full h-[calc(100vh-56px)] lg:h-screen">
+            <VaultSubNav
+              vault={activeVault}
+              vaults={vaults}
+              activeVaultTab="tree"
+              onSelectVaultTab={handleSelectVaultTab}
+              onSwitchVault={(vid) => openVaultInTree(vid)}
+              onOpenAddExploration={() => handleOpenAddExploration()}
+              onJumpToNeedsReview={() =>
+                openVaultInLibrary(activeVault.id, {
+                  filter: "notes",
+                  statusFilter: "needs_review",
+                })
+              }
+              lang={lang}
+              compact
+            />
+            <div className="relative flex-1 min-h-0">
+              <SkillTreeCanvas
                 vault={activeVault}
-                node={selectedNode}
+                vaults={vaults}
+                onSwitchVault={(vid) => openVaultInTree(vid)}
+                onOpenOverview={() => setIsOverviewOpen(true)}
+                selectedNodeId={selectedNodeId}
                 onSelectNode={handleSelectNode}
-                onClose={() => setSelectedNodeId(null)}
-                onMarkMastered={handleMarkMastered}
-                onExpandNode={handleExpandNode}
-                isExpanding={isExpanding}
+                onUnlockAllFog={handleUnlockAllFog}
+                onToggleFavoriteNode={handleToggleFavoriteNode}
+                onOpenInLibrary={(nid) =>
+                  openVaultInLibrary(activeVault.id, {
+                    itemType: "node",
+                    itemId: nid,
+                    filter: "all",
+                  })
+                }
+                onOpenAddExploration={() => handleOpenAddExploration()}
+                hideVaultSwitcher
+                newlyAddedIds={newlyAddedIds}
+                expandedRegions={expandedRegions}
                 lang={lang}
                 theme={theme}
-              />
-            </SkillTreeCanvas>
+                onToggleTheme={toggleTheme}
+                onToggleLang={toggleLang}
+              >
+                {/* Floating Node Study Modal */}
+                <NodeInspector
+                  vault={activeVault}
+                  node={selectedNode}
+                  onSelectNode={handleSelectNode}
+                  onClose={() => setSelectedNodeId(null)}
+                  onMarkMastered={handleMarkMastered}
+                  onToggleFavorite={handleToggleFavoriteNode}
+                  onOpenInLibrary={(nid, editMode) =>
+                    openVaultInLibrary(activeVault.id, {
+                      itemType: "node",
+                      itemId: nid,
+                      startInEditMode: editMode,
+                      filter: "all",
+                    })
+                  }
+                  onExpandNode={handleExpandNode}
+                  isExpanding={isExpanding}
+                  lang={lang}
+                  theme={theme}
+                />
+              </SkillTreeCanvas>
+            </div>
 
             {/* Floating Expansion Toast */}
             {expandToast && (
@@ -1420,7 +1907,16 @@ export default function HomePage() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onCreateVault={handleCreateVault}
-        isLoading={isCreating}
+        isLoading={false}
+        lang={lang}
+      />
+      <AddExplorationModal
+        isOpen={isAddExplorationOpen}
+        onClose={() => setIsAddExplorationOpen(false)}
+        vault={activeVault}
+        initialSourceId={explorationSourceId}
+        onSubmitExploration={handleSubmitExploration}
+        isLoading={isAddingExploration}
         lang={lang}
       />
       <OverviewModal

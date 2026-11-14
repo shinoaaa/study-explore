@@ -24,6 +24,8 @@ import {
   RegionCode,
 } from "@/types/knowledge";
 import {
+  AlertTriangle,
+  BookMarked,
   BookOpen,
   CheckCircle2,
   ChevronDown,
@@ -43,6 +45,7 @@ import {
   Plus,
   Search,
   Sparkles,
+  Star,
   Sun,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -57,6 +60,10 @@ interface SkillTreeCanvasProps {
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string | null) => void;
   onUnlockAllFog: () => void;
+  onToggleFavoriteNode: (nodeId: string) => void;
+  onOpenInLibrary: (nodeId: string) => void;
+  onOpenAddExploration: () => void;
+  hideVaultSwitcher?: boolean;
   newlyAddedIds?: string[];
   expandedRegions?: RegionCode[];
   lang: Language;
@@ -92,6 +99,10 @@ export default function SkillTreeCanvas({
   selectedNodeId,
   onSelectNode,
   onUnlockAllFog,
+  onToggleFavoriteNode,
+  onOpenInLibrary,
+  onOpenAddExploration,
+  hideVaultSwitcher = false,
   newlyAddedIds = [],
   expandedRegions = [],
   lang,
@@ -263,37 +274,41 @@ export default function SkillTreeCanvas({
       : t.tree.bordersSolid;
 
   return (
-    <section className="flex flex-col h-[calc(100vh-56px)] lg:h-screen w-full bg-white dark:bg-[#090F1C] overflow-hidden transition-colors">
-      {/* Unified Clean Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] px-4 py-2.5 shrink-0 transition-colors">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#EAF2FF] dark:bg-blue-950/70 text-[#2F80ED] dark:text-blue-400 shrink-0">
-            <Network className="h-4 w-4" />
+    <section className="flex flex-col flex-1 min-h-0 h-full w-full bg-white dark:bg-[#090F1C] overflow-hidden transition-colors">
+      {/* Unified Clean Canvas Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] px-4 py-2 shrink-0 transition-colors">
+        {!hideVaultSwitcher ? (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#EAF2FF] dark:bg-blue-950/70 text-[#2F80ED] dark:text-blue-400 shrink-0">
+              <Network className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex flex-wrap items-center gap-2">
+              <select
+                aria-label="Select Active Vault"
+                value={vault.id}
+                onChange={(e) => onSwitchVault(e.target.value)}
+                className="max-w-[220px] sm:max-w-[260px] truncate rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 px-2.5 py-1 text-xs font-extrabold text-[#17233C] dark:text-slate-100 hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
+              >
+                {vaults.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+              <span className="hidden md:inline text-[11px] font-medium text-[#6F7E93] dark:text-slate-400">
+                {vault.nodes.length} {t.home.concepts} · {activeRegionCount}{" "}
+                {t.home.regions}
+              </span>
+            </div>
           </div>
-          <div className="min-w-0 flex flex-wrap items-center gap-2">
-            <select
-              aria-label="Select Active Vault"
-              value={vault.id}
-              onChange={(e) => onSwitchVault(e.target.value)}
-              className="max-w-[220px] sm:max-w-[260px] truncate rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 px-2.5 py-1 text-xs font-extrabold text-[#17233C] dark:text-slate-100 hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
-            >
-              {vaults.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-            <span className="hidden sm:inline-flex rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 px-2.5 py-0.5 text-[11px] font-semibold text-[#2F80ED] dark:text-blue-300">
-              {vault.inputContext.mode === "mode_a"
-                ? t.home.modeMaterial
-                : t.home.modeCuriosity}
-            </span>
-            <span className="hidden md:inline text-[11px] font-medium text-[#6F7E93] dark:text-slate-400">
+        ) : (
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#6F7E93] dark:text-slate-400">
+            <span>
               {vault.nodes.length} {t.home.concepts} · {activeRegionCount}{" "}
               {t.home.regions}
             </span>
           </div>
-        </div>
+        )}
 
         {/* Right Controls */}
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
@@ -439,7 +454,34 @@ export default function SkillTreeCanvas({
 
       {/* Main Workspace Area: Interactive Tree Canvas OR Accessible Outline View */}
       <div className="relative flex-1 min-h-0 flex flex-col">
-        {viewMode === "graph" ? (
+        {vault.nodes.length === 0 ? (
+          <div
+            style={{
+              backgroundImage: isDark
+                ? "radial-gradient(#1E293B 1.25px, transparent 1.25px)"
+                : "radial-gradient(#CFDCEB 1.25px, transparent 1.25px)",
+              backgroundSize: "26px 26px",
+            }}
+            className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-[#F3F6FC] dark:bg-[#090F1C]"
+          >
+            <div className="max-w-md rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-7 shadow-lg space-y-4">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EAF2FF] dark:bg-blue-950/60 text-[#2F80ED] dark:text-blue-400">
+                <Network className="h-7 w-7" />
+              </div>
+              <h3 className="text-lg font-extrabold text-[#17233C] dark:text-slate-100">
+                {t.tree.emptyTreeTitle}
+              </h3>
+              <button
+                type="button"
+                onClick={onOpenAddExploration}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-5 py-2.5 text-xs font-bold text-white shadow-sm"
+              >
+                <Sparkles className="h-4 w-4" />
+                {t.tree.emptyTreeAction.replace(/^\+\s*/, "")}
+              </button>
+            </div>
+          </div>
+        ) : viewMode === "graph" ? (
         <div
           ref={containerRef}
           onMouseDown={handleMouseDown}
@@ -951,6 +993,14 @@ export default function SkillTreeCanvas({
                     }`}
                   >
                     {/* Corner Badges */}
+                    {node.isFavorite && (
+                      <span
+                        title={t.reader.unfavorite}
+                        className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#F59E0B] text-white ring-2 ring-white dark:ring-[#111827] shadow-sm"
+                      >
+                        <Star className="h-3 w-3 fill-current" />
+                      </span>
+                    )}
                     {isRoot && (
                       <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#FFA33A] px-2.5 py-0.5 text-[9.5px] font-extrabold tracking-wider text-[#3A2200] shadow-sm">
                         {t.tree.startBadge}
@@ -961,6 +1011,24 @@ export default function SkillTreeCanvas({
                         {t.tree.fogBadge}
                       </span>
                     )}
+                    {node.reviewStatus === "needs_review" && (
+                      <span
+                        title={t.library.statusBadges.needs_review}
+                        className="absolute -bottom-2 right-2 inline-flex items-center gap-0.5 rounded-full bg-[#FEF3C7] dark:bg-amber-950/90 border border-[#FCD34D] dark:border-amber-700 px-1.5 py-0.5 text-[8.5px] font-extrabold text-[#92400E] dark:text-amber-300 shadow-sm"
+                      >
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        {t.library.statusBadges.needs_review}
+                      </span>
+                    )}
+                    {node.origin === "user_edited" &&
+                      node.reviewStatus !== "needs_review" && (
+                        <span
+                          title={t.library.statusBadges.user_edited}
+                          className="absolute -bottom-2 right-2 rounded-full bg-[#F5F3FF] dark:bg-violet-950/90 border border-[#DDD6FE] dark:border-violet-700 px-1.5 py-0.5 text-[8.5px] font-extrabold text-[#6D28D9] dark:text-violet-300 shadow-sm"
+                        >
+                          {t.library.statusBadges.user_edited}
+                        </span>
+                      )}
                     {node.explored && node.mastered && !isRoot && (
                       <span
                         title={t.reader.mastered}
@@ -1171,11 +1239,10 @@ export default function SkillTreeCanvas({
               const outgoing = vault.edges.filter((e) => e.source === node.id);
 
               return (
-                <button
-                  type="button"
+                <div
                   key={node.id}
                   onClick={() => onSelectNode(node.id)}
-                  className={`w-full text-left rounded-2xl border p-4 transition-all ${
+                  className={`w-full cursor-pointer text-left rounded-2xl border p-4 transition-all ${
                     isSelected
                       ? "border-[#2F80ED] bg-white dark:bg-[#111827] ring-2 ring-[#2F80ED]/15 shadow-sm"
                       : "border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] hover:border-[#2F80ED]/50"
@@ -1194,6 +1261,17 @@ export default function SkillTreeCanvas({
                       <span className="rounded-full bg-[#F3F6FC] dark:bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-[#6F7E93] dark:text-slate-300">
                         {difficultyLabel(node.difficulty, lang)}
                       </span>
+                      {node.origin === "user_edited" && (
+                        <span className="rounded-full bg-[#F5F3FF] dark:bg-violet-950/60 border border-[#DDD6FE] dark:border-violet-700/60 px-2 py-0.5 text-xs font-bold text-[#6D28D9] dark:text-violet-300">
+                          {t.library.statusBadges.user_edited}
+                        </span>
+                      )}
+                      {node.reviewStatus === "needs_review" && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] dark:bg-amber-950/60 border border-[#FCD34D] dark:border-amber-700/60 px-2 py-0.5 text-xs font-bold text-[#92400E] dark:text-amber-300">
+                          <AlertTriangle className="h-3 w-3" />
+                          {t.library.statusBadges.needs_review}
+                        </span>
+                      )}
                       {!node.explored && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 px-2 py-0.5 text-xs font-bold text-slate-600 dark:text-slate-300">
                           <Lock className="h-3 w-3" />
@@ -1207,9 +1285,42 @@ export default function SkillTreeCanvas({
                         </span>
                       )}
                     </div>
-                    <span className="text-xs font-bold text-[#2F80ED] dark:text-blue-400">
-                      {t.tree.readConcept} →
-                    </span>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleFavoriteNode(node.id);
+                        }}
+                        aria-label={t.reader.favorite}
+                        className={`rounded-lg p-1 transition-colors ${
+                          node.isFavorite
+                            ? "text-[#F59E0B]"
+                            : "text-[#94A3B8] hover:text-[#F59E0B]"
+                        }`}
+                      >
+                        <Star
+                          className={`h-4 w-4 ${
+                            node.isFavorite ? "fill-current" : ""
+                          }`}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenInLibrary(node.id);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] px-2.5 py-1 text-xs font-bold text-[#17233C] dark:text-slate-200"
+                      >
+                        <BookMarked className="h-3.5 w-3.5 text-[#2F80ED]" />
+                        {t.tree.openInLibrary}
+                      </button>
+                      <span className="text-xs font-bold text-[#2F80ED] dark:text-blue-400">
+                        {t.tree.readConcept} →
+                      </span>
+                    </div>
                   </div>
 
                   <h3 className="text-sm font-extrabold text-[#17233C] dark:text-slate-100">
@@ -1236,7 +1347,7 @@ export default function SkillTreeCanvas({
                       {node.reference}
                     </span>
                   </div>
-                </button>
+                </div>
               );
             })}
         </div>

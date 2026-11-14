@@ -15,11 +15,14 @@ import {
   KnowledgeVault,
 } from "@/types/knowledge";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  BookMarked,
   BookOpen,
   Check,
   CheckCircle2,
+  Edit3,
   Eye,
   FlaskConical,
   Link2,
@@ -27,6 +30,8 @@ import {
   Maximize2,
   Minimize2,
   Sparkles,
+  Star,
+  StickyNote,
   X,
   Zap,
 } from "lucide-react";
@@ -38,6 +43,8 @@ interface NodeInspectorProps {
   onSelectNode: (nodeId: string) => void;
   onClose: () => void;
   onMarkMastered: (nodeId: string) => void;
+  onToggleFavorite: (nodeId: string) => void;
+  onOpenInLibrary: (nodeId: string, editMode?: boolean) => void;
   onExpandNode: (nodeId: string) => Promise<void>;
   isExpanding: boolean;
   lang: Language;
@@ -50,6 +57,8 @@ export default function NodeInspector({
   onSelectNode,
   onClose,
   onMarkMastered,
+  onToggleFavorite,
+  onOpenInLibrary,
   onExpandNode,
   isExpanding,
   lang,
@@ -135,6 +144,19 @@ export default function NodeInspector({
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
+            onClick={() => onToggleFavorite(node.id)}
+            aria-label={node.isFavorite ? t.reader.unfavorite : t.reader.favorite}
+            title={node.isFavorite ? t.reader.unfavorite : t.reader.favorite}
+            className={`rounded-xl border p-1.5 transition-colors ${
+              node.isFavorite
+                ? "border-[#FCD34D] dark:border-amber-700/70 bg-[#FFFBEB] dark:bg-amber-950/60 text-[#F59E0B]"
+                : "border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 text-[#94A3B8] hover:text-[#F59E0B]"
+            }`}
+          >
+            <Star className={`h-4 w-4 ${node.isFavorite ? "fill-current" : ""}`} />
+          </button>
+          <button
+            type="button"
             onClick={() => setIsMaximized((m) => !m)}
             aria-label={isMaximized ? t.reader.compact : t.reader.enlarge}
             className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] hover:bg-[#EAF2FF] dark:hover:bg-slate-700 px-2.5 py-1.5 text-[11px] font-bold text-[#17233C] dark:text-slate-200 transition-colors"
@@ -172,6 +194,21 @@ export default function NodeInspector({
             >
               {regionShortName(node.region, lang)}
             </span>
+            {node.origin === "user_edited" ? (
+              <span className="rounded-full bg-[#F5F3FF] dark:bg-violet-950/60 border border-[#DDD6FE] dark:border-violet-700/60 px-2.5 py-0.5 text-xs font-bold text-[#6D28D9] dark:text-violet-300">
+                {t.library.statusBadges.user_edited}
+              </span>
+            ) : (
+              <span className="rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 border border-[#BFDBFE] dark:border-blue-800 px-2.5 py-0.5 text-xs font-bold text-[#2F80ED] dark:text-blue-300">
+                {t.library.statusBadges.ai_generated}
+              </span>
+            )}
+            {node.reviewStatus === "needs_review" && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] dark:bg-amber-950/60 border border-[#FCD34D] dark:border-amber-700/60 px-2.5 py-0.5 text-xs font-bold text-[#92400E] dark:text-amber-300">
+                <AlertTriangle className="h-3 w-3" />
+                {t.library.statusBadges.needs_review}
+              </span>
+            )}
             {node.mastered ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] dark:bg-emerald-950/60 border border-[#A7F3D0] dark:border-emerald-700/60 px-2.5 py-0.5 text-xs font-bold text-[#047857] dark:text-emerald-300">
                 <CheckCircle2 className="h-3.5 w-3.5" />
@@ -407,6 +444,19 @@ export default function NodeInspector({
           </div>
         )}
 
+        {/* Personal User Annotation Preview (if saved in Knowledge Library) */}
+        {node.userAnnotation && node.userAnnotation.trim() && (
+          <div className="rounded-xl border border-[#DDD6FE] dark:border-violet-800/60 bg-[#FAF5FF] dark:bg-violet-950/25 p-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-[#6D28D9] dark:text-violet-300">
+              <StickyNote className="h-3.5 w-3.5" />
+              {t.reader.personalNote}
+            </div>
+            <p className="text-xs leading-relaxed text-[#334155] dark:text-slate-200">
+              {node.userAnnotation}
+            </p>
+          </div>
+        )}
+
         {/* References */}
         <div>
           <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93] dark:text-slate-400 mb-1">
@@ -420,7 +470,7 @@ export default function NodeInspector({
       </div>
 
       {/* Footer Actions */}
-      <div className="border-t border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-[#0F172A] p-4 space-y-2.5 shrink-0">
+      <div className="border-t border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-[#0F172A] p-4 space-y-2 shrink-0">
         <button
           type="button"
           onClick={() => onExpandNode(node.id)}
@@ -439,6 +489,25 @@ export default function NodeInspector({
             </>
           )}
         </button>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onOpenInLibrary(node.id, true)}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#DDD6FE] dark:border-violet-800/70 bg-[#FAF5FF] dark:bg-violet-950/40 hover:border-[#6D28D9] py-2 px-3 text-xs font-bold text-[#6D28D9] dark:text-violet-300 transition-colors"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            {t.reader.editNote}
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenInLibrary(node.id, false)}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-[#2F80ED] py-2 px-3 text-xs font-bold text-[#17233C] dark:text-slate-200 transition-colors"
+          >
+            <BookMarked className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400" />
+            {t.reader.openInLibrary}
+          </button>
+        </div>
 
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -480,7 +549,7 @@ export default function NodeInspector({
   return (
     <div
       onMouseDown={(e) => e.stopPropagation()}
-      className="absolute inset-x-3 bottom-3 top-3 sm:inset-x-auto sm:top-3.5 sm:right-3.5 sm:bottom-3.5 sm:w-[400px] z-30 pointer-events-auto"
+      className="absolute inset-x-2.5 bottom-2.5 top-auto max-h-[82vh] sm:max-h-none sm:inset-x-auto sm:top-3.5 sm:right-3.5 sm:bottom-3.5 sm:w-[400px] z-30 pointer-events-auto flex flex-col"
     >
       {modalCard}
     </div>

@@ -476,7 +476,7 @@ CRITICAL RULES:
 3. Return ONLY valid raw JSON without markdown fences.`,
       userPrompt: JSON.stringify(enData),
       temperature: 0.2,
-      timeoutMs: 11000,
+      timeoutMs: 6000,
       isOpenRouter: cfg.provider === "openrouter",
     });
 
@@ -588,14 +588,17 @@ export async function executeGatewayStructuredReasoning<T = OrchestratorLlmSchem
   // CASE A: OpenRouter (`nvidia/nemotron-3-ultra-550b-a55b:free` + free fallback chain) or SumoPod
   if (cfg.provider === "openrouter" || cfg.provider === "sumopod") {
     const modelsToTry =
-      cfg.provider === "openrouter" ? cfg.fallbackModels : [cfg.reasoningModel];
+      cfg.provider === "openrouter"
+        ? cfg.fallbackModels.slice(0, 2)
+        : [cfg.reasoningModel];
 
     const targetLangDirective =
       params.userLang === "id"
         ? "\nCRITICAL LANGUAGE RULE: Perform your internal scientific reasoning briefly in English (<50 words), then write ALL user-facing JSON string values (title, summary, simple, standard, deep, formula, application, question, options.text, edgeReason, reason) in natural, fluent Bahasa Indonesia. Never use awkward English prefixes like 'Applied:' or 'Mechanism:'."
         : "\nCRITICAL LANGUAGE RULE: Keep internal reasoning brief (<50 words) and write all user-facing JSON string values in clear, natural English.";
 
-    for (const candidateModel of modelsToTry) {
+    for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
+      const candidateModel = modelsToTry[mIdx];
       const useEnglishPivot =
         cfg.requiresEnglishPivot || /nemotron/i.test(candidateModel);
 
@@ -606,7 +609,7 @@ export async function executeGatewayStructuredReasoning<T = OrchestratorLlmSchem
         systemPrompt: params.englishSystemPrompt + targetLangDirective,
         userPrompt: params.directBilingualPrompt || params.englishUserPrompt,
         temperature: 0.3,
-        timeoutMs: 36000,
+        timeoutMs: mIdx === 0 ? 15000 : 8000,
         isOpenRouter: cfg.provider === "openrouter",
       });
 

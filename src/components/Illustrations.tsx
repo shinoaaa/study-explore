@@ -1,33 +1,46 @@
 import React from "react";
 
 /**
- * Preserved Trellis brand mark (blue gradient rounded square + 3-node connected graph).
+ * Curiora brand mark (Curiosity Aurora: rounded ocean-indigo aurora badge + 3-node curiosity path toward a guiding star).
  */
-export function TrellisLogo({ size = 36 }: { size?: number }) {
+export function CurioraLogo({ size = 36 }: { size?: number }) {
   return (
     <div
       className="flex items-center justify-center rounded-[10px] shadow-md shadow-[#2F80ED]/25 shrink-0"
       style={{
         width: size,
         height: size,
-        background: "linear-gradient(135deg, #4C9AFF 0%, #2F6FE0 100%)",
+        background:
+          "linear-gradient(135deg, #38BDF8 0%, #2F80ED 52%, #6366F1 100%)",
       }}
     >
       <svg
-        width={Math.round(size * 0.62)}
-        height={Math.round(size * 0.62)}
+        width={Math.round(size * 0.68)}
+        height={Math.round(size * 0.68)}
         viewBox="0 0 24 24"
         fill="none"
         stroke="#FFFFFF"
-        strokeWidth="2.2"
+        strokeWidth="2.1"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
       >
-        <path d="M7.2 7.3 10.6 15.9M16.8 7.3l-3.4 8.6M7.5 6h9" />
-        <circle cx="5" cy="6" r="2.5" />
-        <circle cx="19" cy="6" r="2.5" />
-        <circle cx="12" cy="18" r="2.5" />
+        <path
+          d="M3.2 13.2C7.4 7.8 13.2 13.8 20.6 5.6"
+          stroke="#99F6E4"
+          strokeOpacity="0.6"
+          strokeWidth="2.4"
+        />
+        <path d="M6.8 8.3 10.6 15.8M16.9 8.7 12.7 15.9M7.9 6.5h6.7" />
+        <circle cx="5.5" cy="6.5" r="2.2" fill="#FFFFFF" fillOpacity="0.22" />
+        <circle cx="11.6" cy="17.8" r="2.2" fill="#FFFFFF" fillOpacity="0.22" />
+        <path
+          d="M18 3.6 18.85 5.65 20.9 6.5 18.85 7.35 18 9.4 17.15 7.35 15.1 6.5 17.15 5.65Z"
+          fill="#FEF08A"
+          stroke="#FFFFFF"
+          strokeWidth="1.1"
+          strokeLinejoin="round"
+        />
       </svg>
     </div>
   );

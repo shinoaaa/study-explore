@@ -1,9 +1,10 @@
 "use client";
 
 import { BooksStackVector } from "@/components/Illustrations";
+import { Language, UI_COPY } from "@/lib/i18n";
 import { ExplorationMode, VaultInputContext } from "@/types/knowledge";
 import { BookOpen, Compass, Loader2, Sparkles, X } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface CreateVaultModalProps {
   isOpen: boolean;
@@ -13,6 +14,79 @@ interface CreateVaultModalProps {
     inputContext: VaultInputContext
   ) => Promise<void>;
   isLoading: boolean;
+  lang: Language;
+}
+
+type PresetSlug = "fotosintesis" | "listrik" | "ai_medis";
+
+function getTemplateDefaults(tpl: PresetSlug, lang: Language) {
+  const isEn = lang === "en";
+  if (tpl === "fotosintesis") {
+    return {
+      mode: "mode_a" as ExplorationMode,
+      vaultName: isEn
+        ? "Photosynthesis × Clean Energy"
+        : "Fotosintesis × Energi Hijau",
+      subject: isEn ? "Biology" : "Biologi (SMA Kelas XII)",
+      chapter: isEn
+        ? "Metabolism & Photosynthesis"
+        : "Metabolisme & Fotosintesis",
+      subchapters: isEn
+        ? "Chloroplasts & Pigments, Light Reactions, Calvin Cycle, Limiting Factors"
+        : "Kloroplas & Pigmen Cahaya, Reaksi Terang, Siklus Calvin, Faktor Laju",
+      interestDomain: isEn
+        ? "Renewable Energy & Biotech"
+        : "Energi Terbarukan & Bioteknologi",
+      targetGoal: isEn
+        ? "How capturing photons in leaves inspires solar cells"
+        : "Bagaimana proses tangkap cahaya di daun menginspirasi sel surya",
+      motivation: isEn
+        ? "Connect plant cell biology with clean energy design"
+        : "Menghubungkan biologi tumbuhan dengan teknologi energi bersih",
+    };
+  }
+  if (tpl === "listrik") {
+    return {
+      mode: "mode_a" as ExplorationMode,
+      vaultName: isEn
+        ? "Electromagnetism × EV"
+        : "Elektromagnetisme × Kendaraan Listrik",
+      subject: isEn ? "Physics" : "Fisika (SMA Kelas XII)",
+      chapter: isEn
+        ? "Magnetic Fields & Induction"
+        : "Medan Magnet & Induksi Elektromagnetik",
+      subchapters: isEn
+        ? "Magnetic Flux, Faraday's Law, Lorentz Force, Generators & Motors"
+        : "Fluks Magnetik, Hukum Faraday, Gaya Lorentz, Generator & Motor",
+      interestDomain: isEn
+        ? "Automotive Engineering & EVs"
+        : "Teknik Otomotif & Kendaraan Listrik",
+      targetGoal: isEn
+        ? "How traction motors and regenerative braking work"
+        : "Cara kerja motor penggerak listrik dan regenerative braking",
+      motivation: isEn
+        ? "See electromagnetic laws in real electric drivetrains"
+        : "Melihat hukum elektromagnetisme langsung di kendaraan listrik",
+    };
+  }
+  return {
+    mode: "mode_b" as ExplorationMode,
+    vaultName: isEn
+      ? "Neuroplasticity & Neural Networks"
+      : "Neuroplastisitas & Neural Networks",
+    subject: isEn ? "Biology" : "Biologi",
+    chapter: "",
+    subchapters: "",
+    interestDomain: isEn
+      ? "Neuroscience, Cognitive Psych & AI"
+      : "Neurosains, Psikologi Kognitif & AI",
+    targetGoal: isEn
+      ? "How the brain wires memory and inspires Neural Networks"
+      : "Bagaimana otak membentuk memori dan menginspirasi Neural Network",
+    motivation: isEn
+      ? "Connect biological neurons and synapses to Deep Learning architectures"
+      : "Menghubungkan cara kerja neuron biologis hingga arsitektur Deep Learning",
+  };
 }
 
 export default function CreateVaultModal({
@@ -20,61 +94,51 @@ export default function CreateVaultModal({
   onClose,
   onCreateVault,
   isLoading,
+  lang,
 }: CreateVaultModalProps) {
-  const [mode, setMode] = useState<ExplorationMode>("mode_a");
-  const [vaultName, setVaultName] = useState("Fotosintesis × Energi Hijau");
-  const [subject, setSubject] = useState("Biologi (SMA Kelas XII)");
-  const [chapter, setChapter] = useState("Metabolisme & Fotosintesis");
-  const [subchapters, setSubchapters] = useState(
-    "Kloroplas & Pigmen Cahaya, Reaksi Terang, Siklus Calvin, Faktor Laju"
-  );
-  const [interestDomain, setInterestDomain] = useState(
-    "Rekayasa Energi Terbarukan & Bioteknologi"
-  );
-  const [targetGoal, setTargetGoal] = useState(
-    "Memahami bagaimana penangkapan foton cahaya di daun menginspirasi sel surya buatan"
-  );
-  const [motivation, setMotivation] = useState(
-    "Ingin menghubungkan biologi sel tanaman dengan teknologi energi bersih"
-  );
+  const t = UI_COPY[lang];
+  const initial = getTemplateDefaults("fotosintesis", lang);
+  const [mode, setMode] = useState<ExplorationMode>(initial.mode);
+  const [vaultName, setVaultName] = useState(initial.vaultName);
+  const [subject, setSubject] = useState(initial.subject);
+  const [chapter, setChapter] = useState(initial.chapter);
+  const [subchapters, setSubchapters] = useState(initial.subchapters);
+  const [interestDomain, setInterestDomain] = useState(initial.interestDomain);
+  const [targetGoal, setTargetGoal] = useState(initial.targetGoal);
+  const [motivation, setMotivation] = useState(initial.motivation);
+
+  const dirtyRef = useRef(false);
+  const activeTplRef = useRef<PresetSlug>("fotosintesis");
+
+  const applyQuickTemplate = (tpl: PresetSlug, targetLang: Language = lang) => {
+    const d = getTemplateDefaults(tpl, targetLang);
+    activeTplRef.current = tpl;
+    dirtyRef.current = false;
+    setMode(d.mode);
+    setVaultName(d.vaultName);
+    if (d.subject) setSubject(d.subject);
+    if (d.chapter) setChapter(d.chapter);
+    if (d.subchapters) setSubchapters(d.subchapters);
+    setInterestDomain(d.interestDomain);
+    setTargetGoal(d.targetGoal);
+    setMotivation(d.motivation);
+  };
+
+  useEffect(() => {
+    if (!dirtyRef.current) {
+      const d = getTemplateDefaults(activeTplRef.current, lang);
+      setMode(d.mode);
+      setVaultName(d.vaultName);
+      if (d.subject) setSubject(d.subject);
+      if (d.chapter) setChapter(d.chapter);
+      if (d.subchapters) setSubchapters(d.subchapters);
+      setInterestDomain(d.interestDomain);
+      setTargetGoal(d.targetGoal);
+      setMotivation(d.motivation);
+    }
+  }, [lang, isOpen]);
 
   if (!isOpen) return null;
-
-  const applyQuickTemplate = (tpl: "fotosintesis" | "listrik" | "ai_medis") => {
-    if (tpl === "fotosintesis") {
-      setMode("mode_a");
-      setVaultName("Fotosintesis × Energi Hijau");
-      setSubject("Biologi (SMA Kelas XII)");
-      setChapter("Metabolisme & Fotosintesis");
-      setSubchapters(
-        "Kloroplas & Pigmen Cahaya, Reaksi Terang, Siklus Calvin, Faktor Fotosintesis"
-      );
-      setInterestDomain("Rekayasa Energi Terbarukan & Bioteknologi");
-      setTargetGoal("Dari reaksi terang klorofil menuju sel surya bio-inspirasi");
-    } else if (tpl === "listrik") {
-      setMode("mode_a");
-      setVaultName("Elektromagnetisme × Kendaraan Listrik");
-      setSubject("Fisika (SMA Kelas XII)");
-      setChapter("Medan Magnet & Induksi Elektromagnetik");
-      setSubchapters(
-        "Fluks Magnetik, Hukum Faraday, Gaya Lorentz, Generator & Motor"
-      );
-      setInterestDomain("Teknik Otomotif & Kendaraan Listrik (EV)");
-      setTargetGoal(
-        "Memahami prinsip motor traksi listrik dan regenerative braking"
-      );
-    } else {
-      setMode("mode_b");
-      setVaultName("Neuroplastisitas & Neural Networks");
-      setInterestDomain("Neurosains, Psikologi Kognitif & AI");
-      setTargetGoal(
-        "Bagaimana Otak Membentuk Memori & Menginspirasi Neural Network"
-      );
-      setMotivation(
-        "Ingin tahu prasyarat dari sel saraf (neuron) dan sinapsis hingga arsitektur Deep Learning"
-      );
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,29 +155,27 @@ export default function CreateVaultModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17263C]/45 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="w-full max-w-3xl rounded-3xl border border-[#DFE6F0] bg-white p-6 shadow-2xl">
-        {/* Header with Transparent Vector Books Illustration */}
-        <div className="flex items-center justify-between gap-4 border-b border-[#DFE6F0] pb-4">
-          <div>
-            <span className="inline-flex rounded-full bg-[#EAF2FF] px-3 py-0.5 text-[11px] font-bold text-[#2F80ED]">
-              Personal Knowledge Vault
-            </span>
-            <h2 className="mt-1.5 text-2xl font-extrabold text-[#17233C]">
-              Create New Vault
-            </h2>
-            <p className="text-xs text-[#6F7E93]">
-              Unified exploration form — start from learning material (Mode A) or personal curiosity (Mode B).
-            </p>
-          </div>
-          <div className="flex items-start gap-2">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#17263C]/45 dark:bg-black/65 backdrop-blur-sm p-4 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-3xl rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-6 shadow-2xl transition-colors"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Clean Header */}
+        <div className="flex items-center justify-between gap-4 border-b border-[#DFE6F0] dark:border-slate-800 pb-4">
+          <h2 className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
+            {t.create.title}
+          </h2>
+          <div className="flex items-center gap-2">
             <div className="hidden sm:block">
-              <BooksStackVector className="w-32 h-20" />
+              <BooksStackVector className="w-28 h-16" />
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-[#DFE6F0] bg-white p-2 text-[#6F7E93] hover:bg-[#F3F6FC] hover:text-[#17233C]"
+              className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-[#6F7E93] dark:text-slate-400 hover:bg-[#F3F6FC] dark:hover:bg-slate-700 hover:text-[#17233C] dark:hover:text-slate-100"
             >
               <X className="h-4 w-4" />
             </button>
@@ -122,113 +184,102 @@ export default function CreateVaultModal({
 
         {/* Quick Templates */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-[#6F7E93]">
-            Quick Presets:
+          <span className="text-xs font-semibold text-[#6F7E93] dark:text-slate-400">
+            {t.create.presetsLabel}
           </span>
           <button
             type="button"
             onClick={() => applyQuickTemplate("fotosintesis")}
-            className="rounded-full border border-[#DFE6F0] bg-[#F3F6FC] hover:border-[#2F80ED] px-3 py-1 text-xs font-semibold text-[#17233C]"
+            className="rounded-full border border-[#DFE6F0] dark:border-slate-700 bg-[#F3F6FC] dark:bg-slate-800 hover:border-[#2F80ED] dark:hover:border-blue-400 px-3 py-1 text-xs font-semibold text-[#17233C] dark:text-slate-200 transition-colors"
           >
-            Biologi Fotosintesis × Energi
+            {t.create.presetPhoto}
           </button>
           <button
             type="button"
             onClick={() => applyQuickTemplate("listrik")}
-            className="rounded-full border border-[#DFE6F0] bg-[#F3F6FC] hover:border-[#2F80ED] px-3 py-1 text-xs font-semibold text-[#17233C]"
+            className="rounded-full border border-[#DFE6F0] dark:border-slate-700 bg-[#F3F6FC] dark:bg-slate-800 hover:border-[#2F80ED] dark:hover:border-blue-400 px-3 py-1 text-xs font-semibold text-[#17233C] dark:text-slate-200 transition-colors"
           >
-            Fisika Induksi × EV
+            {t.create.presetInduction}
           </button>
           <button
             type="button"
             onClick={() => applyQuickTemplate("ai_medis")}
-            className="rounded-full border border-[#DFE6F0] bg-[#F3F6FC] hover:border-[#2F80ED] px-3 py-1 text-xs font-semibold text-[#17233C]"
+            className="rounded-full border border-[#DFE6F0] dark:border-slate-700 bg-[#F3F6FC] dark:bg-slate-800 hover:border-[#2F80ED] dark:hover:border-blue-400 px-3 py-1 text-xs font-semibold text-[#17233C] dark:text-slate-200 transition-colors"
           >
-            Mode B: Neurosains &amp; AI
+            {t.create.presetNeuro}
           </button>
         </div>
 
-        {/* Dual Mode Switcher Cards */}
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Clean Dual Toggle */}
+        <div className="mt-4 grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => setMode("mode_a")}
-            className={`flex items-start gap-3 rounded-2xl border p-3.5 text-left transition-all ${
+            onClick={() => {
+              dirtyRef.current = true;
+              setMode("mode_a");
+            }}
+            className={`flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
               mode === "mode_a"
-                ? "border-[#2F80ED] bg-[#EAF2FF]/60 ring-2 ring-[#2F80ED]/15"
-                : "border-[#DFE6F0] bg-white hover:bg-[#F8FAFC]"
+                ? "border-[#2F80ED] bg-[#EAF2FF]/70 dark:bg-blue-950/50 dark:border-blue-500 ring-2 ring-[#2F80ED]/15"
+                : "border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-[#F8FAFC] dark:hover:bg-slate-800"
             }`}
           >
             <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
                 mode === "mode_a"
                   ? "bg-[#2F80ED] text-white"
-                  : "bg-[#F3F6FC] text-[#6F7E93]"
+                  : "bg-[#F3F6FC] dark:bg-slate-800 text-[#6F7E93] dark:text-slate-400"
               }`}
             >
               <BookOpen className="h-4 w-4" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-extrabold text-[#17233C]">
-                  From Material
-                </span>
-                <span className="rounded-full bg-[#2F80ED] px-2 py-0.5 text-[10px] font-bold text-white">
-                  Mode A
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs text-[#6F7E93]">
-                Start from textbook subject, chapter &amp; subchapters.
-              </p>
-            </div>
+            <span className="text-sm font-extrabold text-[#17233C] dark:text-slate-100">
+              {t.create.fromMaterial}
+            </span>
           </button>
 
           <button
             type="button"
-            onClick={() => setMode("mode_b")}
-            className={`flex items-start gap-3 rounded-2xl border p-3.5 text-left transition-all ${
+            onClick={() => {
+              dirtyRef.current = true;
+              setMode("mode_b");
+            }}
+            className={`flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
               mode === "mode_b"
-                ? "border-[#2F80ED] bg-[#EAF2FF]/60 ring-2 ring-[#2F80ED]/15"
-                : "border-[#DFE6F0] bg-white hover:bg-[#F8FAFC]"
+                ? "border-[#2F80ED] bg-[#EAF2FF]/70 dark:bg-blue-950/50 dark:border-blue-500 ring-2 ring-[#2F80ED]/15"
+                : "border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-[#F8FAFC] dark:hover:bg-slate-800"
             }`}
           >
             <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
                 mode === "mode_b"
                   ? "bg-[#2F80ED] text-white"
-                  : "bg-[#F3F6FC] text-[#6F7E93]"
+                  : "bg-[#F3F6FC] dark:bg-slate-800 text-[#6F7E93] dark:text-slate-400"
               }`}
             >
               <Compass className="h-4 w-4" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-extrabold text-[#17233C]">
-                  From Interest
-                </span>
-                <span className="rounded-full bg-[#FFA33A] px-2 py-0.5 text-[10px] font-bold text-[#3A2200]">
-                  Mode B
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs text-[#6F7E93]">
-                Start from curiosity, questions, and learning goals.
-              </p>
-            </div>
+            <span className="text-sm font-extrabold text-[#17233C] dark:text-slate-100">
+              {t.create.fromCuriosity}
+            </span>
           </button>
         </div>
 
         {/* Form Fields */}
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
           <div>
-            <label className="block text-xs font-bold text-[#17233C] mb-1">
-              Vault Name <span className="text-[#D95C5C]">*</span>
+            <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
+              {t.create.vaultName} <span className="text-[#D95C5C]">*</span>
             </label>
             <input
               type="text"
               required
               value={vaultName}
-              onChange={(e) => setVaultName(e.target.value)}
-              className="w-full rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] px-3.5 py-2 text-sm text-[#17233C] focus:border-[#2F80ED] focus:bg-white focus:outline-none"
+              onChange={(e) => {
+                dirtyRef.current = true;
+                setVaultName(e.target.value);
+              }}
+              className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none"
             />
           </div>
 
@@ -236,40 +287,49 @@ export default function CreateVaultModal({
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#17233C] mb-1">
-                    Subject / Domain
+                  <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
+                    {t.create.subject}
                   </label>
                   <input
                     type="text"
                     required
                     value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] px-3.5 py-2 text-sm text-[#17233C] focus:border-[#2F80ED] focus:bg-white focus:outline-none"
+                    onChange={(e) => {
+                      dirtyRef.current = true;
+                      setSubject(e.target.value);
+                    }}
+                    className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#17233C] mb-1">
-                    Chapter Title
+                  <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
+                    {t.create.chapter}
                   </label>
                   <input
                     type="text"
                     required
                     value={chapter}
-                    onChange={(e) => setChapter(e.target.value)}
-                    className="w-full rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] px-3.5 py-2 text-sm text-[#17233C] focus:border-[#2F80ED] focus:bg-white focus:outline-none"
+                    onChange={(e) => {
+                      dirtyRef.current = true;
+                      setChapter(e.target.value);
+                    }}
+                    className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-[#17233C] mb-1">
-                  Subchapters (comma-separated)
+                <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
+                  {t.create.subchapters}
                 </label>
                 <input
                   type="text"
                   required
                   value={subchapters}
-                  onChange={(e) => setSubchapters(e.target.value)}
-                  className="w-full rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] px-3.5 py-2 text-sm text-[#17233C] focus:border-[#2F80ED] focus:bg-white focus:outline-none"
+                  onChange={(e) => {
+                    dirtyRef.current = true;
+                    setSubchapters(e.target.value);
+                  }}
+                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none"
                 />
               </div>
             </>
@@ -277,54 +337,63 @@ export default function CreateVaultModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-[#2F80ED] mb-1">
-                Personal Interest Domain
+              <label className="block text-xs font-bold text-[#2F80ED] dark:text-blue-400 mb-1">
+                {t.create.interest}
               </label>
               <input
                 type="text"
                 required
                 value={interestDomain}
-                onChange={(e) => setInterestDomain(e.target.value)}
-                className="w-full rounded-xl border border-[#BFDBFE] bg-[#F8FAFC] px-3.5 py-2 text-sm text-[#17233C] focus:border-[#2F80ED] focus:bg-white focus:outline-none"
+                onChange={(e) => {
+                  dirtyRef.current = true;
+                  setInterestDomain(e.target.value);
+                }}
+                className="w-full rounded-xl border border-[#BFDBFE] dark:border-blue-900/60 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-[#2F80ED] mb-1">
+              <label className="block text-xs font-bold text-[#2F80ED] dark:text-blue-400 mb-1">
                 {mode === "mode_a"
-                  ? "Exploration Question / Focus"
-                  : "Target Topic to Understand"}
+                  ? t.create.goalMaterial
+                  : t.create.goalCuriosity}
               </label>
               <input
                 type="text"
                 required
                 value={targetGoal}
-                onChange={(e) => setTargetGoal(e.target.value)}
-                className="w-full rounded-xl border border-[#BFDBFE] bg-[#F8FAFC] px-3.5 py-2 text-sm text-[#17233C] focus:border-[#2F80ED] focus:bg-white focus:outline-none"
+                onChange={(e) => {
+                  dirtyRef.current = true;
+                  setTargetGoal(e.target.value);
+                }}
+                className="w-full rounded-xl border border-[#BFDBFE] dark:border-blue-900/60 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none"
               />
             </div>
           </div>
 
           {mode === "mode_b" && (
             <div>
-              <label className="block text-xs font-bold text-[#17233C] mb-1">
-                Curiosity / Motivation
+              <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
+                {t.create.motivation}
               </label>
               <input
                 type="text"
                 value={motivation}
-                onChange={(e) => setMotivation(e.target.value)}
-                className="w-full rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] px-3.5 py-2 text-sm text-[#17233C] focus:border-[#2F80ED] focus:bg-white focus:outline-none"
+                onChange={(e) => {
+                  dirtyRef.current = true;
+                  setMotivation(e.target.value);
+                }}
+                className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none"
               />
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#DFE6F0]">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#DFE6F0] dark:border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-[#DFE6F0] bg-white px-4 py-2 text-xs font-bold text-[#6F7E93] hover:bg-[#F3F6FC] hover:text-[#17233C]"
+              className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-bold text-[#6F7E93] dark:text-slate-300 hover:bg-[#F3F6FC] dark:hover:bg-slate-700 hover:text-[#17233C] dark:hover:text-white"
             >
-              Cancel
+              {t.create.cancel}
             </button>
             <button
               type="submit"
@@ -334,12 +403,12 @@ export default function CreateVaultModal({
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Mapping Cross-Region Skill Tree...
+                  {t.create.creating}
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Generate Knowledge Vault →
+                  {t.create.submit} →
                 </>
               )}
             </button>

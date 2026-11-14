@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const lang = body?.lang === "en" ? "en" : "id";
     const vault: KnowledgeVault | undefined = body?.vault;
     const targetNodeId: string | undefined = body?.targetNodeId;
 
@@ -12,13 +13,16 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: "Data Vault atau ID node yang akan diekspansi tidak valid.",
+          error:
+            lang === "en"
+              ? "Invalid Vault data or target node ID."
+              : "Data Vault atau ID node yang ingin diperluas tidak valid.",
         },
         { status: 400 }
       );
     }
 
-    const result = await expandNodeInVault(vault, targetNodeId);
+    const result = await expandNodeInVault(vault, targetNodeId, lang);
 
     return NextResponse.json({
       ok: true,

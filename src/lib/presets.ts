@@ -262,7 +262,7 @@ const MEDIS_NODES: KnowledgeNode[] = [
     explored: false,
     mastered: false,
     summary:
-      "Cabang Lintas-Region (Sains Hayati → Rekayasa Biomedis): bagaimana sensor optik mengukur SpO2 darah tanpa jarum suntik.",
+      "Cabang Lintas-Bidang (Sains Hayati → Rekayasa Biomedis): bagaimana sensor optik mengukur SpO2 darah tanpa jarum suntik.",
     levels: {
       simple:
         "Darah yang penuh oksigen berwarna merah terang, sedangkan yang kurang oksigen agak kebiruan. Alat jepit jari (oksimeter) menembakkan cahaya untuk membaca warna darahmu secara instan!",
@@ -339,7 +339,7 @@ const MEDIS_EDGES: KnowledgeEdge[] = [
     target: "n_bioenergetika",
     relation: "cross_disciplinary",
     reason:
-      "Menyeberang ke kuadran Matematika & Termodinamika Kuantitatif (REG-05): Menganalisis efisiensi energi bebas Gibbs dari ATP yang dihasilkan oleh respirasi seluler.",
+      "Matematika & Termodinamika Kuantitatif: menganalisis efisiensi energi bebas Gibbs dari ATP yang dihasilkan respirasi seluler.",
   },
   {
     id: "e-med-7",
@@ -347,7 +347,7 @@ const MEDIS_EDGES: KnowledgeEdge[] = [
     target: "n_oximetry",
     relation: "cross_disciplinary",
     reason:
-      "Menyeberang ke kuadran Rekayasa & Sistem Terapan (REG-04): Sifat optik ikatan O2 pada Hemoglobin dimanfaatkan oleh insinyur biomedis untuk merancang sensor Pulse Oximeter.",
+      "Rekayasa Biomedis: sifat optik ikatan O2 pada hemoglobin dimanfaatkan untuk merancang sensor pulse oximeter.",
   },
 ];
 
@@ -519,7 +519,7 @@ const OLAHRAGA_NODES: KnowledgeNode[] = [
     explored: false,
     mastered: false,
     summary:
-      "Cabang Lintas-Region (Fisiologi Olahraga → Komputasi & Data Science): bagaimana smartwatch menghitung VO2 Max dari detak jantung dan GPS.",
+      "Cabang Lintas-Bidang (Fisiologi Olahraga → Komputasi & Data Science): bagaimana smartwatch menghitung VO2 Max dari detak jantung dan GPS.",
     levels: {
       simple:
         "Jam tangan pintar (smartwatch) membandingkan seberapa cepat kamu berlari (GPS) dengan seberapa keras jantungmu berdetak untuk menebak skor VO2 Max paru-parumu!",
@@ -627,7 +627,7 @@ const OLAHRAGA_EDGES: KnowledgeEdge[] = [
     target: "n_wearable",
     relation: "cross_disciplinary",
     reason:
-      "Menyeberang ke kuadran Komputasi & AI (REG-03): Konsep fisiologi VO2 Max diterjemahkan menjadi algoritma sensor pada perangkat smartwatch olahraga.",
+      "Komputasi & AI: fisiologi VO2 Max diterjemahkan menjadi algoritma sensor pada smartwatch olahraga.",
   },
   {
     id: "e-sp-6",
@@ -635,7 +635,7 @@ const OLAHRAGA_EDGES: KnowledgeEdge[] = [
     target: "n_kinematika",
     relation: "cross_disciplinary",
     reason:
-      "Menyeberang ke kuadran Matematika & Logika (REG-05): Laju adaptasi konsumsi oksigen menuju VO2 Max dimodelkan dengan fungsi eksponensial.",
+      "Matematika & Logika: laju adaptasi konsumsi oksigen menuju VO2 Max dimodelkan dengan fungsi eksponensial.",
   },
 ];
 
@@ -651,7 +651,7 @@ const KANKER_NODES: KnowledgeNode[] = [
     explored: true,
     mastered: true,
     summary:
-      "Anak tangga fondasi ke-1 (Mode B): memahami bagaimana sel sehat mengatur jadwal pembelahannya.",
+      "Memahami bagaimana sel sehat mengatur jadwal pembelahannya secara teratur.",
     levels: {
       simple:
         "Sel tubuh yang sehat sangat disiplin: mereka punya jadwal ketat kapan harus membelah diri untuk menutup luka, dan kapan harus berhenti.",
@@ -768,7 +768,7 @@ const KANKER_NODES: KnowledgeNode[] = [
     explored: true,
     mastered: false,
     summary:
-      "Topik Tujuan Utama (Mode B): bagaimana sel ganas membentuk massa tumor, pembuluh darah baru, dan menyebar.",
+      "Bagaimana sel ganas membentuk massa tumor, pembuluh darah baru, lalu menyebar.",
     levels: {
       simple:
         "Setelah melewati 3 fondasi sebelumnya, kini jelas: sel yang remnya blong menumpuk jadi benjolan (tumor), memanggil pembuluh darah baru untuk makan (angiogenesis), lalu bisa ikut aliran darah ke organ lain (metastasis).",
@@ -807,7 +807,7 @@ const KANKER_NODES: KnowledgeNode[] = [
     explored: false,
     mastered: false,
     summary:
-      "Cabang Lintas-Region (Onkologi Medis → Komputasi & AI): memetakan mutasi spesifik pasien dengan algoritma komputer.",
+      "Cabang Lintas-Bidang (Onkologi Medis → Komputasi & AI): memetakan mutasi spesifik pasien dengan algoritma komputer.",
     levels: {
       simple:
         "DNA manusia terdiri dari 3 miliar huruf. Ilmuwan komputer membuat algoritma pencari cepat untuk menemukan huruf mana yang salah ketik pada tumor pasien agar dokter bisa memilih obat yang paling tepat.",
@@ -846,7 +846,7 @@ const KANKER_NODES: KnowledgeNode[] = [
     explored: false,
     mastered: false,
     summary:
-      "Cabang Lintas-Region (Medis → Sosial, Kebijakan & Kesehatan Masyarakat): deteksi dini dan kebijakan pengendalian karsinogen.",
+      "Cabang Lintas-Bidang (Medis → Sosial, Kebijakan & Kesehatan Masyarakat): deteksi dini dan kebijakan pengendalian karsinogen.",
     levels: {
       simple:
         "Mencegah lebih baik daripada mengobati: bagaimana kebijakan kawasan tanpa rokok, vaksinasi HPV, dan deteksi dini menyelamatkan jutaan orang sebelum tumor berkembang.",
@@ -907,7 +907,7 @@ const KANKER_EDGES: KnowledgeEdge[] = [
     target: "root",
     relation: "extension",
     reason:
-      "Menuju Tujuan Akhir (Mode B): Ketika regulasi proto-onkogen dan p53 gagal, sel berproliferasi tanpa kendali membentuk massa tumor, memicu angiogenesis, dan bermetastasis.",
+      "Ketika regulasi proto-onkogen dan p53 gagal, sel membelah tanpa kendali membentuk tumor, memicu angiogenesis, hingga bermetastasis.",
   },
   {
     id: "e-ca-5",
@@ -915,7 +915,7 @@ const KANKER_EDGES: KnowledgeEdge[] = [
     target: "n_bioinfo",
     relation: "cross_disciplinary",
     reason:
-      "Menyeberang ke kuadran Komputasi & AI (REG-03): Kompleksitas mutasi pada sel tumor dianalisis menggunakan algoritma Bioinformatika dan genomik komputasional.",
+      "Komputasi & AI: kompleksitas mutasi pada sel tumor dianalisis menggunakan algoritma bioinformatika dan genomik komputasional.",
   },
   {
     id: "e-ca-6",
@@ -923,14 +923,14 @@ const KANKER_EDGES: KnowledgeEdge[] = [
     target: "n_epidemiologi",
     relation: "cross_disciplinary",
     reason:
-      "Menyeberang ke kuadran Sosial & Kebijakan Publik (REG-06): Pemahaman tahapan pra-metastasis menjadi dasar program skrining deteksi dini dan regulasi kesehatan masyarakat.",
+      "Kesehatan Publik & Kebijakan: pemahaman fase pra-metastasis mendasari program skrining deteksi dini dan regulasi kesehatan masyarakat.",
   },
 ];
 
 export const PRESET_VAULTS: KnowledgeVault[] = [
   createVerifiedVault({
     id: "vault-preset-medis",
-    name: "Vault 1: Pernapasan × Medis (Mode A)",
+    name: "Pernapasan × Medis",
     createdAt: "2026-11-12T08:00:00.000Z",
     updatedAt: "2026-11-12T08:00:00.000Z",
     isPreset: true,
@@ -945,10 +945,10 @@ export const PRESET_VAULTS: KnowledgeVault[] = [
         "Memahami bagaimana oksigen dari paru-paru diangkut darah dan digunakan oleh sel tubuh serta implikasi klinisnya",
     },
     overview: {
-      title: "Modul Fondasi: Sistem Pernapasan Manusia (Fokus Medis & Seluler)",
+      title: "Sistem Pernapasan Manusia · Medis & Seluler",
       startingRegion: "REG-01",
       summary:
-        "Buku paket Biologi membahas organ dan mekanisme ventilasi paru-paru, namun perjalanan oksigen sesungguhnya baru dimulai setelah menembus alveolus. Di dalam Vault ini, konsep pertukaran gas dipetakan menuju pengikatan Hemoglobin (REG-02), produksi energi ATP di mitokondria (REG-01), analisis klinis Hipoksia (REG-02), Bioenergetika (REG-05), hingga instrumen medis Pulse Oximetry (REG-04).",
+        "Perjalanan oksigen dari ventilasi paru hingga menembus alveolus, berikatan dengan hemoglobin, menghasilkan ATP di mitokondria, sampai analisis klinis hipoksia dan sensor pulse oximetry.",
       keyConcepts: [
         "Ventilasi Mekanis (Inspirasi & Ekspirasi)",
         "Difusi Alveolar-Kapiler (Hukum Fick)",
@@ -965,7 +965,7 @@ export const PRESET_VAULTS: KnowledgeVault[] = [
 
   createVerifiedVault({
     id: "vault-preset-olahraga",
-    name: "Vault 2: Pernapasan × Olahraga (Mode A)",
+    name: "Pernapasan × Olahraga",
     createdAt: "2026-11-12T08:05:00.000Z",
     updatedAt: "2026-11-12T08:05:00.000Z",
     isPreset: true,
@@ -980,10 +980,10 @@ export const PRESET_VAULTS: KnowledgeVault[] = [
         "Memahami bagaimana kapasitas paru-paru dan suplai oksigen memengaruhi daya tahan atlet serta cara mengukurnya",
     },
     overview: {
-      title: "Modul Fondasi: Sistem Pernapasan Manusia (Fokus Fisiologi Olahraga)",
+      title: "Sistem Pernapasan Manusia · Fisiologi Olahraga",
       startingRegion: "REG-01",
       summary:
-        "Dengan titik awal materi buku yang SAMA (Bab Sistem Pernapasan Manusia), Vault ini membuktikan personalisasi eksplorasi untuk siswa yang berminat pada Olahraga. Cabang pengetahuan dipetakan dari Kapasitas Vital Paru (REG-01) menuju metrik daya tahan VO2 Max dan Ambang Laktat (REG-02), algoritma Smartwatch Sports Analytics (REG-03), serta Kinetika Pengambilan Oksigen (REG-05).",
+        "Menelusuri hubungan kapasitas vital paru dengan daya tahan atlet, mulai dari VO2 Max, ambang laktat, algoritma smartwatch olahraga, sampai pemodelan kinetika oksigen.",
       keyConcepts: [
         "Volume Tidal & Kapasitas Vital Paru",
         "Ventilasi Semenit saat Latihan Fisik",
@@ -1000,7 +1000,7 @@ export const PRESET_VAULTS: KnowledgeVault[] = [
 
   createVerifiedVault({
     id: "vault-preset-kanker",
-    name: "Vault 3: Riset Kanker (Mode B - Tujuan)",
+    name: "Riset Kanker",
     createdAt: "2026-11-12T08:10:00.000Z",
     updatedAt: "2026-11-12T08:10:00.000Z",
     isPreset: true,
@@ -1012,10 +1012,10 @@ export const PRESET_VAULTS: KnowledgeVault[] = [
         "Ingin memahami rangkaian konsep dari dasar sel hingga bagaimana mutasi genetik memicu pertumbuhan tumor",
     },
     overview: {
-      title: "Modul Peta Jalur Tujuan: Dari Biologi Sel Menuju Mekanisme Kanker (Mode B)",
+      title: "Dari Biologi Sel ke Mekanisme Kanker",
       startingRegion: "REG-01",
       summary:
-        "Vault Mode B ini dirancang bagi pelajar yang berangkat langsung dari rasa ingin tahu atau tujuan besar ('Bagaimana kanker berkembang?') tanpa tahu harus mulai dari bab buku apa. Sistem memetakan anak tangga prasyarat dari Siklus Sel Normal & Struktur DNA (REG-01), naik ke Regulasi Gen p53 & Pertumbuhan Tumor (REG-02), lalu membuka cabang lintas disiplin ke Bioinformatika Genomik (REG-03) dan Kebijakan Skrining Kesehatan Masyarakat (REG-06).",
+        "Menelusuri bagaimana sel sehat menjalani siklus pembelahan, mutasi DNA, kegagalan regulasi gen p53, hingga bioinformatika genomik dan kebijakan skrining kesehatan.",
       keyConcepts: [
         "Siklus Sel & Pos Pemeriksaan (Checkpoint)",
         "Replikasi DNA & Mutasi Somatik",

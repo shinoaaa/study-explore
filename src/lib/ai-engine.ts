@@ -1,3 +1,4 @@
+import { KNOWLEDGE_REGIONS } from "@/lib/regions";
 import { validateAndBuildGraph } from "@/lib/validator";
 import {
   KnowledgeEdge,
@@ -7,6 +8,27 @@ import {
   RegionCode,
   VaultInputContext,
 } from "@/types/knowledge";
+
+type EngineLanguage = "en" | "id";
+
+function regLabel(code: RegionCode, lang: EngineLanguage): string {
+  const reg = KNOWLEDGE_REGIONS[code] || KNOWLEDGE_REGIONS["REG-01"];
+  return lang === "id" ? reg.shortNameId : reg.shortName;
+}
+
+/**
+ * Formats a concept title cleanly for formula expressions without cutting words or dangling connectors.
+ */
+function formatFormulaSubject(title: string): string {
+  const cleaned = title.split(":")[0].split("(")[0].trim();
+  if (cleaned.length <= 26) {
+    return cleaned.replace(/[\s&/+-]+$/, "") || title.trim();
+  }
+  const cut = cleaned.slice(0, 26);
+  const lastSpace = cut.lastIndexOf(" ");
+  const boundary = lastSpace > 10 ? cut.slice(0, lastSpace) : cut;
+  return boundary.replace(/[\s&/+-]+$/, "") || cut.trim();
+}
 
 function inferStartingRegion(text: string): RegionCode {
   const lower = text.toLowerCase();
@@ -62,34 +84,40 @@ function getAdjacentCrossRegion(reg: RegionCode): RegionCode {
 
 function buildSystemPromptForExplore(
   vaultName: string,
-  ctx: VaultInputContext
+  ctx: VaultInputContext,
+  lang: EngineLanguage = "id"
 ): string {
   const modeDesc =
     ctx.mode === "mode_a"
-      ? `MODE A (Explore from Learning Material):
-- Mata Pelajaran: ${ctx.subject || "Sains"}
-- Judul Bab: ${ctx.chapter || ctx.targetGoal}
-- Subbab: ${ctx.subchapters || "-"}
-- Minat / Tujuan Personal: ${ctx.interestDomain} (${ctx.targetGoal})`
-      : `MODE B (Explore from Interest & Goals):
-- Bidang Minat: ${ctx.interestDomain}
-- Topik / Hal yang Ingin Dipahami: ${ctx.targetGoal}
-- Motivasi Eksplorasi: ${ctx.motivation || "Memahami konsep dari dasar hingga terapan"}`;
+      ? `Starting from Study Material:
+- Subject: ${ctx.subject || "Science"}
+- Chapter: ${ctx.chapter || ctx.targetGoal}
+- Key Topics: ${ctx.subchapters || "-"}
+- Personal Interest / Focus: ${ctx.interestDomain} (${ctx.targetGoal})`
+      : `Starting from Personal Curiosity:
+- Interest Area: ${ctx.interestDomain}
+- Target Topic: ${ctx.targetGoal}
+- Curiosity / Goal: ${ctx.motivation || "Understand from core foundations to real-world applications"}`;
 
-  return `Anda adalah Knowledge Intelligence Engine untuk aplikasi Trellis (Subtema Smart & Fun Education).
-Tugas Anda: Memetakan input pengguna di dalam Vault "${vaultName}" menjadi struktur Directed Acyclic Graph (DAG) JSON yang mematuhi aturan berikut:
-1. Gunakan Bahasa Indonesia yang akurat secara ilmiah namun mudah dipahami pelajar.
-2. Petakan 6 node inti yang mencakup kombinasi:
-   - 1 node "root" (materi asal pada Mode A, atau topik tujuan utama pada Mode B)
-   - minimal 1 node "prerequisite" (konsep fondasi yang wajib dipahami lebih dulu - BR-02)
-   - node "extension" (pendalaman konsep)
-   - node "application" (penerapan nyata sesuai minat pengguna)
-   - minimal 1 node "cross_disciplinary" yang menyeberang ke Knowledge Region berbeda (mencegah Filter Bubble - BR-04 & BR-05).
-3. Kode region WAJIB salah satu dari: "REG-01" (Sains Alam/Hayati), "REG-02" (Kesehatan/Medis/Fisiologi), "REG-03" (Teknologi/Komputasi/AI), "REG-04" (Rekayasa/Teknik), "REG-05" (Matematika/Logika), "REG-06" (Sosial/Ekonomi/Humaniora).
-4. Jenis relation pada edges WAJIB salah satu dari: "prerequisite", "extension", "application", "related_concept", "cross_disciplinary".
-5. Setiap edge WAJIB memiliki "reason" spesifik yang menjelaskan alasan keterkaitan kedua konsep (BR-03).
+  const langRule =
+    lang === "en"
+      ? "Write all titles, summaries, explanations, quiz items, and edge reasons in clear, natural English (keep precise scientific terminology where helpful)."
+      : "Gunakan Bahasa Indonesia yang mengalir dan enak dibaca (tetap pakai istilah ilmiah yang tepat kalau memang dibutuhkan, jangan terlalu kaku atau terlalu bertele-tele).";
 
-Konteks Input Pengguna:
+  return `You are the Knowledge Mapping Engine for Curiora.
+Map the user's input inside Vault "${vaultName}" into a Directed Acyclic Graph (DAG) JSON:
+1. ${langRule} Never include internal codes like "REG-01", "Mode A", "Mode B", or "Filter Bubble" inside user-visible text.
+2. Map 6 core nodes combining:
+   - 1 "root" node (main material or core target topic)
+   - at least 1 "prerequisite" node
+   - "extension" node
+   - "application" node tailored to the user's interest
+   - at least 1 "cross_disciplinary" node in another Knowledge Region.
+3. Each node's "region" field MUST be one of: "REG-01" (Natural & Life Sciences), "REG-02" (Health & Medicine), "REG-03" (Tech & AI), "REG-04" (Engineering), "REG-05" (Math & Logic), "REG-06" (Social & Humanities).
+4. Edge "relation" MUST be one of: "prerequisite", "extension", "application", "related_concept", "cross_disciplinary".
+5. Every edge MUST include a concise, specific "reason" explaining why those two concepts connect.
+
+User Input:
 ${modeDesc}
 
 Kembalikan HANYA objek JSON murni (tanpa markdown fence) dengan struktur persis berikut:
@@ -143,14 +171,17 @@ Kembalikan HANYA objek JSON murni (tanpa markdown fence) dengan struktur persis 
 
 function synthesizeDeterministicVault(
   vaultName: string,
-  ctx: VaultInputContext
+  ctx: VaultInputContext,
+  lang: EngineLanguage = "id"
 ): KnowledgeVault {
+  const isEn = lang === "en";
   const coreTopic =
     ctx.mode === "mode_a"
-      ? `${ctx.chapter || "Materi Inti"} (${ctx.subject || "Kurikulum"})`
-      : ctx.targetGoal || "Topik Eksplorasi";
+      ? `${ctx.chapter || (isEn ? "Core Topic" : "Materi Inti")}${ctx.subject ? ` (${ctx.subject})` : ""}`
+      : ctx.targetGoal || (isEn ? "Exploration Topic" : "Topik Eksplorasi");
 
-  const interest = ctx.interestDomain || "Penerapan Sains & Teknologi";
+  const interest =
+    ctx.interestDomain || (isEn ? "Applied Science & Tech" : "Sains & Teknologi Terapan");
   const subitems = ctx.subchapters
     ? ctx.subchapters
         .split(/[,•;]/)
@@ -169,271 +200,515 @@ function synthesizeDeterministicVault(
   const crossReg: RegionCode =
     startReg !== "REG-03" && appReg !== "REG-03" ? "REG-03" : "REG-05";
 
-  const firstSub = subitems[0] || `Prinsip Dasar ${coreTopic}`;
-  const secondSub = subitems[1] || `Mekanisme Sistemik ${coreTopic}`;
+  const startLabel = regLabel(startReg, lang);
+  const crossLabel = regLabel(crossReg, lang);
 
-  const overview: OverviewModule = {
-    title: `Modul Fondasi Vault: ${coreTopic}`,
-    startingRegion: startReg,
-    summary:
-      ctx.mode === "mode_a"
-        ? `Memetakan materi "${coreTopic}" dari subbab [${
-            ctx.subchapters || "konsep dasar"
-          }] dan menghubungkannya secara personal dengan minat "${interest}". Peta pengetahuan ini memisahkan konsep prasyarat dari pendalaman materi serta membuka jembatan lintas disiplin.`
-        : `Menyusun peta jalur belajar terarah untuk mencapai tujuan pemahaman "${coreTopic}" di bidang "${interest}", dimulai dari fondasi prasyarat wajib hingga aplikasi dan komputasi lintas bidang.`,
-    keyConcepts: [
-      firstSub,
-      secondSub,
-      `Integrasi ${coreTopic} × ${interest}`,
-      "Eksplorasi Lintas Rumpun Ilmu",
-    ],
-    coreFormulaOrPrinciple: `Prinsip Fondasi (${startReg}) → Mekanisme Inti (${coreTopic}) → Aplikasi Terarah (${interest})`,
-    primaryReference:
-      "OpenStax Open Textbooks (CC BY 4.0) & Rujukan Kurikulum Nasional",
-  };
+  const firstSub =
+    subitems[0] || (isEn ? `Foundations of ${coreTopic}` : `Prinsip Dasar ${coreTopic}`);
+  const secondSub =
+    subitems[1] || (isEn ? `Core Mechanism of ${coreTopic}` : `Mekanisme Inti ${coreTopic}`);
 
-  const rawNodes: KnowledgeNode[] = [
-    {
-      id: "n_prereq",
-      title: `Fondasi Prasyarat: ${firstSub}`,
-      region: startReg,
-      relationToOrigin: "prerequisite",
-      difficulty: "Basic",
-      x: 45,
-      y: 65,
-      explored: true,
-      mastered: false,
-      summary: `Konsep dasar yang wajib dikuasai terlebih dahulu sebelum mendalami ${coreTopic}.`,
-      levels: {
-        simple: `Bayangkan "${firstSub}" sebagai pondasi bangunan: sebelum memahami keseluruhan ${coreTopic}, kita perlu mengenal komponen dasar dan aturan main paling sederhananya.`,
-        standard: `Konsep prasyarat utama yang menjelaskan definisi operasional, variabel dasar, dan hukum pengatur pada ${firstSub} sebagai landasan ${coreTopic}.`,
-        deep: `Analisis struktural dan aksiomatik terhadap parameter dasar ${firstSub} yang menjadi syarat batas (boundary condition) bagi berlakunya mekanisme ${coreTopic}.`,
-      },
-      formula: `Prasyarat Dasar: Pemahaman Variabel & Mekanisme ${firstSub}`,
-      application: `Membantu pelajar menghindari kebingungan istilah saat membaca literatur lanjutan tentang ${coreTopic}.`,
-      reference: `OpenStax Foundation Series — Pengantar ${
-        ctx.subject || ctx.interestDomain
-      }`,
-      quickCheck: {
-        question: `Mengapa konsep "${firstSub}" ditempatkan sebagai node Prerequisite (Prasyarat) sebelum masuk ke topik utama?`,
-        options: [
-          {
-            text: `Karena konsep dasar pada ${firstSub} mutlak diperlukan untuk memahami mekanisme kerja ${coreTopic}`,
-            correct: true,
-          },
-          {
-            text: "Karena konsep ini sama sekali tidak berhubungan dengan topik utama",
-            correct: false,
-          },
-        ],
-      },
-    },
-    {
-      id: "root",
-      title: coreTopic,
-      region: startReg,
-      relationToOrigin: "root",
-      difficulty: "Foundation",
-      x: 175,
-      y: 155,
-      explored: true,
-      mastered: true,
-      summary: `Titik pusat pemetaan pengetahuan di dalam Vault "${vaultName}".`,
-      levels: {
-        simple: `Inti persoalan dari "${coreTopic}" adalah bagaimana komponen-komponen di dalamnya saling bekerja sama menghasilkan perubahan yang bisa kita amati di kehidupan nyata.`,
-        standard: `Sintesis konsep utama "${coreTopic}" yang mencakup struktur, mekanisme proses (${secondSub}), serta keterkaitannya dengan fenomena di bidang ${interest}.`,
-        deep: `Kajian sistemik "${coreTopic}" melalui pendekatan interaksi antar-variabel, keseimbangan dinamis, dan implikasi teoritis lintas skala.`,
-      },
-      formula: `Input Sistem → Proses Inti (${secondSub}) → Keluaran & Adaptasi`,
-      application: `Menjadi jangkar pengetahuan untuk menghubungkan materi belajar dengan minat pada ${interest}.`,
-      reference: `Modul Kurikulum & OpenStax Reference — ${coreTopic}`,
-      quickCheck: {
-        question: `Apa peran utama node pusat "${coreTopic}" di dalam peta Knowledge Vault ini?`,
-        options: [
-          {
-            text: "Menjadi titik jangkar yang menghubungkan konsep prasyarat dasar dengan cabang pendalaman dan aplikasi minat",
-            correct: true,
-          },
-          {
-            text: "Menjadi batas akhir belajar yang tidak bisa dikembangkan lagi",
-            correct: false,
-          },
-        ],
-      },
-    },
-    {
-      id: "n_ext",
-      title: `Pendalaman Mekanisme: ${secondSub}`,
-      region: startReg,
-      relationToOrigin: "extension",
-      difficulty: "Intermediate",
-      x: 55,
-      y: 185,
-      explored: true,
-      mastered: false,
-      summary: `Pendalaman langsung terhadap proses kerja dan dinamika internal dari ${coreTopic}.`,
-      levels: {
-        simple: `Setelah tahu gambaran besarnya, di node ini kita membedah 'mesin bagian dalam' dari ${secondSub} langkah demi langkah.`,
-        standard: `Pendalaman materi dari ${coreTopic} yang memfokuskan bahasan pada tahapan proses, faktor yang memengaruhi laju/efisiensi, dan interaksi komponen pada ${secondSub}.`,
-        deep: `Eksplorasi mekanisme kausal dan regulasi umpan balik (feedback loop) yang mengendalikan stabilitas ${secondSub}.`,
-      },
-      formula: `Efisiensi Proses ∝ Faktor Penggerak / Hambatan Sistemik`,
-      application: `Digunakan untuk menganalisis mengapa perubahan kondisi lingkungan dapat mengubah hasil dari ${coreTopic}.`,
-      reference: `Literatur Lanjutan ${ctx.subject || ctx.interestDomain}`,
-      quickCheck: {
-        question: `Apa perbedaan antara node Extension (${secondSub}) ini dengan node Prerequisite?`,
-        options: [
-          {
-            text: "Node Extension memperdalam rincian mekanisme setelah konsep dasar topik utama dipahami",
-            correct: true,
-          },
-          {
-            text: "Node Extension tidak memerlukan pemahaman konsep dasar sama sekali",
-            correct: false,
-          },
-        ],
-      },
-    },
-    {
-      id: "n_app",
-      title: `Terapan ${interest}: Studi Kasus ${coreTopic}`,
-      region: appReg,
-      relationToOrigin: "application",
-      difficulty: "Intermediate",
-      x: 350,
-      y: 95,
-      explored: true,
-      mastered: false,
-      summary: `Penerapan langsung konsep ${coreTopic} yang disesuaikan dengan minat personal pengguna di bidang ${interest}.`,
-      levels: {
-        simple: `Bagaimana ilmu tentang "${coreTopic}" benar-benar dipakai oleh para praktisi di bidang "${interest}" untuk memecahkan masalah sehari-hari.`,
-        standard: `Implementasi praktis prinsip ${coreTopic} pada konteks ${interest} (${ctx.targetGoal}), menunjukkan bagaimana teori buku diterjemahkan menjadi solusi nyata.`,
-        deep: `Optimalisasi parameter teknis dan evaluasi kinerja sistem berbasis ${coreTopic} pada skenario dunia nyata di sektor ${interest}.`,
-      },
-      formula: `Teori ${coreTopic} + Konteks ${interest} → Solusi Terapan`,
-      application: `Menjawab tujuan personal pengguna: "${ctx.targetGoal}".`,
-      reference: `Journal of Applied ${interest} & Studi Kasus Terapan`,
-      quickCheck: {
-        question: `Mengapa cabang terapan ke bidang "${interest}" ini dimunculkan di dalam peta eksplorasimu?`,
-        options: [
-          {
-            text: "Karena sistem mempersonalisasi cabang eksplorasi agar relevan dengan minat dan tujuan yang kamu masukkan",
-            correct: true,
-          },
-          {
-            text: "Karena seluruh pengguna diwajibkan mempelajari satu minat yang sama",
-            correct: false,
-          },
-        ],
-      },
-    },
-    {
-      id: "n_related",
-      title: `Konsep Terkait: Keseimbangan & Regulasi Sistem`,
-      region: appReg,
-      relationToOrigin: "related_concept",
-      difficulty: "Intermediate",
-      x: 470,
-      y: 175,
-      explored: false,
-      mastered: false,
-      summary: `Konsep sejajar yang memperkaya pemahaman ${coreTopic} tanpa menjadi syarat mutlak.`,
-      levels: {
-        simple: `Ibarat mempelajari cara kerja rem sekaligus mempelajari ban mobil: keduanya saling melengkapi agar sistem berjalan aman dan seimbang.`,
-        standard: `Konsep pendamping yang menjelaskan bagaimana sistem mempertahankan stabilitas dan beradaptasi terhadap gangguan eksternal di sekitar ${coreTopic}.`,
-        deep: `Analisis interaksi multi-variabel dan kopling sistemik antara ${coreTopic} dengan mekanisme regulasi pendamping.`,
-      },
-      formula: `Homeostasis / Keseimbangan Dinamis: ΔInput ≈ ΔRespon Regulasi`,
-      application: `Mencegah kegagalan sistem pada penerapan ${interest}.`,
-      reference: `Kompendium Sistem Terpadu & OpenStax Reference`,
-      quickCheck: {
-        question: `Mengapa hubungan antara node ini dan materi utama dilabeli sebagai Related Concept (bukan Prerequisite)?`,
-        options: [
-          {
-            text: "Karena kedua konsep ini saling melengkapi secara sejajar, bukan urutan prasyarat wajib",
-            correct: true,
-          },
-          {
-            text: "Karena konsep ini dilarang dipelajari oleh siswa",
-            correct: false,
-          },
-        ],
-      },
-    },
-    {
-      id: "n_cross",
-      title: `Lintas Disiplin: Pemodelan Komputasi & AI pada ${coreTopic}`,
-      region: crossReg,
-      relationToOrigin: "cross_disciplinary",
-      difficulty: "Advanced",
-      x: 650,
-      y: 115,
-      explored: false,
-      mastered: false,
-      summary: `Jembatan Lintas-Region menuju ${crossReg} untuk mencegah Filter Bubble dan membuka wawasan bidang baru.`,
-      levels: {
-        simple: `Bagaimana komputer dan kecerdasan buatan (AI) dapat digunakan untuk mensimulasikan dan memprediksi perilaku "${coreTopic}" tanpa harus selalu mencoba manual di laboratorium.`,
-        standard: `Integrasi lintas disiplin antara ${coreTopic} dengan pemodelan data, simulasi komputasi, dan analisis kuantitatif untuk menemukan pola yang sulit dilihat secara manual.`,
-        deep: `Penerapan pemodelan numerik, machine learning, dan analisis prediktif terhadap parameter kompleks pada ${coreTopic} × ${interest}.`,
-      },
-      formula: `Data Observasi → Model Komputasi f(x) → Prediksi & Optimasi`,
-      application: `Membuka wawasan karier interdisipliner yang menggabungkan ${
-        ctx.subject || ctx.interestDomain
-      } dengan Teknologi Komputasi & Sains Data.`,
-      reference: `Interdisciplinary Computational Science & OpenCourseWare`,
-      quickCheck: {
-        question: `Apa tujuan utama hadirnya node Cross-Disciplinary (Lintas Rumpun Ilmu) di dalam Vault ini?`,
-        options: [
-          {
-            text: "Mencegah Filter Bubble dengan menunjukkan bagaimana topik ini terhubung ke rumpun ilmu lain seperti Komputasi/Matematika",
-            correct: true,
-          },
-          {
-            text: "Mengganti seluruh materi sekolah dengan bahasa pemrograman",
-            correct: false,
-          },
-        ],
-      },
-    },
-  ];
+  const overview: OverviewModule = isEn
+    ? {
+        title: coreTopic,
+        startingRegion: startReg,
+        summary:
+          ctx.mode === "mode_a"
+            ? `Connects "${coreTopic}" (${ctx.subchapters || "core concepts"}) to your interest in ${interest}, from prerequisites to cross-field applications.`
+            : `Maps a clear path toward "${coreTopic}" in ${interest}, linking core foundations to applied and computational perspectives.`,
+        keyConcepts: [firstSub, secondSub, `${coreTopic} × ${interest}`, crossLabel],
+        coreFormulaOrPrinciple: `${startLabel} Foundations → ${coreTopic} → ${interest}`,
+        primaryReference: "OpenStax Open Textbooks (CC BY 4.0) & Academic References",
+      }
+    : {
+        title: coreTopic,
+        startingRegion: startReg,
+        summary:
+          ctx.mode === "mode_a"
+            ? `Menghubungkan materi "${coreTopic}" dengan minatmu di ${interest}, mulai dari konsep dasar sampai penerapannya di bidang lain.`
+            : `Memetakan jalur belajar ke arah "${coreTopic}" di bidang ${interest}, dari dasar prasyarat hingga penerapannya.`,
+        keyConcepts: [firstSub, secondSub, `${coreTopic} × ${interest}`, crossLabel],
+        coreFormulaOrPrinciple: `Dasar ${startLabel} → ${coreTopic} → ${interest}`,
+        primaryReference: "OpenStax Open Textbooks (CC BY 4.0) & Referensi Akademik",
+      };
 
-  const rawEdges: KnowledgeEdge[] = [
-    {
-      id: "e-syn-1",
-      source: "n_prereq",
-      target: "root",
-      relation: "prerequisite",
-      reason: `Konsep dasar pada "${firstSub}" merupakan prasyarat wajib yang harus dipahami terlebih dahulu sebelum mempelajari mekanisme "${coreTopic}".`,
-    },
-    {
-      id: "e-syn-2",
-      source: "root",
-      target: "n_ext",
-      relation: "extension",
-      reason: `Memperdalam bahasan "${coreTopic}" ke rincian mekanisme kerja dan faktor pengatur pada "${secondSub}".`,
-    },
-    {
-      id: "e-syn-3",
-      source: "root",
-      target: "n_app",
-      relation: "application",
-      reason: `Menghubungkan prinsip teoritis "${coreTopic}" secara langsung dengan minat dan tujuan pengguna di bidang "${interest}".`,
-    },
-    {
-      id: "e-syn-4",
-      source: "n_ext",
-      target: "n_related",
-      relation: "related_concept",
-      reason: `Mekanisme internal "${secondSub}" berkaitan erat dengan prinsip regulasi keseimbangan sistem secara keseluruhan.`,
-    },
-    {
-      id: "e-syn-5",
-      source: "n_app",
-      target: "n_cross",
-      relation: "cross_disciplinary",
-      reason: `Jembatan Lintas-Region: Tantangan terapan "${coreTopic}" di bidang "${interest}" dapat dianalisis dan dioptimalkan menggunakan pendekatan Komputasi & Pemodelan Kuantitatif.`,
-    },
-  ];
+  const rawNodes: KnowledgeNode[] = isEn
+    ? [
+        {
+          id: "n_prereq",
+          title: `Foundations: ${firstSub}`,
+          region: startReg,
+          relationToOrigin: "prerequisite",
+          difficulty: "Basic",
+          x: 45,
+          y: 65,
+          explored: true,
+          mastered: false,
+          summary: `Core idea worth grasping before diving into ${coreTopic}.`,
+          levels: {
+            simple: `Think of "${firstSub}" as the base layer: once its basic moving parts click, ${coreTopic} makes way more sense.`,
+            standard: `Foundational concept covering core definitions, variables, and rules of ${firstSub} that support ${coreTopic}.`,
+            deep: `Structural analysis of the boundary parameters governing ${firstSub} as a prerequisite for ${coreTopic}.`,
+          },
+          formula: `Core variables & rules of ${firstSub}`,
+          application: `Clears up key terminology before tackling deeper material on ${coreTopic}.`,
+          reference: `OpenStax Foundation Series — ${ctx.subject || ctx.interestDomain}`,
+          quickCheck: {
+            question: `Why does "${firstSub}" come before the main topic?`,
+            options: [
+              {
+                text: `Because understanding ${firstSub} makes the mechanism of ${coreTopic} clear`,
+                correct: true,
+              },
+              {
+                text: "Because it has nothing to do with the main topic",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: "root",
+          title: coreTopic,
+          region: startReg,
+          relationToOrigin: "root",
+          difficulty: "Foundation",
+          x: 175,
+          y: 155,
+          explored: true,
+          mastered: true,
+          summary: `Starting concept inside "${vaultName}".`,
+          levels: {
+            simple: `At its heart, "${coreTopic}" is about how its parts interact to create real effects we can observe.`,
+            standard: `Overview of "${coreTopic}", covering its structure, how ${secondSub} works, and how it ties into ${interest}.`,
+            deep: `Systemic analysis of "${coreTopic}" across dynamic equilibrium, feedback regulation, and multi-scale interactions.`,
+          },
+          formula: `Input → ${secondSub} → Output & Adaptation`,
+          application: `Anchors this topic directly to your interest in ${interest}.`,
+          reference: `OpenStax Reference — ${coreTopic}`,
+          quickCheck: {
+            question: `What role does "${coreTopic}" play here?`,
+            options: [
+              {
+                text: "It links foundational prerequisites to deeper mechanisms and applications",
+                correct: true,
+              },
+              {
+                text: "It is a dead-end topic that cannot branch further",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: "n_ext",
+          title: `Mechanism: ${secondSub}`,
+          region: startReg,
+          relationToOrigin: "extension",
+          difficulty: "Intermediate",
+          x: 55,
+          y: 185,
+          explored: true,
+          mastered: false,
+          summary: `Closer look at how ${coreTopic} works under the hood.`,
+          levels: {
+            simple: `Once you get the big picture, this zooms into the step-by-step engine inside ${secondSub}.`,
+            standard: `Deepens ${coreTopic} by focusing on reaction steps, rate/efficiency factors, and component interactions in ${secondSub}.`,
+            deep: `Causal mechanism and feedback control regulating the stability of ${secondSub}.`,
+          },
+          formula: `Process Efficiency ∝ Driving Factors / Resistance`,
+          application: `Helps explain why changing conditions alter the outcome of ${coreTopic}.`,
+          reference: `Advanced Study Notes — ${ctx.subject || ctx.interestDomain}`,
+          quickCheck: {
+            question: `How does this mechanism branch differ from a prerequisite?`,
+            options: [
+              {
+                text: "It goes deeper into how the main concept works once you know the basics",
+                correct: true,
+              },
+              {
+                text: "It requires zero prior understanding",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: "n_app",
+          title: `In Practice: ${interest}`,
+          region: appReg,
+          relationToOrigin: "application",
+          difficulty: "Intermediate",
+          x: 350,
+          y: 95,
+          explored: true,
+          mastered: false,
+          summary: `How ${coreTopic} shows up in ${interest}.`,
+          levels: {
+            simple: `See how people working in ${interest} actually apply "${coreTopic}" to solve real problems.`,
+            standard: `Practical implementation of ${coreTopic} within ${interest} (${ctx.targetGoal}), turning theory into working solutions.`,
+            deep: `Performance optimization and system trade-offs when applying ${coreTopic} in ${interest}.`,
+          },
+          formula: `${coreTopic} + ${interest} → Applied Solution`,
+          application: `Directly explores your goal: "${ctx.targetGoal}".`,
+          reference: `Applied ${interest} Case Studies`,
+          quickCheck: {
+            question: `Why is "${interest}" connected right here?`,
+            options: [
+              {
+                text: "Because it applies the core science directly to your personal focus",
+                correct: true,
+              },
+              {
+                text: "Because everyone is forced into the exact same career track",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: "n_related",
+          title: "System Balance & Regulation",
+          region: appReg,
+          relationToOrigin: "related_concept",
+          difficulty: "Intermediate",
+          x: 470,
+          y: 175,
+          explored: false,
+          mastered: false,
+          summary: `Parallel concept that rounds out how ${coreTopic} stays stable.`,
+          levels: {
+            simple: `Like learning both how a car engine accelerates and how brakes keep it steady—they work side by side.`,
+            standard: `Companion concept showing how systems maintain balance and respond to external changes around ${coreTopic}.`,
+            deep: `Multi-variable coupling and homeostatic control paired with ${coreTopic}.`,
+          },
+          formula: `Dynamic Balance: ΔInput ≈ ΔRegulation`,
+          application: `Prevents system instability in real ${interest} use cases.`,
+          reference: "Integrated Systems Compendium",
+          quickCheck: {
+            question: `Why is this marked as Related instead of Prerequisite?`,
+            options: [
+              {
+                text: "Because it complements the main idea flexibly without a strict sequence",
+                correct: true,
+              },
+              {
+                text: "Because it is unrelated to the topic",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: "n_cross",
+          title: `${crossLabel}: Modeling ${coreTopic}`,
+          region: crossReg,
+          relationToOrigin: "cross_disciplinary",
+          difficulty: "Advanced",
+          x: 650,
+          y: 115,
+          explored: false,
+          mastered: false,
+          summary: `Cross-field bridge into ${crossLabel} for modeling and prediction.`,
+          levels: {
+            simple: `How tools from ${crossLabel} let researchers simulate "${coreTopic}" cleanly before running costly physical tests.`,
+            standard: `Combines ${coreTopic} with computational modeling and quantitative analysis from ${crossLabel} to uncover hidden patterns.`,
+            deep: `Numerical modeling, predictive inference, and data-driven analysis bridging ${startLabel} with ${crossLabel}.`,
+          },
+          formula: `Observations → Model f(x) → Prediction`,
+          application: `Connects ${ctx.subject || ctx.interestDomain} with modern workflows in ${crossLabel}.`,
+          reference: `Interdisciplinary Science · ${crossLabel}`,
+          quickCheck: {
+            question: `What does a cross-disciplinary node add here?`,
+            options: [
+              {
+                text: `It shows how ideas in ${startLabel} connect with ${crossLabel}`,
+                correct: true,
+              },
+              {
+                text: "It replaces all natural science topics",
+                correct: false,
+              },
+            ],
+          },
+        },
+      ]
+    : [
+        {
+          id: "n_prereq",
+          title: `Dasar: ${firstSub}`,
+          region: startReg,
+          relationToOrigin: "prerequisite",
+          difficulty: "Basic",
+          x: 45,
+          y: 65,
+          explored: true,
+          mastered: false,
+          summary: `Konsep dasar yang enak dipahami dulu sebelum masuk ke ${coreTopic}.`,
+          levels: {
+            simple: `Bayangkan "${firstSub}" sebagai pondasinya: kalau bagian dasarnya sudah kebayang, memahami ${coreTopic} bakal jauh lebih gampang.`,
+            standard: `Konsep prasyarat yang membahas definisi penting, variabel utama, dan aturan dasar pada ${firstSub} sebagai pijakan ${coreTopic}.`,
+            deep: `Analisis parameter dan kondisi batas pada ${firstSub} yang menjadi landasan berjalannya mekanisme ${coreTopic}.`,
+          },
+          formula: `Variabel & Aturan Dasar ${firstSub}`,
+          application: `Biar kamu nggak bingung istilah saat baca bahasan lanjut tentang ${coreTopic}.`,
+          reference: `OpenStax Foundation Series — Pengantar ${ctx.subject || ctx.interestDomain}`,
+          quickCheck: {
+            question: `Kenapa "${firstSub}" dipelajari sebelum masuk ke topik utama?`,
+            options: [
+              {
+                text: `Karena pemahaman ${firstSub} membantu kita mengerti cara kerja ${coreTopic}`,
+                correct: true,
+              },
+              {
+                text: "Karena konsep ini sama sekali nggak nyambung ke topik utama",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: "root",
+          title: coreTopic,
+          region: startReg,
+          relationToOrigin: "root",
+          difficulty: "Foundation",
+          x: 175,
+          y: 155,
+          explored: true,
+          mastered: true,
+          summary: `Titik awal eksplorasi di dalam Vault "${vaultName}".`,
+          levels: {
+            simple: `Intinya, "${coreTopic}" membahas bagaimana komponen-komponen di dalamnya saling bekerja hingga menghasilkan dampak nyata.`,
+            standard: `Gambaran utama "${coreTopic}" yang mencakup struktur, mekanisme ${secondSub}, dan hubungannya dengan bidang ${interest}.`,
+            deep: `Kajian sistemik "${coreTopic}" lewat interaksi antarvariabel, keseimbangan dinamis, dan implikasi lanjutannya.`,
+          },
+          formula: `Input → Proses Inti (${secondSub}) → Output`,
+          application: `Jadi jangkar buat menghubungkan materi belajar ke minatmu di ${interest}.`,
+          reference: `OpenStax Reference — ${coreTopic}`,
+          quickCheck: {
+            question: `Apa peran titik utama "${coreTopic}" di peta ini?`,
+            options: [
+              {
+                text: "Menghubungkan konsep dasar dengan pendalaman mekanisme dan penerapannya",
+                correct: true,
+              },
+              {
+                text: "Jadi jalan buntu yang nggak bisa dikembangkan lagi",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: "n_ext",
+          title: `Mekanisme: ${secondSub}`,
+          region: startReg,
+          relationToOrigin: "extension",
+          difficulty: "Intermediate",
+          x: 55,
+          y: 185,
+          explored: true,
+          mastered: false,
+          summary: `Bedah lebih dekat bagaimana ${coreTopic} bekerja langkah demi langkah.`,
+          levels: {
+            simple: `Setelah dapat gambaran besarnya, di sini kita intip "mesin bagian dalam" dari ${secondSub} pelan-pelan.`,
+            standard: `Pendalaman ${coreTopic} yang fokus ke tahapan proses, faktor efisiensi, dan interaksi komponen pada ${secondSub}.`,
+            deep: `Mekanisme kausal serta regulasi umpan balik (feedback loop) yang menjaga kestabilan ${secondSub}.`,
+          },
+          formula: `Efisiensi Proses ∝ Faktor Penggerak / Hambatan`,
+          application: `Dipakai untuk menganalisis kenapa perubahan kondisi bisa mengubah hasil ${coreTopic}.`,
+          reference: `Literatur Lanjutan ${ctx.subject || ctx.interestDomain}`,
+          quickCheck: {
+            question: `Apa bedanya cabang Pendalaman (${secondSub}) dengan Prasyarat?`,
+            options: [
+              {
+                text: "Cabang ini membedah mekanisme lebih rinci setelah konsep dasarnya dipahami",
+                correct: true,
+              },
+              {
+                text: "Cabang ini tidak butuh pemahaman awal sama sekali",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: "n_app",
+          title: `Penerapan di ${interest}`,
+          region: appReg,
+          relationToOrigin: "application",
+          difficulty: "Intermediate",
+          x: 350,
+          y: 95,
+          explored: true,
+          mastered: false,
+          summary: `Bagaimana konsep ${coreTopic} dipakai langsung di bidang ${interest}.`,
+          levels: {
+            simple: `Gimana ilmu "${coreTopic}" benar-benar dipakai praktisi di bidang "${interest}" untuk menyelesaikan masalah nyata.`,
+            standard: `Penerapan prinsip ${coreTopic} pada konteks ${interest} (${ctx.targetGoal}), mengubah teori jadi solusi praktis.`,
+            deep: `Optimasi parameter dan evaluasi kinerja sistem berbasis ${coreTopic} di sektor ${interest}.`,
+          },
+          formula: `${coreTopic} + ${interest} → Solusi Terapan`,
+          application: `Menjawab langsung fokusmu: "${ctx.targetGoal}".`,
+          reference: `Applied ${interest} Studies`,
+          quickCheck: {
+            question: `Kenapa cabang "${interest}" muncul di peta ini?`,
+            options: [
+              {
+                text: "Karena topiknya nyambung langsung ke minat dan tujuan yang kamu pilih",
+                correct: true,
+              },
+              {
+                text: "Karena semua orang wajib masuk jurusan yang sama",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: "n_related",
+          title: "Keseimbangan & Regulasi Sistem",
+          region: appReg,
+          relationToOrigin: "related_concept",
+          difficulty: "Intermediate",
+          x: 470,
+          y: 175,
+          explored: false,
+          mastered: false,
+          summary: `Konsep sejajar yang melengkapi cara kerja ${coreTopic}.`,
+          levels: {
+            simple: `Ibarat belajar cara kerja mesin mobil sekalian belajar fungsi remnya: sama-sama penting biar sistem tetap stabil.`,
+            standard: `Konsep pendamping yang menjelaskan bagaimana sistem menjaga keseimbangan dan merespons gangguan di sekitar ${coreTopic}.`,
+            deep: `Analisis interaksi multivariabel dan kopling regulasi homeostasis di sekitar ${coreTopic}.`,
+          },
+          formula: `Keseimbangan Dinamis: ΔInput ≈ ΔRegulasi`,
+          application: `Mencegah ketidakseimbangan sistem pada penerapan ${interest}.`,
+          reference: "Kompendium Sistem Terpadu",
+          quickCheck: {
+            question: `Kenapa relasi ini bertipe Konsep Terkait, bukan Prasyarat?`,
+            options: [
+              {
+                text: "Karena saling melengkapi tanpa urutan wajib sebelum atau sesudah",
+                correct: true,
+              },
+              {
+                text: "Karena tidak boleh dipelajari bersama",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: "n_cross",
+          title: `${crossLabel}: Pemodelan ${coreTopic}`,
+          region: crossReg,
+          relationToOrigin: "cross_disciplinary",
+          difficulty: "Advanced",
+          x: 650,
+          y: 115,
+          explored: false,
+          mastered: false,
+          summary: `Jembatan lintas bidang ke ${crossLabel} untuk pemodelan dan analisis.`,
+          levels: {
+            simple: `Bagaimana pendekatan dari ${crossLabel} membantu kita mensimulasikan "${coreTopic}" tanpa harus menebak-nebak.`,
+            standard: `Gabungan ${coreTopic} dengan pemodelan kuantitatif dan simulasi di bidang ${crossLabel} untuk membaca pola tersembunyi.`,
+            deep: `Penerapan pemodelan numerik dan analisis prediktif yang menyatukan ${startLabel} dengan ${crossLabel}.`,
+          },
+          formula: `Data Observasi → Model f(x) → Prediksi`,
+          application: `Membuka wawasan lintas bidang antara ${ctx.subject || ctx.interestDomain} dan ${crossLabel}.`,
+          reference: `Interdisciplinary Review · ${crossLabel}`,
+          quickCheck: {
+            question: `Apa manfaat cabang lintas bidang ini?`,
+            options: [
+              {
+                text: `Menunjukkan bagaimana ${startLabel} bisa terhubung dengan ${crossLabel}`,
+                correct: true,
+              },
+              {
+                text: "Menghapus semua topik sains alam",
+                correct: false,
+              },
+            ],
+          },
+        },
+      ];
+
+  const rawEdges: KnowledgeEdge[] = isEn
+    ? [
+        {
+          id: "e-syn-1",
+          source: "n_prereq",
+          target: "root",
+          relation: "prerequisite",
+          reason: `Understanding "${firstSub}" gives you the foundation needed for "${coreTopic}".`,
+        },
+        {
+          id: "e-syn-2",
+          source: "root",
+          target: "n_ext",
+          relation: "extension",
+          reason: `Zooms in from "${coreTopic}" to the inner mechanism of "${secondSub}".`,
+        },
+        {
+          id: "e-syn-3",
+          source: "root",
+          target: "n_app",
+          relation: "application",
+          reason: `Shows how "${coreTopic}" translates into real work in "${interest}".`,
+        },
+        {
+          id: "e-syn-4",
+          source: "n_ext",
+          target: "n_related",
+          relation: "related_concept",
+          reason: `The mechanism of "${secondSub}" pairs naturally with system stability and regulation.`,
+        },
+        {
+          id: "e-syn-5",
+          source: "n_app",
+          target: "n_cross",
+          relation: "cross_disciplinary",
+          reason: `Practical problems in "${interest}" can be modeled and optimized using methods from ${crossLabel}.`,
+        },
+      ]
+    : [
+        {
+          id: "e-syn-1",
+          source: "n_prereq",
+          target: "root",
+          relation: "prerequisite",
+          reason: `Pemahaman "${firstSub}" jadi dasar sebelum mendalami cara kerja "${coreTopic}".`,
+        },
+        {
+          id: "e-syn-2",
+          source: "root",
+          target: "n_ext",
+          relation: "extension",
+          reason: `Membahas rincian mekanisme dan faktor pengatur "${secondSub}" dari "${coreTopic}".`,
+        },
+        {
+          id: "e-syn-3",
+          source: "root",
+          target: "n_app",
+          relation: "application",
+          reason: `Menghubungkan teori "${coreTopic}" langsung ke penerapan di bidang "${interest}".`,
+        },
+        {
+          id: "e-syn-4",
+          source: "n_ext",
+          target: "n_related",
+          relation: "related_concept",
+          reason: `Mekanisme "${secondSub}" berjalan berdampingan dengan prinsip regulasi keseimbangan sistem.`,
+        },
+        {
+          id: "e-syn-5",
+          source: "n_app",
+          target: "n_cross",
+          relation: "cross_disciplinary",
+          reason: `Masalah terapan "${coreTopic}" di bidang "${interest}" bisa dianalisis dengan pendekatan dari ${crossLabel}.`,
+        },
+      ];
 
   const { nodes, edges, validation } = validateAndBuildGraph(rawNodes, rawEdges);
   const now = new Date().toISOString();
@@ -453,14 +728,16 @@ function synthesizeDeterministicVault(
 
 export async function generateVaultFromInput(
   vaultName: string,
-  ctx: VaultInputContext
+  ctx: VaultInputContext,
+  lang: EngineLanguage = "id"
 ): Promise<{ vault: KnowledgeVault; engineUsed: "gemini-api" | "deterministic-fallback" }> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  const isEn = lang === "en";
 
   if (apiKey) {
     try {
-      const prompt = buildSystemPromptForExplore(vaultName, ctx);
+      const prompt = buildSystemPromptForExplore(vaultName, ctx, lang);
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
       const res = await fetch(url, {
@@ -503,20 +780,28 @@ export async function generateVaultFromInput(
               overview: {
                 title:
                   parsed.overview?.title ||
-                  `Modul Fondasi: ${ctx.chapter || ctx.targetGoal}`,
+                  (isEn
+                    ? `Starting Guide: ${ctx.chapter || ctx.targetGoal}`
+                    : `Pengantar: ${ctx.chapter || ctx.targetGoal}`),
                 startingRegion: parsed.overview?.startingRegion || "REG-01",
                 summary:
                   parsed.overview?.summary ||
-                  "Sintesis konsep awal hasil pemetaan AI.",
+                  (isEn
+                    ? "Initial concept map generated from your topic."
+                    : "Ringkasan awal dari topik yang kamu eksplorasi."),
                 keyConcepts: Array.isArray(parsed.overview?.keyConcepts)
                   ? parsed.overview.keyConcepts
-                  : ["Konsep Inti", "Hubungan Prasyarat", "Aplikasi Lintas Bidang"],
+                  : isEn
+                    ? ["Core Idea", "Key Foundation", "Real-World Link"]
+                    : ["Konsep Inti", "Dasar Penting", "Kaitan Lintas Bidang"],
                 coreFormulaOrPrinciple:
                   parsed.overview?.coreFormulaOrPrinciple ||
-                  "Fondasi → Mekanisme → Aplikasi",
+                  (isEn
+                    ? "Foundation → Mechanism → Application"
+                    : "Fondasi → Mekanisme → Penerapan"),
                 primaryReference:
                   parsed.overview?.primaryReference ||
-                  "OpenStax & Rujukan Akademik Terverifikasi",
+                  "OpenStax & Academic References",
               },
               nodes,
               edges,
@@ -526,19 +811,20 @@ export async function generateVaultFromInput(
         }
       }
     } catch {
-      // Fallback ke deterministic engine di bawah bila API error/timeout (NFR-03)
+      // Fall back cleanly to deterministic synthesis when API fails or quota runs out
     }
   }
 
   return {
     engineUsed: "deterministic-fallback",
-    vault: synthesizeDeterministicVault(vaultName, ctx),
+    vault: synthesizeDeterministicVault(vaultName, ctx, lang),
   };
 }
 
 export async function expandNodeInVault(
   vault: KnowledgeVault,
-  targetNodeId: string
+  targetNodeId: string,
+  lang: EngineLanguage = "id"
 ): Promise<{
   vault: KnowledgeVault;
   addedNodeIds: string[];
@@ -548,6 +834,9 @@ export async function expandNodeInVault(
     vault.nodes.find((n) => n.id === targetNodeId) || vault.nodes[0];
   const suffix = Date.now().toString().slice(-4);
   const crossRegion = getAdjacentCrossRegion(parentNode.region);
+  const isEn = lang === "en";
+  const parentRegionName = regLabel(parentNode.region, lang);
+  const crossRegionName = regLabel(crossRegion, lang);
 
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
@@ -555,17 +844,24 @@ export async function expandNodeInVault(
   if (apiKey) {
     try {
       const existingTitles = vault.nodes.map((n) => n.title).join(", ");
-      const expandPrompt = `Anda adalah Knowledge Intelligence Engine untuk aplikasi Trellis.
-Vault: "${vault.name}" (Minat pengguna: "${vault.inputContext.interestDomain}", Tujuan: "${vault.inputContext.targetGoal}").
-Node yang sedang diekspansi: "${parentNode.title}" (${parentNode.region}) — ${parentNode.summary}
-Daftar konsep yang SUDAH ada (DILARANG duplikasi): ${existingTitles}.
+      const langInstruction = isEn
+        ? "Write every title, summary, explanation level, quiz question, and edge reason in natural, readable English (using accurate scientific terms where needed)."
+        : "Tulis seluruh judul, ringkasan, penjelasan, kuis, dan alasan hubungan dalam Bahasa Indonesia yang santai-rapi dan mudah dipahami (pakai istilah ilmiah hanya bila memang perlu).";
 
-Tugas: Buat TEPAT 2 node konsep cabang baru yang memperdalam eksplorasi secara progresif tanpa batas (NFR-11):
-1) Node pertama bertipe relasi "extension" atau "application" di dalam Region yang sesuai (${parentNode.region} atau sekitarnya),
-2) Node kedua bertipe relasi "cross_disciplinary" yang menyeberang ke Knowledge Region berbeda (selain ${parentNode.region}, rekomendasi ${crossRegion}) untuk mencegah Filter Bubble.
-Setiap edge WAJIB memiliki alasan ilmiah "reason" spesifik (BR-03).
+      const expandPrompt = `You are the Knowledge Mapping Engine for Curiora.
+Vault: "${vault.name}" (Interest: "${vault.inputContext.interestDomain}", Goal: "${vault.inputContext.targetGoal}").
+Node being expanded: "${parentNode.title}" (${parentRegionName}) — ${parentNode.summary}
+Existing concepts (DO NOT duplicate): ${existingTitles}.
 
-Kembalikan HANYA JSON murni:
+Task: Create EXACTLY 2 new branch concept nodes that deepen exploration naturally:
+1) First node uses relation "extension" or "application" inside "${parentNode.region}" (${parentRegionName}) or an adjacent region.
+2) Second node uses relation "cross_disciplinary" bridging into a different region (recommended: "${crossRegion}" = ${crossRegionName}) so learning opens fresh perspectives.
+Rules:
+- ${langInstruction}
+- Never include internal codes like "REG-01", "Mode A", "Mode B", "BR-", or "NFR-" inside user-facing text.
+- Every edge MUST include a concise, specific "reason" explaining why the two concepts connect.
+
+Return ONLY raw JSON (no markdown fence):
 {
   "nodes": [
     {
@@ -654,95 +950,185 @@ Kembalikan HANYA JSON murni:
         }
       }
     } catch {
-      // Fallback ke deterministic expansion di bawah bila API key invalid/kuota habis
+      // Fallback cleanly to deterministic expansion if Gemini API fails or times out
     }
   }
 
-  const newNodes: KnowledgeNode[] = [
-    {
-      id: `n_exp_ext_${suffix}`,
-      title: `Pendalaman Lanjut: Dinamika Mikro pada ${parentNode.title}`,
-      region: parentNode.region,
-      relationToOrigin: "extension",
-      difficulty: "Advanced",
-      x: Math.min(parentNode.x + 115, 840),
-      y: Math.min(parentNode.y + 85, 460),
-      explored: true,
-      mastered: false,
-      summary: `Cabang baru hasil ekspansi dari "${parentNode.title}" di dalam rumpun ${parentNode.region}.`,
-      levels: {
-        simple: `Mengupas lebih dekat bagaimana faktor-faktor kecil di dalam "${parentNode.title}" bekerja saat kondisi berubah ekstrem.`,
-        standard: `Ekspansi konsep lanjutan dari "${parentNode.title}" yang membahas mekanisme regulasi tingkat mikro, batas adaptasi sistem, serta studi kasus mendalam.`,
-        deep: `Analisis kinetika, regulasi molekuler/sistemik, dan interaksi parameter orde tinggi yang mengontrol "${parentNode.title}".`,
-      },
-      formula: `Regulasi Lanjut: d(${parentNode.title.slice(0, 14)})/dt = f(Parameter Internal, Lingkungan)`,
-      application: `Memperdalam penguasaan materi "${parentNode.title}" untuk analisis kasus kompleks sesuai minat ${vault.inputContext.interestDomain}.`,
-      reference: `${parentNode.reference} (Advanced Module Expansion)`,
-      quickCheck: {
-        question: `Apa kontribusi cabang ekspansi ini terhadap pemahaman "${parentNode.title}"?`,
-        options: [
-          {
-            text: "Menggali mekanisme regulasi dan batas adaptasi konsep secara lebih spesifik",
-            correct: true,
+  const baseParentTitle = parentNode.title.replace(
+    /^(?:Deeper Dynamics:\s*|Pendalaman:\s*Dinamika\s*)+/i,
+    ""
+  );
+  const newNodes: KnowledgeNode[] = isEn
+    ? [
+        {
+          id: `n_exp_ext_${suffix}`,
+          title: `Deeper Dynamics: ${baseParentTitle}`,
+          region: parentNode.region,
+          relationToOrigin: "extension",
+          difficulty: "Advanced",
+          x: Math.min(parentNode.x + 115, 840),
+          y: Math.min(parentNode.y + 85, 460),
+          explored: true,
+          mastered: false,
+          summary: `Next-level branch from "${parentNode.title}" in ${parentRegionName}.`,
+          levels: {
+            simple: `Zooms into how the finer parts of "${parentNode.title}" respond when conditions get pushed to the limit.`,
+            standard: `Further exploration of "${parentNode.title}", unpacking regulatory loops, edge limits, and practical case scenarios.`,
+            deep: `Kinetic behavior, molecular/systemic control, and higher-order parameter interactions governing "${parentNode.title}".`,
           },
-          {
-            text: "Membatalkan seluruh hukum dasar pada konsep sebelumnya",
-            correct: false,
+          formula: `Dynamic Response: d(${formatFormulaSubject(parentNode.title)})/dt = f(Internal State, Environment)`,
+          application: `Sharpens how you analyze complex cases around "${parentNode.title}" in ${vault.inputContext.interestDomain}.`,
+          reference: `${parentNode.reference} (Extended Exploration)`,
+          quickCheck: {
+            question: `What does this deeper branch add to "${parentNode.title}"?`,
+            options: [
+              {
+                text: "Reveals finer control mechanisms and edge behavior under changing conditions",
+                correct: true,
+              },
+              {
+                text: "Invalidates everything established in the parent concept",
+                correct: false,
+              },
+            ],
           },
-        ],
-      },
-    },
-    {
-      id: `n_exp_cross_${suffix}`,
-      title: `Inovasi Lintas-Region (${crossRegion}): ${parentNode.title}`,
-      region: crossRegion,
-      relationToOrigin: "cross_disciplinary",
-      difficulty: "Advanced",
-      x: undefined as unknown as number, // akan ditempatkan otomatis di kuadran crossRegion oleh validator
-      y: undefined as unknown as number,
-      explored: false,
-      mastered: false,
-      summary: `Jembatan lintas-region dari "${parentNode.title}" (${parentNode.region}) menyeberang ke rumpun ${crossRegion}.`,
-      levels: {
-        simple: `Bagaimana para ahli di rumpun ${crossRegion} memanfaatkan prinsip "${parentNode.title}" untuk menciptakan teknologi atau metode baru.`,
-        standard: `Eksplorasi lintas disiplin yang menghubungkan konsep "${parentNode.title}" dengan inovasi teknologi, instrumentasi, atau pemodelan di kuadran ${crossRegion}.`,
-        deep: `Konvergensi keilmuan antara ${parentNode.region} dan ${crossRegion} dalam mentransformasi konsep "${parentNode.title}" menjadi sistem terapan modern.`,
-      },
-      formula: `Sinergi Lintas-Region: Konsep (${parentNode.region}) × Metodologi (${crossRegion})`,
-      application: `Membuka peluang riset dan karier lintas bidang dari titik tolak "${parentNode.title}".`,
-      reference: `Interdisciplinary Review (${parentNode.region} × ${crossRegion})`,
-      quickCheck: {
-        question: `Mengapa garis penghubung menuju node ini berjenis Cross-Disciplinary?`,
-        options: [
-          {
-            text: `Karena node ini menyeberangkan eksplorasi dari rumpun ${parentNode.region} menuju rumpun ${crossRegion}`,
-            correct: true,
+        },
+        {
+          id: `n_exp_cross_${suffix}`,
+          title: `${crossRegionName} Angle: ${parentNode.title}`,
+          region: crossRegion,
+          relationToOrigin: "cross_disciplinary",
+          difficulty: "Advanced",
+          x: undefined as unknown as number,
+          y: undefined as unknown as number,
+          explored: false,
+          mastered: false,
+          summary: `Cross-field bridge connecting "${parentNode.title}" with ${crossRegionName}.`,
+          levels: {
+            simple: `How people in ${crossRegionName} borrow principles from "${parentNode.title}" to build fresh tools or insights.`,
+            standard: `Interdisciplinary link uniting "${parentNode.title}" with modeling, instruments, or frameworks from ${crossRegionName}.`,
+            deep: `Domain convergence between ${parentRegionName} and ${crossRegionName}, turning "${parentNode.title}" into an applied modern system.`,
           },
-          {
-            text: "Karena node ini merupakan bab pertama di buku sekolah dasar",
-            correct: false,
+          formula: `Synergy: Concept (${parentRegionName}) × Approach (${crossRegionName})`,
+          application: `Opens new research angles and cross-disciplinary workflows starting from "${parentNode.title}".`,
+          reference: `Interdisciplinary Review — ${parentRegionName} × ${crossRegionName}`,
+          quickCheck: {
+            question: "Why is this node linked with a Cross-Disciplinary edge?",
+            options: [
+              {
+                text: `Because it bridges "${parentNode.title}" from ${parentRegionName} into ${crossRegionName}`,
+                correct: true,
+              },
+              {
+                text: "Because it repeats the exact same basic definition word-for-word",
+                correct: false,
+              },
+            ],
           },
-        ],
-      },
-    },
-  ];
+        },
+      ]
+    : [
+        {
+          id: `n_exp_ext_${suffix}`,
+          title: `Pendalaman: Dinamika ${baseParentTitle}`,
+          region: parentNode.region,
+          relationToOrigin: "extension",
+          difficulty: "Advanced",
+          x: Math.min(parentNode.x + 115, 840),
+          y: Math.min(parentNode.y + 85, 460),
+          explored: true,
+          mastered: false,
+          summary: `Cabang lanjutan dari "${parentNode.title}" di ${parentRegionName}.`,
+          levels: {
+            simple: `Melihat lebih dekat cara bagian-bagian kecil di "${parentNode.title}" bekerja saat kondisinya berubah drastis.`,
+            standard: `Pembahasan lanjutan dari "${parentNode.title}" seputar mekanisme kontrol, batas adaptasi sistem, dan contoh kasus nyatanya.`,
+            deep: `Analisis kinetika, regulasi molekuler atau sistemik, serta interaksi parameter yang mengatur "${parentNode.title}".`,
+          },
+          formula: `Respon Lanjut: d(${formatFormulaSubject(parentNode.title)})/dt = f(Parameter Internal, Lingkungan)`,
+          application: `Membantu kamu membedah kasus yang lebih rumit dari "${parentNode.title}" sesuai minat ${vault.inputContext.interestDomain}.`,
+          reference: `${parentNode.reference} (Lanjutan)`,
+          quickCheck: {
+            question: `Apa yang ditambah cabang ini terhadap pemahaman "${parentNode.title}"?`,
+            options: [
+              {
+                text: "Mengupas mekanisme kontrol dan batas kerja konsep saat kondisinya lebih kompleks",
+                correct: true,
+              },
+              {
+                text: "Membatalkan semua dasar dari konsep sebelumnya",
+                correct: false,
+              },
+            ],
+          },
+        },
+        {
+          id: `n_exp_cross_${suffix}`,
+          title: `Kaitan ${crossRegionName}: ${parentNode.title}`,
+          region: crossRegion,
+          relationToOrigin: "cross_disciplinary",
+          difficulty: "Advanced",
+          x: undefined as unknown as number,
+          y: undefined as unknown as number,
+          explored: false,
+          mastered: false,
+          summary: `Jembatan lintas bidang dari "${parentNode.title}" menuju ${crossRegionName}.`,
+          levels: {
+            simple: `Bagaimana prinsip "${parentNode.title}" dipakai di bidang ${crossRegionName} untuk bikin solusi atau alat baru.`,
+            standard: `Koneksi lintas bidang yang menggabungkan "${parentNode.title}" dengan metode analisis atau teknologi dari ${crossRegionName}.`,
+            deep: `Konvergensi keilmuan antara ${parentRegionName} dan ${crossRegionName} untuk mengubah konsep "${parentNode.title}" menjadi sistem terapan modern.`,
+          },
+          formula: `Sinergi: Konsep (${parentRegionName}) × Pendekatan (${crossRegionName})`,
+          application: `Membuka ide riset dan terapan baru lintas bidang dari titik awal "${parentNode.title}".`,
+          reference: `Tinjauan Lintas Bidang — ${parentRegionName} × ${crossRegionName}`,
+          quickCheck: {
+            question: "Kenapa node ini terhubung sebagai garis Lintas Bidang?",
+            options: [
+              {
+                text: `Karena idenya menyeberang dari ${parentRegionName} ke ${crossRegionName}`,
+                correct: true,
+              },
+              {
+                text: "Karena materinya cuma mengulang definisi awal tanpa konteks baru",
+                correct: false,
+              },
+            ],
+          },
+        },
+      ];
 
-  const newEdges: KnowledgeEdge[] = [
-    {
-      id: `e_exp_1_${suffix}`,
-      source: parentNode.id,
-      target: newNodes[0].id,
-      relation: "extension",
-      reason: `Ekspansi bertahap dari node "${parentNode.title}": Membedah mekanisme regulasi dan dinamika lanjutan di dalam rumpun ${parentNode.region}.`,
-    },
-    {
-      id: `e_exp_2_${suffix}`,
-      source: parentNode.id,
-      target: newNodes[1].id,
-      relation: "cross_disciplinary",
-      reason: `Penyebaran Lintas-Region (${parentNode.region} → ${crossRegion}): Menerapkan prinsip "${parentNode.title}" ke dalam inovasi lintas disiplin ilmu.`,
-    },
-  ];
+  const newEdges: KnowledgeEdge[] = isEn
+    ? [
+        {
+          id: `e_exp_1_${suffix}`,
+          source: parentNode.id,
+          target: newNodes[0].id,
+          relation: "extension",
+          reason: `Builds directly on "${parentNode.title}" by unpacking how its internal controls respond under tougher conditions.`,
+        },
+        {
+          id: `e_exp_2_${suffix}`,
+          source: parentNode.id,
+          target: newNodes[1].id,
+          relation: "cross_disciplinary",
+          reason: `Bridges "${parentNode.title}" from ${parentRegionName} into ${crossRegionName} for fresh applications.`,
+        },
+      ]
+    : [
+        {
+          id: `e_exp_1_${suffix}`,
+          source: parentNode.id,
+          target: newNodes[0].id,
+          relation: "extension",
+          reason: `Mendalami "${parentNode.title}" dengan mengupas mekanisme kontrol dan batas kerjanya di ${parentRegionName}.`,
+        },
+        {
+          id: `e_exp_2_${suffix}`,
+          source: parentNode.id,
+          target: newNodes[1].id,
+          relation: "cross_disciplinary",
+          reason: `Membawa prinsip "${parentNode.title}" dari ${parentRegionName} ke ${crossRegionName} untuk sudut pandang terapan baru.`,
+        },
+      ];
 
   const combinedNodes = [...vault.nodes, ...newNodes];
   const combinedEdges = [...vault.edges, ...newEdges];

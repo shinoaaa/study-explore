@@ -15,6 +15,7 @@ import {
   RegionCode,
 } from "@/types/knowledge";
 import {
+  BookOpen,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -39,13 +40,14 @@ export type RegionVisualMode = "hybrid" | "aura_only" | "bordered";
 
 interface SkillTreeCanvasProps {
   vault: KnowledgeVault;
-  selectedNodeId: string;
-  onSelectNode: (nodeId: string) => void;
+  vaults: KnowledgeVault[];
+  onSwitchVault: (vaultId: string) => void;
+  onOpenOverview: () => void;
+  selectedNodeId: string | null;
+  onSelectNode: (nodeId: string | null) => void;
   onUnlockAllFog: () => void;
   newlyAddedIds?: string[];
   expandedRegions?: RegionCode[];
-  isFullCanvas?: boolean;
-  onToggleFullCanvas?: () => void;
 }
 
 function trimToCardEdge(
@@ -68,13 +70,14 @@ function trimToCardEdge(
 
 export default function SkillTreeCanvas({
   vault,
+  vaults,
+  onSwitchVault,
+  onOpenOverview,
   selectedNodeId,
   onSelectNode,
   onUnlockAllFog,
   newlyAddedIds = [],
   expandedRegions = [],
-  isFullCanvas = false,
-  onToggleFullCanvas,
 }: SkillTreeCanvasProps) {
   const [viewMode, setViewMode] = useState<"graph" | "outline">("graph");
   const [regionFilter, setRegionFilter] = useState<RegionCode | "ALL">("ALL");
@@ -177,7 +180,13 @@ export default function SkillTreeCanvas({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest("[data-node-card='true']")) return;
+    const target = e.target as HTMLElement;
+    if (
+      target.closest("[data-node-card='true']") ||
+      target.closest("[data-canvas-ui='true']")
+    ) {
+      return;
+    }
     setIsPanning(true);
     panOriginRef.current = {
       x: e.clientX,
@@ -197,7 +206,16 @@ export default function SkillTreeCanvas({
     });
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isPanning) {
+      const moved = Math.hypot(
+        e.clientX - panOriginRef.current.x,
+        e.clientY - panOriginRef.current.y
+      );
+      if (moved < 5 && selectedNodeId) {
+        onSelectNode(null);
+      }
+    }
     setIsPanning(false);
   };
 
@@ -222,30 +240,49 @@ export default function SkillTreeCanvas({
       : "Borders: Solid";
 
   return (
-    <section className="flex flex-col rounded-2xl border border-[#DFE6F0] bg-white shadow-sm overflow-hidden">
-      {/* Workspace Top Bar matching Figma Screen 07 */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#DFE6F0] bg-white px-4 py-3">
+    <section className="flex flex-col h-[calc(100vh-56px)] lg:h-screen w-full bg-white overflow-hidden">
+      {/* Unified Clean Top Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#DFE6F0] bg-white px-4 py-2.5 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF2FF] text-[#2F80ED] shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#EAF2FF] text-[#2F80ED] shrink-0">
             <Network className="h-4 w-4" />
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-extrabold text-[#17233C] truncate">
-                {vault.name}
-              </h2>
-              <span className="hidden sm:inline-flex rounded-full bg-[#EAF2FF] px-2 py-0.5 text-[11px] font-semibold text-[#2F80ED]">
-                {vault.inputContext.mode === "mode_a" ? "Mode A" : "Mode B"}
-              </span>
-            </div>
-            <p className="text-[11px] text-[#6F7E93] truncate">
-              {vault.nodes.length} nodes · {activeRegionCount} of 6 regions · Outward Region Containment
-            </p>
+          <div className="min-w-0 flex flex-wrap items-center gap-2">
+            <select
+              aria-label="Select Active Vault"
+              value={vault.id}
+              onChange={(e) => onSwitchVault(e.target.value)}
+              className="max-w-[240px] sm:max-w-[290px] truncate rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] px-2.5 py-1 text-xs font-extrabold text-[#17233C] hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
+            >
+              {vaults.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+            <span className="hidden sm:inline-flex rounded-full bg-[#EAF2FF] px-2.5 py-0.5 text-[11px] font-semibold text-[#2F80ED]">
+              {vault.inputContext.mode === "mode_a"
+                ? "From Material"
+                : "From Interest"}
+            </span>
+            <span className="hidden md:inline text-[11px] font-medium text-[#6F7E93]">
+              {vault.nodes.length} concepts · {activeRegionCount} of 6 regions
+            </span>
           </div>
         </div>
 
-        {/* Right Controls: Tree/Outline Switcher, Search, Aura Toggle, Filters */}
+        {/* Right Controls: Overview, Tree/Outline, Search, Aura Toggle, Filters */}
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenOverview}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] bg-white hover:border-[#2F80ED] hover:bg-[#EAF2FF]/60 px-2.5 py-1.5 text-xs font-bold text-[#17233C] transition-colors"
+            title="View Foundation Overview"
+          >
+            <BookOpen className="h-3.5 w-3.5 text-[#2F80ED]" />
+            <span className="hidden xl:inline">Overview</span>
+          </button>
+
           {/* Tree / Outline Switcher */}
           <div className="flex items-center rounded-xl border border-[#DFE6F0] bg-[#F3F6FC] p-1">
             <button
@@ -348,21 +385,10 @@ export default function SkillTreeCanvas({
               type="button"
               onClick={onUnlockAllFog}
               className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 text-xs font-semibold text-amber-800 transition-all"
-              title="Lift atmospheric Fog of War on all nodes"
+              title="Lift Fog of War on all nodes"
             >
               <CloudFog className="h-3.5 w-3.5" />
               Reveal Fog ({fogCount})
-            </button>
-          )}
-
-          {onToggleFullCanvas && (
-            <button
-              type="button"
-              onClick={onToggleFullCanvas}
-              title={isFullCanvas ? "Exit Full Canvas" : "Expand Canvas Width"}
-              className="hidden lg:inline-flex items-center justify-center rounded-xl border border-[#DFE6F0] bg-white hover:bg-[#F3F6FC] p-1.5 text-[#17233C]"
-            >
-              <Maximize2 className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -375,21 +401,24 @@ export default function SkillTreeCanvas({
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onMouseLeave={() => setIsPanning(false)}
           onWheel={handleWheel}
           style={{
             backgroundImage:
               "radial-gradient(#CFDCEB 1.25px, transparent 1.25px)",
             backgroundSize: "26px 26px",
           }}
-          className={`relative w-full ${
-            isFullCanvas ? "h-[690px]" : "h-[600px]"
-          } select-none overflow-hidden bg-[#F3F6FC] ${
+          className={`relative w-full flex-1 min-h-0 select-none overflow-hidden bg-[#F3F6FC] ${
             isPanning ? "cursor-grabbing" : "cursor-grab"
           }`}
         >
-          {/* Floating Unbounded Open Exploration Telemetry Pill (Top Center - NFR-11) */}
-          <div className="pointer-events-none absolute inset-x-0 top-3.5 z-20 flex justify-center px-4">
+          {/* Floating Exploration Summary Pill */}
+          <div
+            data-canvas-ui="true"
+            className={`pointer-events-none absolute inset-x-0 top-3.5 z-20 flex justify-center px-4 transition-all ${
+              selectedNodeId ? "lg:pr-[416px]" : ""
+            }`}
+          >
             <div className="pointer-events-auto inline-flex flex-wrap items-center gap-3 rounded-full border border-[#DFE6F0] bg-white/95 backdrop-blur-sm px-4 py-1.5 text-xs shadow-sm">
               <span className="inline-flex items-center gap-1.5 font-semibold text-[#17233C]">
                 <Network className="h-3.5 w-3.5 text-[#2F80ED]" />
@@ -414,7 +443,10 @@ export default function SkillTreeCanvas({
           </div>
 
           {/* Floating Left Zoom Controls */}
-          <div className="absolute left-3.5 top-3.5 z-20 flex flex-col items-center gap-2">
+          <div
+            data-canvas-ui="true"
+            className="absolute left-3.5 top-3.5 z-20 flex flex-col items-center gap-2"
+          >
             <div className="flex flex-col rounded-xl border border-[#DFE6F0] bg-white/95 shadow-sm overflow-hidden">
               <button
                 type="button"
@@ -514,7 +546,7 @@ export default function SkillTreeCanvas({
                 ))}
               </defs>
 
-              {/* Hybrid Region Auras & Borders (NFR-09 Auto-Expanding) */}
+              {/* Hybrid Region Auras & Borders */}
               {visibleRegionBounds.map((box: RegionBounds) => {
                 const reg = KNOWLEDGE_REGIONS[box.region];
                 const isExpandedHere = expandedRegions.includes(box.region);
@@ -906,6 +938,7 @@ export default function SkillTreeCanvas({
 
           {/* Bottom-Left Edge Relations Legend Card (Collapsible to preserve canvas space) */}
           <div
+            data-canvas-ui="true"
             className={`absolute bottom-3.5 left-3.5 z-20 rounded-2xl border border-[#DFE6F0] bg-white/95 backdrop-blur-sm shadow-sm transition-all ${
               legendExpanded ? "w-[264px] px-3.5 py-2.5" : "px-3 py-2"
             }`}
@@ -961,8 +994,13 @@ export default function SkillTreeCanvas({
             )}
           </div>
 
-          {/* Bottom-Right Live Mini-map */}
-          <div className="hidden sm:block absolute bottom-3.5 right-3.5 z-20 rounded-xl border border-[#DFE6F0] bg-white/95 p-1.5 shadow-sm">
+          {/* Bottom-Right Live Mini-map (shifts cleanly when Concept Reader modal is docked right) */}
+          <div
+            data-canvas-ui="true"
+            className={`hidden sm:block absolute bottom-3.5 z-20 rounded-xl border border-[#DFE6F0] bg-white/95 p-1.5 shadow-sm transition-all ${
+              selectedNodeId ? "right-3.5 lg:right-[424px]" : "right-3.5"
+            }`}
+          >
             <svg
               width={156}
               height={96}
@@ -1005,12 +1043,8 @@ export default function SkillTreeCanvas({
           </div>
         </div>
       ) : (
-        /* Accessible Outline View (Light Mode - FEAT-07) */
-        <div
-          className={`${
-            isFullCanvas ? "h-[690px]" : "h-[600px]"
-          } overflow-y-auto bg-[#F3F6FC] p-4 space-y-2.5`}
-        >
+        /* Accessible Outline View */
+        <div className="flex-1 min-h-0 overflow-y-auto bg-[#F3F6FC] p-4 sm:p-6 space-y-2.5">
           {filteredNodes
             .filter(
               (n) =>
@@ -1062,7 +1096,7 @@ export default function SkillTreeCanvas({
                       )}
                     </div>
                     <span className="text-xs font-bold text-[#2F80ED]">
-                      Open in Inspector →
+                      Read Concept →
                     </span>
                   </div>
 

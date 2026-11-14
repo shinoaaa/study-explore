@@ -97,7 +97,7 @@ export default function CreateVaultModal({
         <div className="flex items-center justify-between gap-4 border-b border-[#DFE6F0] pb-4">
           <div>
             <span className="inline-flex rounded-full bg-[#EAF2FF] px-3 py-0.5 text-[11px] font-bold text-[#2F80ED]">
-              Obsidian-Style Isolated Workspace (BR-01)
+              Personal Knowledge Vault
             </span>
             <h2 className="mt-1.5 text-2xl font-extrabold text-[#17233C]">
               Create New Vault

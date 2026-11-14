@@ -137,7 +137,7 @@ export const EDGE_RELATIONS: Record<EdgeRelationType, EdgeRelationDefinition> = 
     hasArrow: true,
     badgeClass: "bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]",
     description:
-      "Konsep fondasi yang mutlak harus dipahami terlebih dahulu sebelum konsep target (BR-02).",
+      "Konsep fondasi yang perlu dipahami terlebih dahulu sebelum melanjutkan ke konsep target.",
     visualRule: "Dashed Arrow (Amber)",
   },
   extension: {
@@ -175,7 +175,7 @@ export const EDGE_RELATIONS: Record<EdgeRelationType, EdgeRelationDefinition> = 
     hasArrow: false,
     badgeClass: "bg-[#CFFAFE] text-[#155E75] border-[#67E8F9]",
     description:
-      "Keterkaitan konseptual sejajar yang saling melengkapi namun bukan syarat mutlak (BR-02).",
+      "Keterkaitan konseptual sejajar yang saling melengkapi namun dapat dipelajari fleksibel tanpa syarat urutan.",
     visualRule: "Dotted Bidir (Cyan)",
   },
   cross_disciplinary: {
@@ -187,7 +187,7 @@ export const EDGE_RELATIONS: Record<EdgeRelationType, EdgeRelationDefinition> = 
     hasArrow: true,
     badgeClass: "bg-[#FAE8FF] text-[#86198F] border-[#F0ABFC]",
     description:
-      "Jembatan yang menyeberangkan eksplorasi ke Knowledge Region lain untuk mencegah Filter Bubble (BR-04 & BR-05).",
+      "Jembatan eksplorasi menuju rumpun ilmu lain agar pemahaman berkembang lebih luas dan multidisiplin.",
     visualRule: "Curved Portal (Magenta)",
   },
 };

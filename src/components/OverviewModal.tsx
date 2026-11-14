@@ -30,7 +30,7 @@ export default function OverviewModal({
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF2FF] px-3 py-0.5 text-xs font-bold text-[#2F80ED]">
                 <BookOpenCheck className="h-3.5 w-3.5" />
-                Foundation Overview Module (FR-04)
+                Foundation Overview
               </span>
               <span
                 className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${regInfo.badgeClass}`}
@@ -53,7 +53,7 @@ export default function OverviewModal({
 
         <div className="rounded-2xl border border-[#DFE6F0] bg-[#F8FAFC] p-4 space-y-1.5">
           <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93]">
-            Conceptual Synthesis (Copyright-Safe Summary — BR-08)
+            Concept Synthesis
           </div>
           <p className="text-sm leading-relaxed text-[#334155]">
             {vault.overview.summary}

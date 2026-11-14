@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Trellis — Knowledge Exploration Platform",
+  title: "Trellis — Your Knowledge Cosmos",
   description:
-    "AI-Powered Knowledge Exploration Platform yang memetakan materi pembelajaran dan minat personal menjadi Regional Skill Tree interaktif (LOGICODIX 2026).",
+    "Explore interconnected concepts from your study materials or personal curiosity inside an adaptive regional knowledge tree.",
 };
 
 export default function RootLayout({

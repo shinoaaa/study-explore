@@ -350,7 +350,7 @@ function synthesizeDeterministicVault(
         question: `Mengapa hubungan antara node ini dan materi utama dilabeli sebagai Related Concept (bukan Prerequisite)?`,
         options: [
           {
-            text: "Karena kedua konsep ini saling melengkapi secara sejajar, bukan urutan prasyarat wajib (sesuai BR-02)",
+            text: "Karena kedua konsep ini saling melengkapi secara sejajar, bukan urutan prasyarat wajib",
             correct: true,
           },
           {

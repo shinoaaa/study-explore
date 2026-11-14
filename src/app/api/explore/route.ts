@@ -2,6 +2,9 @@ import { exploreIntoVault, generateVaultFromInput } from "@/lib/ai-engine";
 import { KnowledgeVault, VaultInputContext } from "@/types/knowledge";
 import { NextResponse } from "next/server";
 
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();

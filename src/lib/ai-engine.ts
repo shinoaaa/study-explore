@@ -1,11 +1,22 @@
-import { KNOWLEDGE_REGIONS } from "@/lib/regions";
+import { inferStartingRegion, KNOWLEDGE_REGIONS } from "@/lib/regions";
 import { validateAndBuildGraph } from "@/lib/validator";
 import {
+  mergeExplorationIntoVault,
+  normalizeNode,
+  normalizeVault,
+} from "@/lib/vault-storage";
+import {
+  ExplanationDepth,
+  ExplanationLevels,
+  ExplorationContext,
+  ExplorationPath,
   KnowledgeEdge,
   KnowledgeNode,
   KnowledgeVault,
+  LearningSource,
   OverviewModule,
   RegionCode,
+  SourceFormat,
   VaultInputContext,
 } from "@/types/knowledge";
 
@@ -28,46 +39,6 @@ function formatFormulaSubject(title: string): string {
   const lastSpace = cut.lastIndexOf(" ");
   const boundary = lastSpace > 10 ? cut.slice(0, lastSpace) : cut;
   return boundary.replace(/[\s&/+-]+$/, "") || cut.trim();
-}
-
-function inferStartingRegion(text: string): RegionCode {
-  const lower = text.toLowerCase();
-  if (
-    /medis|kedokteran|kanker|penyakit|klinis|kesehatan|olahraga|atlet|fisiologi|obat|farmasi|gizi/.test(
-      lower
-    )
-  ) {
-    return "REG-02";
-  }
-  if (
-    /komputer|informatika|pemrograman|coding|ai|data|algoritma|software|jaringan|siber|web/.test(
-      lower
-    )
-  ) {
-    return "REG-03";
-  }
-  if (
-    /teknik|rekayasa|mesin|elektro|robot|industri|sipil|iot|sensor|otomotif|energi terbarukan/.test(
-      lower
-    )
-  ) {
-    return "REG-04";
-  }
-  if (
-    /matematika|kalkulus|aljabar|statistika|probabilitas|geometri|logika|trigonometri|diskrit/.test(
-      lower
-    )
-  ) {
-    return "REG-05";
-  }
-  if (
-    /ekonomi|sosial|sejarah|psikologi|hukum|politik|akuntansi|bisnis|manajemen|geografi|sosiologi/.test(
-      lower
-    )
-  ) {
-    return "REG-06";
-  }
-  return "REG-01";
 }
 
 function getAdjacentCrossRegion(reg: RegionCode): RegionCode {
@@ -771,7 +742,7 @@ export async function generateVaultFromInput(
           const now = new Date().toISOString();
           return {
             engineUsed: "gemini-api",
-            vault: {
+            vault: normalizeVault({
               id: `vault-${Date.now()}`,
               name: vaultName,
               createdAt: now,
@@ -806,7 +777,7 @@ export async function generateVaultFromInput(
               nodes,
               edges,
               validation,
-            },
+            }),
           };
         }
       }
@@ -817,7 +788,7 @@ export async function generateVaultFromInput(
 
   return {
     engineUsed: "deterministic-fallback",
-    vault: synthesizeDeterministicVault(vaultName, ctx, lang),
+    vault: normalizeVault(synthesizeDeterministicVault(vaultName, ctx, lang)),
   };
 }
 
@@ -924,27 +895,39 @@ Return ONLY raw JSON (no markdown fence):
           parsed.nodes.length >= 1 &&
           Array.isArray(parsed.edges)
         ) {
-          const combinedNodes = [...vault.nodes, ...parsed.nodes];
+          const nowIso = new Date().toISOString();
+          const preparedParsedNodes = parsed.nodes.map((pn: KnowledgeNode) =>
+            normalizeNode(
+              {
+                ...pn,
+                origin: "ai_generated",
+                sourceIds: parentNode.sourceIds || [],
+              },
+              parentNode.sourceIds?.[0],
+              nowIso
+            )
+          );
+          const combinedNodes = [...vault.nodes, ...preparedParsedNodes];
           const combinedEdges = [...vault.edges, ...parsed.edges];
           const { nodes, edges, validation } = validateAndBuildGraph(
             combinedNodes,
             combinedEdges
           );
-          const addedNodeIds = parsed.nodes
-            .map((n: { id: string }) => n.id)
+          const addedNodeIds = preparedParsedNodes
+            .map((n: KnowledgeNode) => n.id)
             .filter((id: string) => nodes.some((vn) => vn.id === id));
 
           if (addedNodeIds.length > 0) {
             return {
               engineUsed: "gemini-api",
               addedNodeIds,
-              vault: {
+              vault: normalizeVault({
                 ...vault,
-                updatedAt: new Date().toISOString(),
+                updatedAt: nowIso,
                 nodes,
                 edges,
                 validation,
-              },
+              }),
             };
           }
         }
@@ -1130,7 +1113,19 @@ Return ONLY raw JSON (no markdown fence):
         },
       ];
 
-  const combinedNodes = [...vault.nodes, ...newNodes];
+  const nowIso = new Date().toISOString();
+  const normalizedNewNodes = newNodes.map((nn) =>
+    normalizeNode(
+      {
+        ...nn,
+        origin: "ai_generated",
+        sourceIds: parentNode.sourceIds || [],
+      },
+      parentNode.sourceIds?.[0],
+      nowIso
+    )
+  );
+  const combinedNodes = [...vault.nodes, ...normalizedNewNodes];
   const combinedEdges = [...vault.edges, ...newEdges];
   const { nodes, edges, validation } = validateAndBuildGraph(
     combinedNodes,
@@ -1139,13 +1134,280 @@ Return ONLY raw JSON (no markdown fence):
 
   return {
     engineUsed: "deterministic-fallback",
-    addedNodeIds: newNodes.map((n) => n.id),
-    vault: {
+    addedNodeIds: normalizedNewNodes.map((n) => n.id),
+    vault: normalizeVault({
       ...vault,
-      updatedAt: new Date().toISOString(),
+      updatedAt: nowIso,
       nodes,
       edges,
       validation,
-    },
+    }),
+  };
+}
+
+export interface AddExplorationPayload {
+  vault: KnowledgeVault;
+  path: ExplorationPath;
+  existingSourceId?: string;
+  sourceFormat?: SourceFormat;
+  title: string;
+  chapterOrSection?: string;
+  excerptOrNotes?: string;
+  focusQuestion: string;
+  explorationGoal: string;
+  depth: ExplanationDepth;
+  lang?: EngineLanguage;
+}
+
+/**
+ * Run a new Exploration inside an active Vault and merge its mapped concepts non-destructively.
+ */
+export async function exploreIntoVault(
+  payload: AddExplorationPayload
+): Promise<{
+  vault: KnowledgeVault;
+  addedNodeIds: string[];
+  flaggedReviewIds: string[];
+  engineUsed: "gemini-api" | "deterministic-fallback";
+}> {
+  const {
+    vault,
+    path,
+    existingSourceId,
+    sourceFormat,
+    title,
+    chapterOrSection,
+    excerptOrNotes,
+    focusQuestion,
+    explorationGoal,
+    depth,
+    lang = "id",
+  } = payload;
+
+  const isEn = lang === "en";
+  const now = new Date().toISOString();
+  const identity = vault.identity;
+  const interest =
+    identity?.mainInterest ||
+    vault.inputContext.interestDomain ||
+    vault.name;
+
+  const reusedSource = existingSourceId
+    ? (vault.learningSources || []).find((s) => s.id === existingSourceId)
+    : undefined;
+
+  const effectiveTitle = (reusedSource?.title || title).trim() || vault.name;
+  const effectiveChapter =
+    (reusedSource?.chapterOrSection || chapterOrSection || "").trim() || undefined;
+  const effectiveNotes =
+    (reusedSource?.excerptOrNotes || excerptOrNotes || "").trim() || undefined;
+
+  const ctx: VaultInputContext =
+    path === "material"
+      ? {
+          mode: "mode_a",
+          subject: effectiveChapter || effectiveTitle,
+          chapter: effectiveTitle,
+          subchapters: effectiveNotes || effectiveTitle,
+          interestDomain: interest,
+          targetGoal: focusQuestion || explorationGoal || effectiveTitle,
+          motivation: explorationGoal,
+        }
+      : {
+          mode: "mode_b",
+          interestDomain: interest,
+          targetGoal: effectiveTitle || focusQuestion,
+          motivation: effectiveNotes || explorationGoal || focusQuestion,
+        };
+
+  const generated = await generateVaultFromInput(vault.name, ctx, lang);
+
+  const sourceId = reusedSource?.id || `src-${Date.now()}`;
+  const newSource: LearningSource | undefined = reusedSource
+    ? undefined
+    : {
+        id: sourceId,
+        title: effectiveTitle,
+        format:
+          path === "material"
+            ? sourceFormat || "book_chapter"
+            : "curiosity",
+        chapterOrSection: effectiveChapter,
+        excerptOrNotes:
+          effectiveNotes ||
+          explorationGoal ||
+          (isEn
+            ? `Exploration notes anchored to ${effectiveTitle}.`
+            : `Catatan eksplorasi untuk topik ${effectiveTitle}.`),
+        focusQuestion: focusQuestion || identity?.focusQuestion || effectiveTitle,
+        origin: "user_source",
+        isFavorite: false,
+        createdAt: now,
+        updatedAt: now,
+        linkedNodeIds: [],
+      };
+
+  const exploration: ExplorationContext = {
+    id: `exp-${Date.now()}`,
+    path,
+    sourceId,
+    title: effectiveTitle,
+    subjectOrTopic: interest,
+    chapterOrSection: effectiveChapter,
+    focusQuestion: focusQuestion || identity?.focusQuestion || effectiveTitle,
+    explorationGoal: explorationGoal || identity?.learningGoal || effectiveTitle,
+    depth,
+    createdAt: now,
+    mappedNodeIds: [],
+  };
+
+  const merged = mergeExplorationIntoVault({
+    vault,
+    exploration,
+    newSource,
+    incomingNodes: generated.vault.nodes,
+    incomingEdges: generated.vault.edges,
+    overview: generated.vault.overview,
+    lang,
+  });
+
+  return {
+    ...merged,
+    engineUsed: generated.engineUsed,
+  };
+}
+
+/**
+ * Generate a preview-only AI revision of a concept note without mutating saved state.
+ */
+export async function generateNoteRevisionPreview(params: {
+  vaultName: string;
+  mainInterest: string;
+  learningGoal: string;
+  node: KnowledgeNode;
+  depth: ExplanationDepth;
+  instruction?: string;
+  lang?: EngineLanguage;
+}): Promise<{
+  summary: string;
+  levels: ExplanationLevels;
+  rationale: string;
+  engineUsed: "gemini-api" | "deterministic-fallback";
+}> {
+  const {
+    vaultName,
+    mainInterest,
+    learningGoal,
+    node,
+    depth,
+    instruction,
+    lang = "id",
+  } = params;
+  const isEn = lang === "en";
+  const focusNote = (instruction || "").trim();
+
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+
+  if (apiKey) {
+    try {
+      const prompt = `You are a careful study editor for Curiora. Improve clarity without removing accuracy or voice.
+Vault: "${vaultName}" (Interest: "${mainInterest}", Goal: "${learningGoal}").
+Topic: "${node.title}"
+Target Depth to highlight: "${depth}"
+User instruction: "${focusNote || (isEn ? "Clarify intuition, keep factual precision, and tighten readability." : "Perjelas intuisi, jaga ketepatan konsep, dan rapikan alur baca.")}"
+User personal annotation (preserve context): "${node.userAnnotation || "-"}"
+
+Current Note:
+- summary: ${JSON.stringify(node.summary)}
+- simple: ${JSON.stringify(node.levels.simple)}
+- standard: ${JSON.stringify(node.levels.standard)}
+- deep: ${JSON.stringify(node.levels.deep)}
+
+Language rule: ${isEn ? "Respond in natural English." : "Tulis seluruh revisi dalam Bahasa Indonesia yang jelas dan enak dibaca."}
+Return ONLY raw JSON (no markdown fence):
+{
+  "summary": "string",
+  "levels": { "simple": "string", "standard": "string", "deep": "string" },
+  "rationale": "1 short sentence explaining what changed"
+}`;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.35,
+            responseMimeType: "application/json",
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const parsed = JSON.parse(rawText);
+        if (parsed?.summary && parsed?.levels?.simple && parsed?.levels?.standard && parsed?.levels?.deep) {
+          return {
+            summary: parsed.summary,
+            levels: parsed.levels,
+            rationale:
+              parsed.rationale ||
+              (isEn
+                ? "Refined clarity and aligned examples with your Vault focus."
+                : "Memperjelas penjelasan agar lebih selaras dengan fokus vault kamu."),
+            engineUsed: "gemini-api",
+          };
+        }
+      }
+    } catch {
+      // Fallback cleanly to deterministic preview
+    }
+  }
+
+  const nextLevels: ExplanationLevels = { ...node.levels };
+  const annotationHint = node.userAnnotation?.trim()
+    ? isEn
+      ? ` Building on your note ("${node.userAnnotation.slice(0, 70)}"),`
+      : ` Menyambung catatanmu ("${node.userAnnotation.slice(0, 70)}"),`
+    : "";
+
+  const extraCue = focusNote
+    ? isEn
+      ? ` Refined with focus on: ${focusNote}.`
+      : ` Dipertajam dengan fokus: ${focusNote}.`
+    : "";
+
+  if (depth === "simple") {
+    nextLevels.simple = isEn
+      ? `Think of "${node.title}" step by step:${annotationHint} first notice what triggers it, then trace how it shapes ${mainInterest}.${extraCue} ${node.levels.simple}`
+      : `Bayangkan "${node.title}" secara bertahap:${annotationHint} kenali dulu pemicunya, lalu lihat dampaknya di bidang ${mainInterest}.${extraCue} ${node.levels.simple}`;
+  } else if (depth === "standard") {
+    nextLevels.standard = isEn
+      ? `${node.levels.standard}${annotationHint} In the context of "${learningGoal}", this explains why ${node.title} sits as a key bridge across related concepts.${extraCue}`
+      : `${node.levels.standard}${annotationHint} Dalam konteks "${learningGoal}", konsep ini jadi jembatan penting antaride yang saling berkaitan.${extraCue}`;
+  } else {
+    nextLevels.deep = isEn
+      ? `${node.levels.deep} Key framing for ${mainInterest}: track boundary conditions, feedback loops, and quantitative trade-offs (${node.formula}).${extraCue}`
+      : `${node.levels.deep} Kerangka lanjut untuk ${mainInterest}: perhatikan batas kerja, umpan balik sistem, dan hubungan prinsip (${node.formula}).${extraCue}`;
+  }
+
+  return {
+    summary: focusNote
+      ? `${node.summary} — ${focusNote}`
+      : isEn
+        ? `${node.summary} Tuned for ${mainInterest}.`
+        : `${node.summary} Diselaraskan ke fokus ${mainInterest}.`,
+    levels: nextLevels,
+    rationale: focusNote
+      ? isEn
+        ? `Adjusted the ${depth} explanation around "${focusNote}" for your review.`
+        : `Menyesuaikan penjelasan level ${depth} ke fokus "${focusNote}" sebagai pratinjau.`
+      : isEn
+        ? `Tightened the ${depth} explanation around your Vault's goal without changing your saved note until you apply it.`
+        : `Mempertajam penjelasan level ${depth} agar makin nyambung dengan tujuan vault (baru diterapkan kalau kamu setuju).`,
+    engineUsed: "deterministic-fallback",
   };
 }

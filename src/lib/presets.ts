@@ -1,19 +1,26 @@
 import { validateAndBuildGraph } from "@/lib/validator";
+import { normalizeVault } from "@/lib/vault-storage";
 import { KnowledgeEdge, KnowledgeNode, KnowledgeVault } from "@/types/knowledge";
 
 function createVerifiedVault(
-  rawVault: Omit<KnowledgeVault, "validation">
+  rawVault: Omit<KnowledgeVault, "validation">,
+  favoriteNodeIds: string[] = []
 ): KnowledgeVault {
+  const favSet = new Set(favoriteNodeIds);
   const { nodes, edges, validation } = validateAndBuildGraph(
-    rawVault.nodes,
+    rawVault.nodes.map((n) => ({
+      ...n,
+      isFavorite: favSet.has(n.id),
+      origin: n.origin || "ai_generated",
+    })),
     rawVault.edges
   );
-  return {
+  return normalizeVault({
     ...rawVault,
     nodes,
     edges,
     validation,
-  };
+  });
 }
 
 const MEDIS_NODES: KnowledgeNode[] = [
@@ -928,105 +935,179 @@ const KANKER_EDGES: KnowledgeEdge[] = [
 ];
 
 export const PRESET_VAULTS: KnowledgeVault[] = [
-  createVerifiedVault({
-    id: "vault-preset-medis",
-    name: "Pernapasan × Medis",
-    createdAt: "2026-11-12T08:00:00.000Z",
-    updatedAt: "2026-11-12T08:00:00.000Z",
-    isPreset: true,
-    inputContext: {
-      mode: "mode_a",
-      subject: "Biologi (SMA Kelas XI)",
-      chapter: "Sistem Pernapasan Manusia",
-      subchapters:
-        "Organ pernapasan, Mekanisme pernapasan, Pertukaran gas, Gangguan sistem pernapasan",
-      interestDomain: "Dunia Medis & Fisiologi Sel",
-      targetGoal:
-        "Memahami bagaimana oksigen dari paru-paru diangkut darah dan digunakan oleh sel tubuh serta implikasi klinisnya",
-    },
-    overview: {
-      title: "Sistem Pernapasan Manusia · Medis & Seluler",
-      startingRegion: "REG-01",
-      summary:
-        "Perjalanan oksigen dari ventilasi paru hingga menembus alveolus, berikatan dengan hemoglobin, menghasilkan ATP di mitokondria, sampai analisis klinis hipoksia dan sensor pulse oximetry.",
-      keyConcepts: [
-        "Ventilasi Mekanis (Inspirasi & Ekspirasi)",
-        "Difusi Alveolar-Kapiler (Hukum Fick)",
-        "Transpor Oksihemoglobin & Efek Bohr",
-        "Fosforilasi Oksidatif Mitokondria",
+  createVerifiedVault(
+    {
+      id: "vault-preset-medis",
+      name: "Pernapasan × Medis",
+      createdAt: "2026-11-12T08:00:00.000Z",
+      updatedAt: "2026-11-12T08:00:00.000Z",
+      isPreset: true,
+      identity: {
+        mainInterest: "Dunia Medis & Fisiologi Sel",
+        shortDescription:
+          "Menghubungkan sistem pernapasan manusia dengan transpor oksigen seluler dan pembacaan klinis.",
+        focusQuestion:
+          "Bagaimana oksigen dari paru-paru diangkut darah dan digunakan oleh sel tubuh?",
+        learningGoal:
+          "Memahami mekanisme difusi gas, oksihemoglobin, hingga aplikasi pulse oximetry klinik.",
+        relatedInterests: ["Biologi Sel", "Klinis & Diagnostik", "Sensor Biomedis"],
+        difficultyComfort: "Intermediate",
+      },
+      inputContext: {
+        mode: "mode_a",
+        subject: "Biologi (SMA Kelas XI)",
+        chapter: "Sistem Pernapasan Manusia",
+        subchapters:
+          "Organ pernapasan, Mekanisme pernapasan, Pertukaran gas, Gangguan sistem pernapasan",
+        interestDomain: "Dunia Medis & Fisiologi Sel",
+        targetGoal:
+          "Bagaimana oksigen dari paru-paru diangkut darah dan digunakan oleh sel tubuh serta implikasi klinisnya",
+      },
+      learningSources: [
+        {
+          id: "src-medis-campbell",
+          title: "Campbell Biology — Bab Pertukaran Gas",
+          format: "book_chapter",
+          chapterOrSection: "Ch. 42: Gas Exchange & Circulation",
+          excerptOrNotes:
+            "Ventilasi mekanis, difusi alveolus-kapiler (Hukum Fick), kurva disosiasi hemoglobin-oksigen, dan pengikatan O2 oleh Fe2+ pada gugus heme.",
+          focusQuestion:
+            "Bagaimana gradien tekanan parsial memicu difusi oksigen ke oksihemoglobin?",
+          origin: "user_source",
+          isFavorite: true,
+          createdAt: "2026-11-12T08:00:00.000Z",
+          updatedAt: "2026-11-12T08:00:00.000Z",
+          linkedNodeIds: ["root", "n_difusi", "n_hb", "n_respsel"],
+        },
+        {
+          id: "src-medis-oximetry",
+          title: "Catatan Klinis: Hipoksia & Pulse Oximetry",
+          format: "lecture_notes",
+          chapterOrSection: "Modul Diagnostik Non-Invasif",
+          excerptOrNotes:
+            "Perbedaan serapan cahaya merah (660 nm) vs inframerah (940 nm) pada Hb teroksigenasi vs deoksihemoglobin di ujung jari.",
+          focusQuestion:
+            "Bagaimana sensor optik membaca saturasi O2 pasien secara real-time?",
+          origin: "user_source",
+          isFavorite: false,
+          createdAt: "2026-11-12T08:04:00.000Z",
+          updatedAt: "2026-11-12T08:04:00.000Z",
+          linkedNodeIds: ["n_hipoksia", "n_bioenergetika", "n_oximetry"],
+        },
       ],
-      coreFormulaOrPrinciple:
-        "Ventilasi Paru → Difusi Alveolus (ΔP O2) → Transpor Hb(O2)4 → Respirasi Seluler (ATP)",
-      primaryReference: "Campbell Biology 12th Ed. Ch. 42 & OpenStax Biology 2e Ch. 39",
+      overview: {
+        title: "Sistem Pernapasan Manusia · Medis & Seluler",
+        startingRegion: "REG-01",
+        summary:
+          "Perjalanan oksigen dari ventilasi paru hingga menembus alveolus, berikatan dengan hemoglobin, menghasilkan ATP di mitokondria, sampai analisis klinis hipoksia dan sensor pulse oximetry.",
+        keyConcepts: [
+          "Ventilasi Mekanis (Inspirasi & Ekspirasi)",
+          "Difusi Alveolar-Kapiler (Hukum Fick)",
+          "Transpor Oksihemoglobin & Efek Bohr",
+          "Fosforilasi Oksidatif Mitokondria",
+        ],
+        coreFormulaOrPrinciple:
+          "Ventilasi Paru → Difusi Alveolus (ΔP O2) → Transpor Hb(O2)4 → Respirasi Seluler (ATP)",
+        primaryReference: "Campbell Biology 12th Ed. Ch. 42 & OpenStax Biology 2e Ch. 39",
+      },
+      nodes: MEDIS_NODES,
+      edges: MEDIS_EDGES,
     },
-    nodes: MEDIS_NODES,
-    edges: MEDIS_EDGES,
-  }),
+    ["root", "n_hb"]
+  ),
 
-  createVerifiedVault({
-    id: "vault-preset-olahraga",
-    name: "Pernapasan × Olahraga",
-    createdAt: "2026-11-12T08:05:00.000Z",
-    updatedAt: "2026-11-12T08:05:00.000Z",
-    isPreset: true,
-    inputContext: {
-      mode: "mode_a",
-      subject: "Biologi (SMA Kelas XI)",
-      chapter: "Sistem Pernapasan Manusia",
-      subchapters:
-        "Organ pernapasan, Mekanisme pernapasan, Pertukaran gas, Kapasitas paru-paru",
-      interestDomain: "Fisiologi Olahraga & Performa Atlet",
-      targetGoal:
-        "Memahami bagaimana kapasitas paru-paru dan suplai oksigen memengaruhi daya tahan atlet serta cara mengukurnya",
+  createVerifiedVault(
+    {
+      id: "vault-preset-olahraga",
+      name: "Pernapasan × Olahraga",
+      createdAt: "2026-11-12T08:05:00.000Z",
+      updatedAt: "2026-11-12T08:05:00.000Z",
+      isPreset: true,
+      identity: {
+        mainInterest: "Fisiologi Olahraga & Performa Atlet",
+        shortDescription:
+          "Mengeksplorasi kapasitas paru, ambang laktat, dan pengukuran kebugaran atletik dengan wearable.",
+        focusQuestion:
+          "Bagaimana kapasitas paru-paru dan suplai oksigen memengaruhi daya tahan atlet?",
+        learningGoal:
+          "Menghubungkan spirometri dengan persamaan Fick VO2 Max dan analitik smartwatch olahraga.",
+        relatedInterests: ["VO2 Max", "Kebugaran Kardio", "Wearable Sports Tech"],
+        difficultyComfort: "Intermediate",
+      },
+      inputContext: {
+        mode: "mode_a",
+        subject: "Biologi (SMA Kelas XI)",
+        chapter: "Sistem Pernapasan Manusia",
+        subchapters:
+          "Organ pernapasan, Mekanisme pernapasan, Pertukaran gas, Kapasitas paru-paru",
+        interestDomain: "Fisiologi Olahraga & Performa Atlet",
+        targetGoal:
+          "Memahami bagaimana kapasitas paru-paru dan suplai oksigen memengaruhi daya tahan atlet serta cara mengukurnya",
+      },
+      overview: {
+        title: "Sistem Pernapasan Manusia · Fisiologi Olahraga",
+        startingRegion: "REG-01",
+        summary:
+          "Menelusuri hubungan kapasitas vital paru dengan daya tahan atlet, mulai dari VO2 Max, ambang laktat, algoritma smartwatch olahraga, sampai pemodelan kinetika oksigen.",
+        keyConcepts: [
+          "Volume Tidal & Kapasitas Vital Paru",
+          "Ventilasi Semenit saat Latihan Fisik",
+          "VO2 Max (Persamaan Fick)",
+          "Ambang Laktat (Aerobik vs Anaerobik)",
+        ],
+        coreFormulaOrPrinciple:
+          "Kapasitas Vital + Curah Jantung → VO2 Max = Q_max × (CaO2 - CvO2)",
+        primaryReference: "McArdle Exercise Physiology 8th Ed. & OpenStax Biology 2e",
+      },
+      nodes: OLAHRAGA_NODES,
+      edges: OLAHRAGA_EDGES,
     },
-    overview: {
-      title: "Sistem Pernapasan Manusia · Fisiologi Olahraga",
-      startingRegion: "REG-01",
-      summary:
-        "Menelusuri hubungan kapasitas vital paru dengan daya tahan atlet, mulai dari VO2 Max, ambang laktat, algoritma smartwatch olahraga, sampai pemodelan kinetika oksigen.",
-      keyConcepts: [
-        "Volume Tidal & Kapasitas Vital Paru",
-        "Ventilasi Semenit saat Latihan Fisik",
-        "VO2 Max (Persamaan Fick)",
-        "Ambang Laktat (Aerobik vs Anaerobik)",
-      ],
-      coreFormulaOrPrinciple:
-        "Kapasitas Vital + Curah Jantung → VO2 Max = Q_max × (CaO2 - CvO2)",
-      primaryReference: "McArdle Exercise Physiology 8th Ed. & OpenStax Biology 2e",
-    },
-    nodes: OLAHRAGA_NODES,
-    edges: OLAHRAGA_EDGES,
-  }),
+    ["root", "n_vo2max"]
+  ),
 
-  createVerifiedVault({
-    id: "vault-preset-kanker",
-    name: "Riset Kanker",
-    createdAt: "2026-11-12T08:10:00.000Z",
-    updatedAt: "2026-11-12T08:10:00.000Z",
-    isPreset: true,
-    inputContext: {
-      mode: "mode_b",
-      interestDomain: "Dunia Medis, Genetika & Onkologi",
-      targetGoal: "Bagaimana Sel Kanker Berkembang di Dalam Tubuh",
-      motivation:
-        "Ingin memahami rangkaian konsep dari dasar sel hingga bagaimana mutasi genetik memicu pertumbuhan tumor",
+  createVerifiedVault(
+    {
+      id: "vault-preset-kanker",
+      name: "Riset Kanker",
+      createdAt: "2026-11-12T08:10:00.000Z",
+      updatedAt: "2026-11-12T08:10:00.000Z",
+      isPreset: true,
+      identity: {
+        mainInterest: "Dunia Medis, Genetika & Onkologi",
+        shortDescription:
+          "Jejak biologis dari pembelahan sel normal menuju disregulasi p53, bioinformatika genomik, dan epidemiologi.",
+        focusQuestion:
+          "Bagaimana sel kanker berkembang dan menyebar di dalam tubuh?",
+        learningGoal:
+          "Memahami rangkaian konsep mulai dari siklus sel, mutasi DNA, onkogenesis, hingga bioinformatika medis.",
+        relatedInterests: ["Genetika Molekuler", "Bioinformatika", "Kesehatan Masyarakat"],
+        difficultyComfort: "Advanced",
+      },
+      inputContext: {
+        mode: "mode_b",
+        interestDomain: "Dunia Medis, Genetika & Onkologi",
+        targetGoal: "Bagaimana Sel Kanker Berkembang di Dalam Tubuh",
+        motivation:
+          "Ingin memahami rangkaian konsep dari dasar sel hingga bagaimana mutasi genetik memicu pertumbuhan tumor",
+      },
+      overview: {
+        title: "Dari Biologi Sel ke Mekanisme Kanker",
+        startingRegion: "REG-01",
+        summary:
+          "Menelusuri bagaimana sel sehat menjalani siklus pembelahan, mutasi DNA, kegagalan regulasi gen p53, hingga bioinformatika genomik dan kebijakan skrining kesehatan.",
+        keyConcepts: [
+          "Siklus Sel & Pos Pemeriksaan (Checkpoint)",
+          "Replikasi DNA & Mutasi Somatik",
+          "Proto-onkogen vs Gen Supresor Tumor (TP53)",
+          "Angiogenesis, Invasi & Metastasis",
+        ],
+        coreFormulaOrPrinciple:
+          "Siklus Sel Normal → Mutasi DNA → Gagal Regulasi p53 → Proliferasi Tumor & Angiogenesis",
+        primaryReference: "Weinberg, The Biology of Cancer 2nd Ed. & Campbell Biology Ch. 12",
+      },
+      nodes: KANKER_NODES,
+      edges: KANKER_EDGES,
     },
-    overview: {
-      title: "Dari Biologi Sel ke Mekanisme Kanker",
-      startingRegion: "REG-01",
-      summary:
-        "Menelusuri bagaimana sel sehat menjalani siklus pembelahan, mutasi DNA, kegagalan regulasi gen p53, hingga bioinformatika genomik dan kebijakan skrining kesehatan.",
-      keyConcepts: [
-        "Siklus Sel & Pos Pemeriksaan (Checkpoint)",
-        "Replikasi DNA & Mutasi Somatik",
-        "Proto-onkogen vs Gen Supresor Tumor (TP53)",
-        "Angiogenesis, Invasi & Metastasis",
-      ],
-      coreFormulaOrPrinciple:
-        "Siklus Sel Normal → Mutasi DNA → Gagal Regulasi p53 → Proliferasi Tumor & Angiogenesis",
-      primaryReference: "Weinberg, The Biology of Cancer 2nd Ed. & Campbell Biology Ch. 12",
-    },
-    nodes: KANKER_NODES,
-    edges: KANKER_EDGES,
-  }),
+    ["root", "n_regulasi"]
+  ),
 ];

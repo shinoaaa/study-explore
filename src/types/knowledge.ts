@@ -1,12 +1,25 @@
 export type ExplorationMode = "mode_a" | "mode_b";
 
+export type ExplorationPath = "material" | "curiosity";
+
+export type SourceFormat =
+  | "book_chapter"
+  | "article"
+  | "lecture_notes"
+  | "topic"
+  | "curiosity";
+
+export type NodeOrigin = "ai_generated" | "user_edited" | "user_source";
+
+export type NodeReviewStatus = "needs_review" | "reviewed";
+
 export type RegionCode =
-  | "REG-01" // Natural & Life Sciences
-  | "REG-02" // Health, Medicine & Performance
-  | "REG-03" // Technology, Computing & AI
-  | "REG-04" // Engineering & Applied Systems
-  | "REG-05" // Formal Logic & Mathematics
-  | "REG-06"; // Social, Economy & Humanities
+  | "REG-01"
+  | "REG-02"
+  | "REG-03"
+  | "REG-04"
+  | "REG-05"
+  | "REG-06";
 
 export type EdgeRelationType =
   | "prerequisite"
@@ -15,7 +28,11 @@ export type EdgeRelationType =
   | "related_concept"
   | "cross_disciplinary";
 
-export type DifficultyLevel = "Foundation" | "Basic" | "Intermediate" | "Advanced";
+export type DifficultyLevel =
+  | "Foundation"
+  | "Basic"
+  | "Intermediate"
+  | "Advanced";
 
 export type ExplanationDepth = "simple" | "standard" | "deep";
 
@@ -35,6 +52,19 @@ export interface ExplanationLevels {
   deep: string;
 }
 
+export interface NodeRevision {
+  id: string;
+  version: number;
+  createdAt: string;
+  kind: "initial_ai" | "manual_edit" | "ai_revise_accepted" | "restored";
+  label: string;
+  summary: string;
+  levels: ExplanationLevels;
+  formula?: string;
+  application?: string;
+  userAnnotation?: string;
+}
+
 export interface KnowledgeNode {
   id: string;
   title: string;
@@ -51,6 +81,14 @@ export interface KnowledgeNode {
   application: string;
   reference: string;
   quickCheck: QuickCheckQuiz;
+  origin?: NodeOrigin;
+  userAnnotation?: string;
+  reviewStatus?: NodeReviewStatus;
+  reviewReason?: string;
+  isFavorite?: boolean;
+  revisions?: NodeRevision[];
+  sourceIds?: string[];
+  updatedAt?: string;
 }
 
 export interface KnowledgeEdge {
@@ -60,6 +98,44 @@ export interface KnowledgeEdge {
   relation: EdgeRelationType;
   reason: string;
   isCrossRegion?: boolean;
+}
+
+export interface LearningSource {
+  id: string;
+  title: string;
+  format: SourceFormat;
+  chapterOrSection?: string;
+  excerptOrNotes: string;
+  focusQuestion: string;
+  origin: "user_source";
+  isFavorite?: boolean;
+  reviewStatus?: NodeReviewStatus;
+  createdAt: string;
+  updatedAt: string;
+  linkedNodeIds: string[];
+}
+
+export interface ExplorationContext {
+  id: string;
+  path: ExplorationPath;
+  sourceId?: string;
+  title: string;
+  subjectOrTopic?: string;
+  chapterOrSection?: string;
+  focusQuestion: string;
+  explorationGoal: string;
+  depth: ExplanationDepth;
+  createdAt: string;
+  mappedNodeIds: string[];
+}
+
+export interface VaultIdentity {
+  mainInterest: string;
+  shortDescription: string;
+  focusQuestion: string;
+  learningGoal: string;
+  relatedInterests: string[];
+  difficultyComfort?: DifficultyLevel;
 }
 
 export interface OverviewModule {
@@ -84,11 +160,9 @@ export interface ValidationReport {
 
 export interface VaultInputContext {
   mode: ExplorationMode;
-  // Mode A fields
   subject?: string;
   chapter?: string;
   subchapters?: string;
-  // Mode B & shared personalization fields
   interestDomain: string;
   targetGoal: string;
   motivation?: string;
@@ -100,6 +174,9 @@ export interface KnowledgeVault {
   createdAt: string;
   updatedAt: string;
   isPreset?: boolean;
+  identity?: VaultIdentity;
+  learningSources?: LearningSource[];
+  explorations?: ExplorationContext[];
   inputContext: VaultInputContext;
   overview: OverviewModule;
   nodes: KnowledgeNode[];

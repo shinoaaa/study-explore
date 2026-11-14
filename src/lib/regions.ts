@@ -265,3 +265,46 @@ export const EDGE_RELATIONS: Record<EdgeRelationType, EdgeRelationDefinition> = 
     visualRule: "Curved Portal (Magenta)",
   },
 };
+
+/**
+ * Infer a starting knowledge region from natural-language topic or interest keywords.
+ */
+export function inferStartingRegion(text: string): RegionCode {
+  const lower = text.toLowerCase();
+  if (
+    /medis|kedokteran|kanker|penyakit|klinis|kesehatan|olahraga|atlet|fisiologi|obat|farmasi|gizi|medicine|clinical|cancer|health|sport|oncology|cardio|neuro/.test(
+      lower
+    )
+  ) {
+    return "REG-02";
+  }
+  if (
+    /komputer|informatika|pemrograman|coding|ai|data|algoritma|software|jaringan|siber|web|computer|machine learning|neural|deep learning|programming|algorithm|tech/.test(
+      lower
+    )
+  ) {
+    return "REG-03";
+  }
+  if (
+    /teknik|rekayasa|mesin|elektro|robot|industri|sipil|iot|sensor|otomotif|energi terbarukan|engineering|solar|battery|motor|electric|robotics|clean energy|renewable/.test(
+      lower
+    )
+  ) {
+    return "REG-04";
+  }
+  if (
+    /matematika|kalkulus|aljabar|statistika|probabilitas|geometri|logika|trigonometri|diskrit|math|calculus|algebra|statistics|probability|logic|geometry/.test(
+      lower
+    )
+  ) {
+    return "REG-05";
+  }
+  if (
+    /ekonomi|sosial|sejarah|psikologi|hukum|politik|akuntansi|bisnis|manajemen|geografi|sosiologi|economics|psychology|history|policy|law|sociology|cognitive/.test(
+      lower
+    )
+  ) {
+    return "REG-06";
+  }
+  return "REG-01";
+}

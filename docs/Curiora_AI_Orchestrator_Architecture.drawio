@@ -6,7 +6,7 @@
         <mxCell id="1" parent="0" />
 
         <!-- Title Banner -->
-        <mxCell id="title_box" value="ARSITEKTUR CURIORA 5-STAGE AI KNOWLEDGE ORCHESTRATOR&#xa;Input Envelope → Pre-AI Relevance &amp; Typo Gate + Spatial Cross-Region Planner → Gemini 2.5 Flash / Fallback → DAG &amp; Cross-Region Pull Layout → Output Envelope" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#17263C;strokeColor=#0F172A;fontColor=#FFFFFF;fontStyle=1;fontSize=15;align=center;verticalAlign=middle;arcSize=12;" vertex="1" parent="1">
+        <mxCell id="title_box" value="ARSITEKTUR CURIORA AI KNOWLEDGE ORCHESTRATOR + BILINGUAL PIVOT (OPENROUTER / SUMOPOD)&#xa;Input Envelope (ID/EN) → Stage 2A/2B Gate &amp; Planner + Stage 2C (ID→EN Pivot) → NVIDIA: Nemotron 3 Ultra (free) + Stage 3B (EN→ID Adapter) → DAG &amp; Pull Layout → Output Envelope" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#17263C;strokeColor=#0F172A;fontColor=#FFFFFF;fontStyle=1;fontSize=15;align=center;verticalAlign=middle;arcSize=12;" vertex="1" parent="1">
           <mxGeometry x="40" y="25" width="1520" height="65" as="geometry" />
         </mxCell>
 
@@ -44,7 +44,7 @@
           <mxGeometry x="395" y="180" width="330" height="125" as="geometry" />
         </mxCell>
 
-        <mxCell id="stage3" value="STAGE 3: Node Material Synthesizer &amp; True Fog-of-War Lifecycle Engine&#xa;• Buka Node (OPEN_NODE): generate materi 3-Level khusus di node tersebut &amp; hubungkan ke node explored (tanpa auto-buka node lain)&#xa;• Expand Node (EXPAND_FOG_BRANCHES dari dalam node): spawn Fog Stub abu-abu (hanya judul topik, belum ada isi &amp; relasi lain)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0D9468;strokeWidth=2;fontColor=#065F46;fontStyle=1;fontSize=12;align=left;spacingLeft=14;" vertex="1" parent="lane_orch">
+        <mxCell id="stage3" value="STAGE 2C, 3A &amp; 3B: Bilingual Pivot (ID→EN→ID) + True Fog-of-War Synthesizer&#xa;• Stage 2C (ID→EN Pivot): normalisasi input Bahasa Indonesia ke Canonical English sebelum dikirim ke NVIDIA Nemotron 3 Ultra (free)&#xa;• Stage 3A/3B: sintesis materi node (OPEN_NODE) atau Fog Stub (EXPAND_FOG_BRANCHES), lalu lokalisasi balik EN→ID secara natural" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0D9468;strokeWidth=2;fontColor=#065F46;fontStyle=1;fontSize=12;align=left;spacingLeft=14;" vertex="1" parent="lane_orch">
           <mxGeometry x="35" y="340" width="690" height="105" as="geometry" />
         </mxCell>
 
@@ -60,7 +60,7 @@
         <mxCell id="lane_ai" value="3. INTELLIGENCE &amp; FALLBACK LAYER" style="swimlane;startSize=34;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontColor=#17233C;fontStyle=1;fontSize=13;rounded=1;arcSize=6;" vertex="1" parent="1">
           <mxGeometry x="1210" y="110" width="350" height="820" as="geometry" />
         </mxCell>
-        <mxCell id="ai_gemini" value="Google Gemini 2.5 Flash API&#xa;• Structured JSON Mode&#xa;• Menerima Spatial Topology Directive&#xa;• Sintesis Materi &amp; Relasi Lintas-Bidang" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#2F80ED;fontColor=#1E3A8A;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_ai">
+        <mxCell id="ai_gemini" value="OpenRouter / SumoPod Gateway (ai-gateway.ts)&#xa;• Primary: NVIDIA: Nemotron 3 Ultra (free)&#xa;  (nvidia/nemotron-3-ultra-550b-a55b:free)&#xa;• Bilingual Adapter: ID→EN Reasoning → EN→ID&#xa;• Fallback: Nemotron 3.5 / Gemma 4 / SumoPod" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#2F80ED;fontColor=#1E3A8A;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_ai">
           <mxGeometry x="30" y="175" width="290" height="115" as="geometry" />
         </mxCell>
         <mxCell id="ai_fallback" value="Deterministic Graph &amp; Semantic Engine&#xa;• Zero-Downtime Local Synthesis&#xa;• Orthogonal Region Bridge Scorer&#xa;• Typo Fuzzy Matcher &amp; Relevance Guard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#0D9468;fontColor=#065F46;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_ai">

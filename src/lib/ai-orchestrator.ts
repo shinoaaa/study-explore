@@ -1,3 +1,11 @@
+import {
+  buildBilingualPivotMeta,
+  executeGatewayStructuredReasoning,
+  localizeOrchestratorOutputEnToId,
+  OrchestratorLlmSchema,
+  pivotTextIdToEn,
+  translateInboundFieldsIdToEn,
+} from "@/lib/ai-gateway";
 import { regionShortName } from "@/lib/i18n";
 import { inferStartingRegion } from "@/lib/regions";
 import { validateAndBuildGraph } from "@/lib/validator";
@@ -379,6 +387,13 @@ export function assembleOrchestratorEnvelope(params: {
     lang,
   } = params;
   const identity = deriveVaultIdentity(vault);
+  const effectiveNodeTitle =
+    preValidationGate.normalizedTitle || nodeAction.nodeTitle || vault.name;
+  const bilingualPivot = buildBilingualPivotMeta({
+    lang,
+    rawTopic: effectiveNodeTitle,
+    rawVaultInterest: `${identity.mainInterest} — ${identity.focusQuestion || vault.name}`,
+  });
 
   return {
     requestId: `orch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -395,6 +410,7 @@ export function assembleOrchestratorEnvelope(params: {
     },
     preValidationGate,
     spatialTopologyPlan,
+    bilingualPivot,
     existingGraphSnapshot: {
       nodes: vault.nodes.map((n) => ({
         id: n.id,
@@ -625,6 +641,114 @@ RETURN ONLY VALID JSON MATCHING THIS EXACT CONTRACT:
       "reason": "Specific scientific reason why primaryNode connects to this opened node."
     }
   ]
+}`;
+}
+
+/**
+ * STAGE 2C + 3A: Canonical English Reasoning Prompt for `NVIDIA: Nemotron 3 Ultra (free)`
+ * (`nvidia/nemotron-3-ultra-550b-a55b:free` on OpenRouter).
+ * Because Nemotron 3 Ultra performs scientific reasoning in English and lacks native Indonesian fluency,
+ * the Orchestrator pivots all inbound Indonesian fields to English first, runs Nemotron 3 Ultra in 100% English,
+ * and then passes the output through Stage 3B (`localizeOrchestratorOutputEnToId`) to return natural Bahasa Indonesia.
+ */
+function buildCanonicalEnglishOrchestratorPrompt(
+  envelope: OrchestratorInputEnvelope,
+  enFields: {
+    topicTitleEn: string;
+    vaultNameEn: string;
+    mainInterestEn: string;
+    focusQuestionEn: string;
+    learningGoalEn: string;
+    inputContentEn?: string;
+  }
+): string {
+  const { intent, nodeAction, spatialTopologyPlan, existingGraphSnapshot } =
+    envelope;
+
+  const exploredExistingNodesEn = existingGraphSnapshot.nodes
+    .filter((n) => n.explored)
+    .map((n) => ({
+      id: n.id,
+      title: pivotTextIdToEn(n.title),
+      region: n.region,
+      summary: pivotTextIdToEn(n.summary),
+    }));
+
+  const userInputSummaryEn =
+    nodeAction.openMode === "instant_ai"
+      ? "Mode: Instant AI Exploration (synthesize directly from Vault Identity and graph context)."
+      : `Mode: User Material / Note Attached (${nodeAction.openMode})
+Input Title (EN): ${enFields.topicTitleEn}
+Input Content / Prompt / Chapter (EN): ${enFields.inputContentEn || "-"}`;
+
+  return `Process this Canonical English Orchestrator Input Envelope and return ONLY valid JSON matching the exact response contract.
+
+STRICT ARCHITECTURAL RULES (ENGLISH REASONING MODE FOR NEMOTRON 3 ULTRA):
+1. Write ALL JSON string values in clear, rigorous academic English. (An outbound Stage 3B localization adapter will translate English back to the user's UI language after reasoning completes.)
+2. NEVER output internal codes like "REG-01", "Mode A", "Mode B", "BR-", or "NFR-" inside user-visible text fields.
+3. TOPIC RELEVANCE & TYPO GATE ("relevanceGate"):
+   - Check if Target Node Title ("${enFields.topicTitleEn}") is scientifically relevant to Vault Name ("${enFields.vaultNameEn}"), Main Interest ("${enFields.mainInterestEn}"), or existing opened nodes.
+   - If it has a minor spelling typo, set "status": "typo_corrected" and put the corrected spelling in "normalizedTitle".
+   - ONLY if the topic is completely unrelated to the vault domain (e.g. cooking recipes or video games inside a Science/Biology/Engineering vault), set "status": "rejected_too_far" and provide a clear 1-sentence "dangerMessage". Otherwise set "status": "valid".
+4. SPATIAL TOPOLOGY & CROSS-REGION LAYOUT DIRECTIVE:
+   - ${spatialTopologyPlan.layoutDirective}
+   - Primary Region: ${spatialTopologyPlan.primaryRegion}
+   - Orthogonally Adjacent Regions: ${spatialTopologyPlan.adjacentRegionCandidates.join(", ")}
+5. FOG OF WAR STUB RULE:
+   - "frontierNodes" represent unopened Fog of War stubs: they ONLY need "title", "region", "relation", "edgeReason", and "difficulty".
+   - "crossLinks" may ONLY connect to ALREADY-OPENED existing nodes (from the list below) and at most 1 crossLink.
+
+CANONICAL ENGLISH INPUT ENVELOPE:
+- Intent: ${intent}
+- Vault Name (EN): ${enFields.vaultNameEn}
+- Main Interest (EN): ${enFields.mainInterestEn}
+- Focus Question (EN): ${enFields.focusQuestionEn}
+- Learning Goal (EN): ${enFields.learningGoalEn}
+- Target Node ID: ${nodeAction.targetNodeId || "new"}
+- Target Node Title (EN): ${enFields.topicTitleEn}
+- ${userInputSummaryEn}
+- Opened Nodes in Vault (${exploredExistingNodesEn.length}):
+${JSON.stringify(exploredExistingNodesEn, null, 2)}
+
+RETURN ONLY RAW JSON (NO MARKDOWN FENCES) MATCHING THIS CONTRACT:
+{
+  "relevanceGate": {
+    "status": "valid",
+    "normalizedTitle": "${enFields.topicTitleEn}",
+    "dangerMessage": ""
+  },
+  "primaryNode": {
+    "title": "Clear 2-5 word concept title in English",
+    "region": "${spatialTopologyPlan.primaryRegion}",
+    "difficulty": "Intermediate",
+    "summary": "2-sentence synthesis in English.",
+    "levels": {
+      "simple": "Everyday intuitive analogy in English (2-3 sentences).",
+      "standard": "Structured core mechanism in English (2-3 sentences).",
+      "deep": "Advanced analytical & quantitative insight in English (2-3 sentences)."
+    },
+    "formula": "Key governing equation, law, or causal rule in English",
+    "application": "Concrete real-world application in English",
+    "reference": "OpenStax / Peer-Reviewed Academic Reference",
+    "quickCheck": {
+      "question": "1 reflection question in English?",
+      "options": [
+        { "text": "Correct answer", "correct": true },
+        { "text": "Distractor 1", "correct": false },
+        { "text": "Distractor 2", "correct": false }
+      ]
+    }
+  },
+  "frontierNodes": [
+    {
+      "title": "Next progressive concept stub in English (2-5 words)",
+      "region": "${spatialTopologyPlan.adjacentRegionCandidates[0] || spatialTopologyPlan.primaryRegion}",
+      "relation": "extension",
+      "edgeReason": "Why this fog stub branches from primaryNode",
+      "difficulty": "Intermediate"
+    }
+  ],
+  "crossLinks": []
 }`;
 }
 
@@ -988,6 +1112,7 @@ export async function executeOrchestratorPipeline(params: {
         requestId: envelope.requestId,
         intent: params.intent,
         engineUsed: "Curiora Pre-Join Topic Relevance Gate",
+        bilingualPivot: envelope.bilingualPivot,
         validationStatus: "rejected_too_far",
         openedNodeId: "",
         spawnedFrontierNodeIds: [],
@@ -1000,9 +1125,8 @@ export async function executeOrchestratorPipeline(params: {
     };
   }
 
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
   let engineUsed =
-    "Curiora Orchestrator (Deterministic Graph & Spatial Topology Engine)";
+    "Curiora Orchestrator (Bilingual ID↔EN Pivot + Deterministic Spatial Topology Engine)";
 
   let workingNodes = [...normalizedVault.nodes];
   let workingEdges = [...normalizedVault.edges];
@@ -1011,77 +1135,52 @@ export async function executeOrchestratorPipeline(params: {
   let crossLinksDiscovered: OrchestratorCrossLink[] = [];
   const flaggedReviewNodeIds: string[] = [];
 
-  // Optional Gemini 2.5 Flash LLM execution with strict JSON contract
-  let llmData: {
-    relevanceGate?: {
-      status?: "valid" | "typo_corrected" | "rejected_too_far";
-      normalizedTitle?: string;
-      dangerMessage?: string;
-    };
-    primaryNode?: {
-      title?: string;
-      region?: RegionCode;
-      difficulty?: DifficultyLevel;
-      summary?: string;
-      levels?: { simple?: string; standard?: string; deep?: string };
-      formula?: string;
-      application?: string;
-      reference?: string;
-      quickCheck?: {
-        question?: string;
-        options?: { text: string; correct: boolean }[];
-      };
-    };
-    frontierNodes?: {
-      title?: string;
-      region?: RegionCode;
-      relation?: EdgeRelationType;
-      edgeReason?: string;
-      difficulty?: DifficultyLevel;
-    }[];
-    crossLinks?: {
-      existingNodeId?: string;
-      relation?: EdgeRelationType;
-      reason?: string;
-    }[];
-  } | null = null;
+  // STAGE 2C + 3A + 3B: Multi-Provider LLM Execution (OpenRouter NVIDIA Nemotron 3 Ultra (free) / SumoPod / Gemini)
+  // Automatically runs Inbound ID->EN Pivot -> English Reasoning on Nemotron 3 Ultra -> Outbound EN->ID Localization
+  let llmData: OrchestratorLlmSchema | null = null;
 
-  if (apiKey && apiKey.length > 10 && params.intent !== "ANALYZE_RELATIONS") {
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: buildOrchestratorPrompt(envelope) }],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.3,
-              responseMimeType: "application/json",
-            },
-          }),
-        }
-      );
-      if (response.ok) {
-        const json = await response.json();
-        const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (rawText) {
-          llmData = JSON.parse(rawText);
-          engineUsed =
-            "Curiora Orchestrator (Gemini 2.5 Flash + Spatial Topology Guard)";
-        }
-      }
-    } catch {
-      // Fallback cleanly to deterministic synthesizer
-    }
+  if (params.intent !== "ANALYZE_RELATIONS") {
+    const enFields = await translateInboundFieldsIdToEn({
+      topicTitle:
+        preValidationGate.normalizedTitle ||
+        params.nodeAction.nodeTitle ||
+        params.nodeAction.inputTitle ||
+        normalizedVault.name,
+      vaultName: normalizedVault.name,
+      mainInterest: identity.mainInterest,
+      focusQuestion: identity.focusQuestion,
+      learningGoal: identity.learningGoal,
+      inputContent: params.nodeAction.inputContent,
+    });
+
+    const englishUserPrompt = buildCanonicalEnglishOrchestratorPrompt(
+      envelope,
+      enFields
+    );
+    const directBilingualPrompt = buildOrchestratorPrompt(envelope);
+
+    const gatewayResult =
+      await executeGatewayStructuredReasoning<OrchestratorLlmSchema>({
+        englishSystemPrompt:
+          "You are the Curiora AI Knowledge Orchestrator running on NVIDIA Nemotron 3 Ultra. Reason in rigorous academic English and output ONLY valid raw JSON matching the exact response schema.",
+        englishUserPrompt,
+        directBilingualPrompt,
+        userLang: lang,
+        localizeOutputFn: localizeOrchestratorOutputEnToId,
+      });
+
+    llmData = gatewayResult.data;
+    engineUsed = gatewayResult.engineUsed;
+    envelope.bilingualPivot = {
+      ...envelope.bilingualPivot,
+      canonicalEnglishTopic: enFields.topicTitleEn,
+      canonicalEnglishVaultInterest: enFields.mainInterestEn,
+      reasoningProvider: gatewayResult.provider,
+      reasoningModel: gatewayResult.modelUsed,
+    };
   }
 
-  // Check if Gemini flagged the topic as rejected_too_far
+  // Check if the LLM flagged the topic as rejected_too_far
   if (
     llmData?.relevanceGate?.status === "rejected_too_far" &&
     (params.intent === "BRANCH_NEW_NODE" || params.intent === "SEED_FIRST_NODE")
@@ -1105,6 +1204,7 @@ export async function executeOrchestratorPipeline(params: {
         requestId: envelope.requestId,
         intent: params.intent,
         engineUsed,
+        bilingualPivot: envelope.bilingualPivot,
         validationStatus: "rejected_too_far",
         openedNodeId: "",
         spawnedFrontierNodeIds: [],
@@ -1460,6 +1560,7 @@ export async function executeOrchestratorPipeline(params: {
       requestId: envelope.requestId,
       intent: params.intent,
       engineUsed,
+      bilingualPivot: envelope.bilingualPivot,
       validationStatus: preValidationGate.status,
       openedNodeId,
       spawnedFrontierNodeIds,

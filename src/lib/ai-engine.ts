@@ -1,3 +1,8 @@
+import {
+  executeGatewayStructuredReasoning,
+  localizeTextEnToId,
+  pivotTextIdToEn,
+} from "@/lib/ai-gateway";
 import { inferStartingRegion, KNOWLEDGE_REGIONS } from "@/lib/regions";
 import { validateAndBuildGraph } from "@/lib/validator";
 import {
@@ -1306,12 +1311,28 @@ export async function generateNoteRevisionPreview(params: {
   const isEn = lang === "en";
   const focusNote = (instruction || "").trim();
 
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  const englishPrompt = `You are a careful study editor for Curiora. Improve clarity without removing accuracy or voice.
+Vault: "${pivotTextIdToEn(vaultName)}" (Interest: "${pivotTextIdToEn(mainInterest)}", Goal: "${pivotTextIdToEn(learningGoal)}").
+Topic: "${pivotTextIdToEn(node.title)}"
+Target Depth to highlight: "${depth}"
+User instruction: "${pivotTextIdToEn(focusNote) || "Clarify intuition, keep factual precision, and tighten readability."}"
+User personal annotation (preserve context): "${pivotTextIdToEn(node.userAnnotation || "-")}"
 
-  if (apiKey) {
-    try {
-      const prompt = `You are a careful study editor for Curiora. Improve clarity without removing accuracy or voice.
+Current Note:
+- summary: ${JSON.stringify(pivotTextIdToEn(node.summary))}
+- simple: ${JSON.stringify(pivotTextIdToEn(node.levels.simple))}
+- standard: ${JSON.stringify(pivotTextIdToEn(node.levels.standard))}
+- deep: ${JSON.stringify(pivotTextIdToEn(node.levels.deep))}
+
+Language rule: Write all JSON values in clear academic English.
+Return ONLY raw JSON (no markdown fence):
+{
+  "summary": "string",
+  "levels": { "simple": "string", "standard": "string", "deep": "string" },
+  "rationale": "1 short sentence explaining what changed"
+}`;
+
+  const directBilingualPrompt = `You are a careful study editor for Curiora. Improve clarity without removing accuracy or voice.
 Vault: "${vaultName}" (Interest: "${mainInterest}", Goal: "${learningGoal}").
 Topic: "${node.title}"
 Target Depth to highlight: "${depth}"
@@ -1332,39 +1353,44 @@ Return ONLY raw JSON (no markdown fence):
   "rationale": "1 short sentence explaining what changed"
 }`;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.35,
-            responseMimeType: "application/json",
-          },
-        }),
-      });
+  const gatewayRes = await executeGatewayStructuredReasoning<{
+    summary?: string;
+    levels?: ExplanationLevels;
+    rationale?: string;
+  }>({
+    englishSystemPrompt:
+      "You are the Curiora Study Revision Engine running on NVIDIA Nemotron 3 Ultra. Output ONLY valid JSON.",
+    englishUserPrompt: englishPrompt,
+    directBilingualPrompt,
+    userLang: lang,
+    localizeOutputFn: async (enParsed) => ({
+      summary: localizeTextEnToId(enParsed.summary || ""),
+      levels: {
+        simple: localizeTextEnToId(enParsed.levels?.simple || ""),
+        standard: localizeTextEnToId(enParsed.levels?.standard || ""),
+        deep: localizeTextEnToId(enParsed.levels?.deep || ""),
+      },
+      rationale: localizeTextEnToId(enParsed.rationale || ""),
+    }),
+  });
 
-      if (res.ok) {
-        const data = await res.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const parsed = JSON.parse(rawText);
-        if (parsed?.summary && parsed?.levels?.simple && parsed?.levels?.standard && parsed?.levels?.deep) {
-          return {
-            summary: parsed.summary,
-            levels: parsed.levels,
-            rationale:
-              parsed.rationale ||
-              (isEn
-                ? "Refined clarity and aligned examples with your Vault focus."
-                : "Memperjelas penjelasan agar lebih selaras dengan fokus vault kamu."),
-            engineUsed: "gemini-api",
-          };
-        }
-      }
-    } catch {
-      // Fallback cleanly to deterministic preview
-    }
+  const parsed = gatewayRes.data;
+  if (
+    parsed?.summary &&
+    parsed?.levels?.simple &&
+    parsed?.levels?.standard &&
+    parsed?.levels?.deep
+  ) {
+    return {
+      summary: parsed.summary,
+      levels: parsed.levels,
+      rationale:
+        parsed.rationale ||
+        (isEn
+          ? "Refined clarity and aligned examples with your Vault focus."
+          : "Memperjelas penjelasan agar lebih selaras dengan fokus vault kamu."),
+      engineUsed: "gemini-api",
+    };
   }
 
   const nextLevels: ExplanationLevels = { ...node.levels };

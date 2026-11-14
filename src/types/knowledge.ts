@@ -234,6 +234,24 @@ export interface OrchestratorValidationGate {
   dangerMessage?: string;
 }
 
+export type AiProviderKind =
+  | "openrouter"
+  | "sumopod"
+  | "gemini"
+  | "deterministic";
+
+export interface OrchestratorBilingualPivotMeta {
+  userLang: "en" | "id";
+  pivotLang: "en";
+  inboundTranslatedToEn: boolean;
+  outboundLocalizedToId: boolean;
+  canonicalEnglishTopic: string;
+  canonicalEnglishVaultInterest: string;
+  reasoningProvider: AiProviderKind;
+  reasoningModel: string;
+  localizationModel: string;
+}
+
 export interface OrchestratorSpatialTopologyPlan {
   primaryRegion: RegionCode;
   adjacentRegionCandidates: RegionCode[];
@@ -256,6 +274,7 @@ export interface OrchestratorInputEnvelope {
   nodeAction: OrchestratorNodePayload;
   preValidationGate: OrchestratorValidationGate;
   spatialTopologyPlan: OrchestratorSpatialTopologyPlan;
+  bilingualPivot: OrchestratorBilingualPivotMeta;
   existingGraphSnapshot: {
     nodes: OrchestratorGraphDigestNode[];
     edges: OrchestratorGraphDigestEdge[];
@@ -274,6 +293,7 @@ export interface OrchestratorStageTrace {
   requestId: string;
   intent: OrchestratorIntent;
   engineUsed: string;
+  bilingualPivot?: OrchestratorBilingualPivotMeta;
   validationStatus: "valid" | "typo_corrected" | "rejected_too_far";
   openedNodeId: string;
   spawnedFrontierNodeIds: string[];

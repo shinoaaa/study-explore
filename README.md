@@ -102,29 +102,36 @@ flowchart TD
         LIB["Node Reader & Knowledge Library (3-Level Depth + Ask AI Revise Diff + History v1..vn)"]
     end
 
-    subgraph Orchestrator["2. Curiora 5-Stage AI Knowledge Orchestrator (/api/orchestrate)"]
+    subgraph Orchestrator["2. Curiora 5-Stage AI Knowledge Orchestrator (/api/orchestrate & ai-gateway.ts)"]
         S1["Stage 1: Input Context Assembler (OrchestratorInputEnvelope)"]
-        S2A["Stage 2A: Intent Router & Prompt Compiler"]
-        S2B["Stage 2B: Cross-Node Relation Analyzer (Scan Existing Vault Nodes)"]
-        S3["Stage 3: Node Material Synthesizer & Progressive Frontier Spawner"]
-        S4["Stage 4: DAG Validator, Anti-Orphan Guard & Dynamic Organic Layout"]
+        S2A["Stage 2A: Pre-AI Topic Relevance & Typo Validation Gate"]
+        S2B["Stage 2B: Pre-AI Cross-Region Spatial Topology Planner"]
+        S2C["Stage 2C: Inbound Bilingual Pivot (ID -> Canonical English)"]
+        S3A["Stage 3A: Node Material Synthesizer & True Fog-of-War Spawner"]
+        S3B["Stage 3B: Outbound Localization Adapter (English -> Natural Bahasa Indonesia)"]
+        S4["Stage 4: DAG Validator, Single-Edge Guard & Cross-Region Pull Layout"]
         S5["Stage 5: Non-Destructive State Reconciler (OrchestratorOutputEnvelope)"]
     end
 
-    subgraph Engine["3. Intelligence & Engine Layer"]
-        GEMINI["Google Gemini 2.5 Flash (Structured JSON Mode)"]
-        FALLBACK["Deterministic Graph & Cross-Link Fallback Engine"]
+    subgraph Engine["3. Multi-Provider AI Gateway & Fallback Layer"]
+        OPENROUTER["OpenRouter: NVIDIA Nemotron 3 Ultra (free) + <think> JSON Extractor"]
+        SUMOPOD["SumoPod AI Gateway (https://ai.sumopod.com/v1)"]
+        FALLBACK["Deterministic Bilingual Graph & Spatial Topology Engine"]
     end
 
     VP --> TRIG
     TRIG -->|POST /api/orchestrate| S1
     S1 --> S2A
     S1 --> S2B
-    S2A --> GEMINI
-    S2B --> S3
-    GEMINI --> S3
-    FALLBACK -.-> S3
-    S3 --> S4
+    S2A --> S2C
+    S2B --> S2C
+    S2C -->|100% English Reasoning Prompt| OPENROUTER
+    S2C -.-> SUMOPOD
+    OPENROUTER --> S3A
+    SUMOPOD -.-> S3A
+    FALLBACK -.-> S3A
+    S3A --> S3B
+    S3B --> S4
     S4 --> S5
     S5 -->|OrchestratorOutputEnvelope + Trace| TREE
     TREE <--> LIB
@@ -137,10 +144,11 @@ flowchart TD
   - `nodeAction`: `{ targetNodeId?, parentNodeId?, nodeTitle?, openMode: 'instant_ai' | 'custom_prompt' | 'user_note' | 'book_chapter', inputTitle?, inputContent?, preferredDepth? }`
   - `preValidationGate`: `{ status: 'valid' | 'typo_corrected' | 'rejected_too_far', originalTitle, normalizedTitle, dangerMessage? }`
   - `spatialTopologyPlan`: `{ primaryRegion, adjacentRegionCandidates, activeRegions, regionNodeCounts, maxCrossRegionLinksPerNode, layoutDirective }`
+  - `bilingualPivot`: `{ userLang, pivotLang: 'en', inboundTranslatedToEn, outboundLocalizedToId, canonicalEnglishTopic, canonicalEnglishVaultInterest, reasoningProvider, reasoningModel, localizationModel }`
   - `existingGraphSnapshot`: daftar ringkas node yang sudah dibuka (`explored: true`) maupun *Fog Stub* (`explored: false`).
 - **Kontrak Output (`OrchestratorOutputEnvelope`):**
   - `ok`: `boolean`, `validationGate`: hasil gerbang validasi topik/typo, `vault`: objek `KnowledgeVault` yang telah divalidasi DAG & ditata ulang posisinya dengan *Cross-Region Pull Vector*.
-  - `trace` (`OrchestratorStageTrace`): `{ requestId, intent, engineUsed, validationStatus, openedNodeId, spawnedFrontierNodeIds, crossLinksDiscovered, dagValid, processedAt }`.
+  - `trace` (`OrchestratorStageTrace`): `{ requestId, intent, engineUsed, bilingualPivot, validationStatus, openedNodeId, spawnedFrontierNodeIds, crossLinksDiscovered, dagValid, processedAt }`.
 
 ---
 
@@ -148,34 +156,54 @@ flowchart TD
 
 - **Framework:** Next.js (App Router, TypeScript)
 - **Styling & UI:** Tailwind CSS, Lucide React Icons, Custom SVG Directed Acyclic Graph Renderer
-- **AI / LLM Integration:** Google Gemini API (`gemini-2.5-flash` via REST API) + *Deterministic Domain Fallback Engine*
+- **AI / LLM Integration (`src/lib/ai-gateway.ts` & `src/lib/ai-orchestrator.ts`):**
+  - **Primary Free Reasoning Model:** **OpenRouter** (`https://openrouter.ai/api/v1`) dengan **`NVIDIA: Nemotron 3 Ultra (free)`** (`nvidia/nemotron-3-ultra-550b-a55b:free`) + **Bilingual Pivot Pipeline (`ID -> EN -> Nemotron 3 Ultra -> EN -> ID`)** & `<think>`-safe JSON Extractor.
+  - **Alternative Fast Gateway:** **SumoPod AI Gateway** (`https://ai.sumopod.com/v1`) atau **Google Gemini** (`gemini-2.5-flash`).
+  - **Zero-Downtime Fallback:** *Deterministic Bilingual Graph & Spatial Topology Engine*.
 - **State & Storage:** React Hooks + Browser `localStorage` (Zero-friction Vault, Light/Dark Mode, & EN/ID preference persistence tanpa login)
 
 ---
 
-## 7. Panduan Instalasi & Menjalankan di Localhost
+## 7. Panduan Instalasi & Konfigurasi OpenRouter / SumoPod (`.env.local`)
 
-1. **Clone repositori:**
+1. **Clone repositori & instal dependensi:**
    ```bash
    git clone https://github.com/shinoaaa/study-explore.git
    cd study-explore
-   ```
-
-2. **Instal dependensi:**
-   ```bash
    npm install
    ```
 
-3. **Konfigurasi variabel lingkungan (`.env.local`):**
-   Salin file `.env.example` menjadi `.env.local`:
+2. **Salin file `.env.example` menjadi `.env.local`:**
    ```bash
    cp .env.example .env.local
    ```
-   Isi variabel `GEMINI_API_KEY` dengan API Key Google Gemini Anda:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-   *(Catatan: Jika `GEMINI_API_KEY` dikosongkan, aplikasi tetap dapat berjalan penuh menggunakan **Smart Deterministic Knowledge Synthesis Engine** dan 3 **Preset Vaults** bawaan sehingga pengujian lokal maupun demo tidak pernah terblokir).*
+
+3. **Pilih Opsi Gateway AI di `.env.local`:**
+
+   ### Opsi A (Default — 100% Gratis Tanpa Kartu Kredit): OpenRouter + `NVIDIA: Nemotron 3 Ultra (free)`
+   1. Buka [https://openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) dan login menggunakan akun Google atau GitHub (tidak perlu kartu kredit).
+   2. Klik **Create Key**, beri nama bebas (mis. `curiora-dev`), lalu salin key (`sk-or-v1-...`).
+   3. Tempel ke dalam `.env.local`:
+      ```env
+      AI_PROVIDER=openrouter
+      OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+      OPENROUTER_TRANSLATOR_MODEL=google/gemma-4-31b-it:free
+      ```
+   *(Catatan Arsitektur: Karena `NVIDIA: Nemotron 3 Ultra (free)` memiliki penalaran sains terbaik dalam Bahasa Inggris, Curiora otomatis menerjemahkan input Bahasa Indonesia ke Bahasa Inggris (`Stage 2C`), menjalankan penalaran penuh di Nemotron 3 Ultra (`Stage 3A`), lalu menerjemahkan hasilnya kembali ke Bahasa Indonesia (`Stage 3B`)).*
+
+   ### Opsi B (Alternatif Ngebut & Stabil): SumoPod AI Gateway
+   Jika ingin respons yang lebih cepat tanpa antrean model `:free` publik OpenRouter:
+   1. Buka dashboard [https://sumopod.com](https://sumopod.com) $\rightarrow$ menu **API Keys** $\rightarrow$ buat API Key baru (`sk-...`).
+   2. Tempel ke dalam `.env.local`:
+      ```env
+      AI_PROVIDER=sumopod
+      SUMOPOD_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      SUMOPOD_BASE_URL=https://ai.sumopod.com/v1
+      SUMOPOD_MODEL=gpt-4o-mini
+      ```
+
+   *(Catatan: Jika semua variabel API Key dikosongkan, aplikasi tetap berjalan 100% menggunakan **Smart Deterministic Bilingual Synthesis Engine** dan 3 **Preset Vaults** bawaan).*
 
 4. **Jalankan server development:**
    ```bash
@@ -187,7 +215,9 @@ flowchart TD
 
 ## 8. Dokumentasi Penggunaan AI & Atribusi
 
-- **Model AI yang Digunakan:** Google Gemini (`gemini-2.5-flash`).
+- **Model AI yang Digunakan:**
+  - **OpenRouter:** `nvidia/nemotron-3-ultra-550b-a55b:free` (**NVIDIA: Nemotron 3 Ultra (free)**) dengan rantai fallback gratis (`nvidia/nemotron-3.5-lightning:free` & `google/gemma-4-31b-it:free`).
+  - **SumoPod AI Gateway / Google Gemini (Opsional):** `gpt-4o-mini` / `gemini-2.5-flash`.
 - **Bagian Produk yang Memanfaatkan AI:**
   1. `/api/orchestrate` (**Curiora 5-Stage AI Knowledge Orchestrator** — `src/lib/ai-orchestrator.ts`): Menerima paket terstruktur `OrchestratorInputEnvelope` saat pengguna memilih **Langsung Buka (`instant_ai`)** atau **Tambah Catatan / Materi Dulu (`custom_prompt`, `user_note`, `book_chapter`)** pada sebuah node, menjalankan **Cross-Node Relation Analyzer** untuk mendeteksi hubungan ilmiah dengan seluruh node yang sudah ada di Vault, memekarkan *Frontier Nodes* baru dalam status *Fog of War*, memvalidasi DAG & posisi organik (`validator.ts`), serta mengembalikan `OrchestratorOutputEnvelope` beserta `OrchestratorStageTrace`.
   2. `/api/explore` & `/api/expand`: Mendukung inisialisasi peta pengetahuan dan pemekaran cabang kontekstual dari node yang dipilih pengguna di dalam Vault.

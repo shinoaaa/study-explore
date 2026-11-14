@@ -81,8 +81,13 @@ import {
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 
-const STORAGE_KEY = "curiora_vaults_v1";
-const LEGACY_VAULT_KEYS = ["trellis_vaults_v1", "nexusvault_ai_vaults_v1"];
+const STORAGE_KEY = "curiora_clean_single_vault_v1";
+const LEGACY_VAULT_KEYS = [
+  "curiora_vaults_v1",
+  "trellis_vaults_v1",
+  "nexusvault_ai_vaults_v1",
+];
+const DEFAULT_USER_VAULTS: KnowledgeVault[] = [PRESET_VAULTS[0]];
 const THEME_KEY = "curiora_theme_v1";
 const LEGACY_THEME_KEY = "trellis_theme_v1";
 const LANG_KEY = "curiora_lang_v1";
@@ -158,9 +163,9 @@ function mergePresetUpdates(cached: KnowledgeVault[]): KnowledgeVault[] {
 }
 
 export default function HomePage() {
-  const [vaults, setVaults] = useState<KnowledgeVault[]>(PRESET_VAULTS);
+  const [vaults, setVaults] = useState<KnowledgeVault[]>(DEFAULT_USER_VAULTS);
   const [activeVaultId, setActiveVaultId] = useState<string>(
-    PRESET_VAULTS[0].id
+    DEFAULT_USER_VAULTS[0].id
   );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>("home");
@@ -168,7 +173,7 @@ export default function HomePage() {
 
   // Appearance & language preferences
   const [theme, setTheme] = useState<ThemeMode>("light");
-  const [lang, setLang] = useState<Language>("en");
+  const [lang, setLang] = useState<Language>("id");
 
   // Filters & search
   const [vaultSearch, setVaultSearch] = useState("");
@@ -220,10 +225,12 @@ export default function HomePage() {
         setLang(savedLang);
         document.documentElement.lang = savedLang;
       }
-      const raw =
-        localStorage.getItem(STORAGE_KEY) ||
-        LEGACY_VAULT_KEYS.map((k) => localStorage.getItem(k)).find(Boolean) ||
-        null;
+      // Automatically purge old cluttered vault keys so testing starts clean
+      for (const oldKey of LEGACY_VAULT_KEYS) {
+        localStorage.removeItem(oldKey);
+      }
+
+      const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -709,7 +716,7 @@ export default function HomePage() {
 
   const handleDeleteVault = (vaultId: string) => {
     const remaining = vaults.filter((v) => v.id !== vaultId);
-    const safeList = remaining.length > 0 ? remaining : PRESET_VAULTS;
+    const safeList = remaining.length > 0 ? remaining : DEFAULT_USER_VAULTS;
     persistVaults(safeList);
     if (activeVaultId === vaultId) {
       setActiveVaultId(safeList[0].id);
@@ -718,8 +725,8 @@ export default function HomePage() {
   };
 
   const handleResetPresets = () => {
-    persistVaults(PRESET_VAULTS);
-    setActiveVaultId(PRESET_VAULTS[0].id);
+    persistVaults(DEFAULT_USER_VAULTS);
+    setActiveVaultId(DEFAULT_USER_VAULTS[0].id);
     setSelectedNodeId(null);
     setShowEmptyDemo(false);
   };
@@ -1487,16 +1494,14 @@ export default function HomePage() {
                           >
                             {t.vaults.openTree}
                           </button>
-                          {!v.isPreset && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteVault(v.id)}
-                              title={t.vaults.deleteTitle}
-                              className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 p-2 text-[#6F7E93] dark:text-slate-400 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteVault(v.id)}
+                            title={t.vaults.deleteTitle}
+                            className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 p-2 text-[#6F7E93] dark:text-slate-400 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
                     </div>

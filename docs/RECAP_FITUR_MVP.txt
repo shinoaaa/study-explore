@@ -403,13 +403,32 @@ Aplikasi diimplementasikan menggunakan kerangka kerja Next.js (App Router + Type
 
 
 ================================================================================
-8. PEMBARUAN SIKLUS HIDUP VAULT & KNOWLEDGE LIBRARY
+8. PEMBARUAN SIKLUS HIDUP VAULT, NODE-CENTRIC EXPLORATION & CURIORA 5-STAGE AI ORCHESTRATOR
 ================================================================================
 
-Untuk menyelaraskan implementasi aplikasi web dan prototipe UI Figma dengan spesifikasi siklus hidup Vault terbaru:
-  * Pembuatan Vault Sederhana (Identity-First): Create New Vault difokuskan pada identitas topik (Vault Name, Main Interest, Short Description, Focus Question, Learning Goal, Related Interests, Preferred Starting Depth) dan langsung mendarat ke halaman Vault Overview.
-  * Inside-Vault Workspace Hub: VaultSubNav menyediakan switcher Vault serta tab Overview | Knowledge Tree | Knowledge Library dan tombol + Add Exploration di dalam Vault.
-  * Add Exploration Fleksibel Multi-Sumber: Terisi otomatis dari identitas Vault (dengan tombol Use Vault Defaults), mendukung jalur From Material dan From Curiosity, sumber baru atau sumber tersimpan, serta aksi Save Source Only maupun Add Exploration & Map.
-  * Knowledge Library & Favorit ★: Daftar terpadu All | Source Materials | AI Notes | ★ Favorites lengkap dengan filter All Statuses | Needs Review | User Edited, pengurutan Favorites First, serta lencana bersih User Source, AI Generated, User Edited, Needs Review, Reviewed, dan Favorite ★.
-  * Penyuntingan Aman, AI Revise Diff & Revision History: Mendukung Edit Manual + Personal Annotation, pratinjau diff sebelum menerapkan saran AI (/api/revise-note), riwayat versi v1..vn dengan Restore non-destruktif, serta perlindungan catatan User Edited melalui merge non-destruktif yang memunculkan tanda Needs Review + tombol Mark Reviewed.
-  * Keterhubungan Tree <-> Knowledge Library: Navigasi dua arah langsung antara Node Study modal / Outline View dan item catatan di Knowledge Library.
+1. Collapsible Sidebar & Clean Recent Vaults:
+   * Sidebar kiri dapat ditutup dan dibuka kembali kapan saja (Collapsible Sidebar).
+   * Bintang favorit dihapus dari daftar Recent Vaults di sidebar agar tetap bersih (favorit hanya ditampilkan di dalam Vault & Node).
+
+2. Vault Overview Langsung ke Bagian Nodes:
+   * Tepat di bawah kartu Vault Profile, halaman langsung menampilkan daftar Nodes tanpa kotak statistik tambahan yang membingungkan.
+   * Setiap kartu Node memiliki 2 tombol utama: (1) Baca Materi / Buka Node, dan (2) Ke Node di Tree.
+
+3. Kanvas Knowledge Tree Berbentuk Lingkaran & Callout Topik di Atas Node:
+   * Setiap node dirender sebagai lingkaran bersih (r = 22px) dengan 5 gaya garis edge.
+   * Topik node berada di dalam kotak keterangan (callout box) dengan panah segitiga di atas lingkaran node.
+   * Dilengkapi tombol ikon Hide / Show Node Labels di toolbar tree (tanpa teks penjelasan bertele-tele): saat mode Hide aktif, semua keterangan disembunyikan, dan jika salah satu lingkaran node diklik, hanya keterangan node tersebut yang muncul.
+   * Posisi node diatur secara dinamis maju-mundur (Organic Wave Stagger X/Y) di dalam batas wilayah Region (NFR-09).
+
+4. Input Materi Berpusat pada Node & Eksplorasi Bertahap per Node:
+   * Saat membuka node baru atau menambah cabang node, pengguna diberi opsi: (1) Langsung Buka (Open Directly), atau (2) Tambah Catatan / Materi Dulu (Prompt / Pertanyaan Fokus, Catatan Pribadi, atau 1 Chapter Buku / Materi).
+   * Setiap kali node dibuka, sistem memekarkan Frontier Nodes berikutnya dalam status Fog of War dan otomatis menganalisis keterkaitannya dengan seluruh node yang sudah ada di dalam Vault.
+
+5. Arsitektur Curiora 5-Stage AI Knowledge Orchestrator (/api/orchestrate & src/lib/ai-orchestrator.ts):
+   * Stage 1 — Input Context Assembler (OrchestratorInputEnvelope): Membungkus konteks identitas Vault, aksi node (targetNodeId, openMode, inputKind, inputContent), dan ringkasan existingGraphSnapshot seluruh node yang ada di Vault.
+   * Stage 2A — Intent Router & Prompt Compiler: Merutekan intent (SEED_FIRST_NODE | OPEN_NODE | BRANCH_NEW_NODE | ANALYZE_RELATIONS) dan menyusun kontrak JSON ketat.
+   * Stage 2B — Cross-Node Relation Analyzer: Memindai seluruh node di dalam Vault untuk mendeteksi hubungan lintas-cabang & lintas-region beserta alasan ilmiahnya (OrchestratorCrossLink[]).
+   * Stage 3 — Node Material Synthesizer & Progressive Frontier Spawner: Memanggil Google Gemini 2.5 Flash (atau Deterministic Fallback Engine) untuk menyintesis penjelasan 3-level dan memekarkan 2-3 Frontier Nodes berikutnya.
+   * Stage 4 — DAG Validator, Anti-Orphan Guard & Dynamic Organic Layout (validator.ts): Memastikan struktur Directed Acyclic Graph bebas siklus dan menghitung tata letak organik maju-mundur di dalam Region.
+   * Stage 5 — Non-Destructive State Reconciler (OrchestratorOutputEnvelope): Menggabungkan hasil secara non-destruktif (melindungi catatan User Edited dengan status Needs Review) dan mengembalikan OrchestratorOutputEnvelope beserta telemetri OrchestratorStageTrace.
+   * File Diagram Draw.io tersedia di: Curiora_AI_Orchestrator_Architecture.drawio & Curiora_AI_Orchestrator_Architecture.png.

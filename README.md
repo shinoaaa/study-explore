@@ -66,51 +66,76 @@ Untuk menjaga keakuratan hubungan konsep dan stabilitas aplikasi:
 
 ## 4. Fitur Utama yang Diimplementasikan
 
-1. **Identity-First Vault Manager (`FEAT-01`):** Buat Vault baru secara ringkas dari identitas (*Vault Name*, *Main Interest*, *Short Description*, *Focus Question*, *Learning Goal*, *Related Interests* tags, dan *Preferred Starting Depth*), filter **`All Vaults` | `★ Has Favorites`**, kelola di `localStorage`, serta jelajahi 3 *Preset Vault* (*Biologi Medis*, *Fisiologi Olahraga*, dan *Riset Onkologi/Kanker*).
-2. **Inside-Vault Hub (`Overview` | `Knowledge Tree` | `Knowledge Library`):** Navigasi terpadu `VaultSubNav` di dalam Vault dengan penukar Vault aktif, hitungan sumber/catatan/favorit/`to review`, editor identitas inline (*Edit Identity*), daftar **Learning Sources**, **Starred Favorites ★**, dan riwayat eksplorasi.
-3. **Flexible Multi-Source Add Exploration (`FEAT-02`):** Tambah eksplorasi kapan saja di dalam Vault (`+ Add Exploration`), terisi otomatis dari identitas Vault, mendukung jalur **From Material** maupun **From Curiosity**, memilih sumber baru atau sumber tersimpan (*existing source*), serta opsi **Save Source Only** atau **Add Exploration & Map**.
-4. **Persistent Knowledge Library, Safe Editing & Revision History:** Workspace dua-panel untuk membaca sumber materi dan catatan konsep, menandai **Favorites ★** di seluruh layar, menulis catatan/anotasi pribadi (**`User Edited`**), meminta **`Ask AI Revise`** dengan pratinjau diff sebelum disimpan (`/api/revise-note`), meninjau **`Revision History`** (`v1`..`vn`) beserta **Restore** non-destruktif, serta perlindungan otomatis **`Needs Review`** jika eksplorasi baru bersinggungan dengan catatan yang sudah disunting pengguna.
-5. **Regional Skill Tree Canvas & 5 Gaya Edge Berbeda (`FEAT-04`):** Kanvas graf *pan/zoom* penuh layar bergaya *Hybrid Outward Region Aura* (adaptif Light & Dark Mode) dengan filter 6 *Knowledge Regions*, *toggle* `Region Borders`, jaminan *Region Containment*, serta 5 gaya garis *edge* (`prerequisite`, `extension`, `application`, `related_concept`, `cross_disciplinary`).
-6. **Atmospheric Fog of War, Favorites ★ & Open Exploration Telemetry (`FEAT-05`):** Cabang yang belum dibuka tampil terselubung kabut *Fog of War* dan terbuka saat diklik; lencana status bersih (`User Source`, `AI Generated`, `User Edited`, `Needs Review`, `Reviewed`, `Favorite ★`), serta metrik hitungan terbuka tanpa bar persentase target akhir.
-7. **Bidirectional Concept Reader Modal <-> Knowledge Library (`FEAT-06`):** Modal baca node (*Enlarge/Compact*, tombol `★`, `Edit Note`, dan `Open in Library`), alasan ilmiah keterkaitan konsep (`reason`), *backlinks*, serta lompatan dua arah antara **Knowledge Tree** (`View in Knowledge Tree →`) dan **Knowledge Library** termasuk di **Outline View**.
-8. **Bilingual EN/ID, Light/Dark Mode & Progressive Expansion (`FEAT-07`–`FEAT-09`):** Beralih tema **Light/Dark** dan bahasa **EN/ID**, 3 tingkat kedalaman penjelasan (*Simple/Standard/Deep*), *1-Click Quick Check*, pemekaran cabang `/api/expand`, serta validasi DAG otomatis (`src/lib/validator.ts`).
+1. **Identity-First Vault Manager & Collapsible Clean Sidebar (`FEAT-01`):** Buat Vault baru secara ringkas dari identitas (*Vault Name*, *Main Interest*, *Short Description*, *Focus Question*, *Learning Goal*, *Related Interests* tags, dan *Preferred Starting Depth*), filter **`All Vaults` | `★ Has Favorites`**, kelola di `localStorage`, serta jelajahi 3 *Preset Vault* (*Biologi Medis*, *Fisiologi Olahraga*, dan *Riset Onkologi/Kanker*). Sidebar kiri dapat ditutup/dibuka (*Collapsible Sidebar*) dan daftar *Recent Vaults* dibuat bersih tanpa lencana bintang berlebihan.
+2. **Streamlined Vault Overview — Direct Nodes Section (`Overview` | `Knowledge Tree` | `Knowledge Library`):** Di bawah kartu **Vault Profile**, tampilan *Vault Overview* langsung menyajikan bagian **Nodes** tanpa kotak statistik yang membingungkan. Setiap kartu Node memiliki tombol bintang **Favorite ★** di dalam Vault serta **2 tombol aksi langsung**:
+   - **Baca Materi (`Read Material` / `Buka Node`)** — langsung membaca materi node atau membuka node baru.
+   - **Ke Node di Tree (`View in Tree`)** — langsung melompat dan memfokuskan node tersebut di kanvas *Knowledge Tree*.
+3. **Node-Centric Material Input & Progressive Node-by-Node Exploration (`FEAT-02`):** Eksplorasi berjalan bertahap dari satu node ke node berikutnya tanpa perlu halaman *Source Note* terpisah. Saat membuka node baru (atau menambah cabang node baru), pengguna diberi **2 pilihan utama**:
+   - **Langsung Buka (`Open Directly`):** AI langsung menyintesis materi node dari konteks Vault & prasyaratnya.
+   - **Tambah Catatan / Materi Dulu (`Add Note / Material First`):** Pengguna dapat memasukkan **Prompt / Pertanyaan Fokus**, **Catatan Pribadi**, atau **1 Chapter Buku / Materi** langsung ke dalam node tersebut sebelum dibuka.
+4. **Curiora 5-Stage AI Knowledge Orchestrator & Cross-Node Relation Analyzer (`/api/orchestrate`):** Setiap kali sebuah node dibuka atau ditambahkan, orkestrator AI 5-tahap (`src/lib/ai-orchestrator.ts`) menyusun *Input Context Envelope*, menganalisis **keterkaitan lintas-node (`Cross-Node Relation Analyzer`)** terhadap seluruh node yang sudah ada di dalam Vault, memekarkan *Frontier Nodes* berikutnya dalam status *Fog of War*, memvalidasi DAG & *Region Containment*, serta mengembalikan *Output Delta Envelope* beserta telemetri `OrchestratorStageTrace`.
+5. **Circular Skill Tree Nodes, Topic Callout Box & Dynamic Staggered Layout (`FEAT-04` & `FEAT-05`):**
+   - Setiap node dirender sebagai **lingkaran bersih (`r = 22px`)** yang dihubungkan oleh 5 gaya garis *edge* (`prerequisite`, `extension`, `application`, `related_concept`, `cross_disciplinary`).
+   - Topik node tampil sebagai **kotak keterangan (*callout box*) dengan panah segitiga (`▼`) tepat di atas lingkaran node**.
+   - Dilengkapi tombol ikon **Hide / Show Node Labels** di toolbar kanvas (tanpa teks keterangan bertele-tele): ketika dalam mode *Hide*, seluruh label di atas node disembunyikan agar peta bersih, namun **ketika salah satu lingkaran node diklik, keterangan node yang dipilih tersebut langsung muncul sendiri**.
+   - Posisi lingkaran node diatur secara **dinamis maju-mundur (*Organic Wave Stagger X/Y*)** di dalam batas *Region Aura* agar nyaman dibaca dan tidak kaku.
+6. **Persistent Knowledge Library, Safe Editing & Revision History (`FEAT-06`):** Workspace dua-panel untuk membaca materi node (beserta lampiran *1 Chapter Buku / Prompt / Catatan* yang diinput pada node), menandai **Favorites ★** di dalam Vault, menulis anotasi pribadi (**`User Edited`**), meminta **`Ask AI Revise`** dengan pratinjau diff (`/api/revise-note`), meninjau **`Revision History`** (`v1`..`vn`) beserta **Restore** non-destruktif, serta perlindungan otomatis **`Needs Review`**.
+7. **Bilingual EN/ID, Light/Dark Mode & Zero Internal Code Leak (`FEAT-07`–`FEAT-09`):** Beralih tema **Light/Dark** dan bahasa **EN/ID**, 3 tingkat kedalaman penjelasan (*Simple/Standard/Deep*), *1-Click Quick Check*, serta filter ketat yang menjamin nol kebocoran kode internal lomba di UI.
 
 ---
 
-## 5. Diagram Arsitektur Sistem & Alur Data
+## 5. Arsitektur Curiora 5-Stage AI Knowledge Orchestrator & Kontrak Data
+
+Diagram arsitektur lengkap tersedia dalam format **Draw.io** yang dapat disunting di [`docs/Curiora_AI_Orchestrator_Architecture.drawio`](docs/Curiora_AI_Orchestrator_Architecture.drawio) dan gambar beresolusi tinggi di [`docs/Curiora_AI_Orchestrator_Architecture.png`](docs/Curiora_AI_Orchestrator_Architecture.png):
+
+![Arsitektur Curiora 5-Stage AI Knowledge Orchestrator](docs/Curiora_AI_Orchestrator_Architecture.png)
 
 ```mermaid
 flowchart TD
-    subgraph Frontend["1. Frontend Workspace (Next.js App Router)"]
-        VM["Vault Manager (Identity-First + Favorites Filter)"]
-        OV["Inside-Vault Hub (Overview + Add Exploration Modal)"]
-        ST["Regional Skill Tree Canvas + Concept Reader (★ & Backlinks)"]
-        KL["Knowledge Library (Sources, Annotations, AI Diff Preview & History)"]
+    subgraph Workspace["1. Application Workspace Layer"]
+        VP["Vault Profile + Direct Nodes List (Baca Materi | Ke Node di Tree)"]
+        TRIG["Trigger Buka / Tambah Node (Langsung Buka vs Prompt / Catatan / 1 Chapter Buku)"]
+        TREE["Circular Knowledge Tree (● + Top Callout ▼ + Toggle Hide/Show + Dynamic Stagger)"]
+        LIB["Node Reader & Knowledge Library (3-Level Depth + Ask AI Revise Diff + History v1..vn)"]
     end
 
-    subgraph Backend["2. Backend Orchestrator (/api/explore, /api/expand & /api/revise-note)"]
-        OR["Context, Merge & Safe-Revision Orchestrator"]
+    subgraph Orchestrator["2. Curiora 5-Stage AI Knowledge Orchestrator (/api/orchestrate)"]
+        S1["Stage 1: Input Context Assembler (OrchestratorInputEnvelope)"]
+        S2A["Stage 2A: Intent Router & Prompt Compiler"]
+        S2B["Stage 2B: Cross-Node Relation Analyzer (Scan Existing Vault Nodes)"]
+        S3["Stage 3: Node Material Synthesizer & Progressive Frontier Spawner"]
+        S4["Stage 4: DAG Validator, Anti-Orphan Guard & Dynamic Organic Layout"]
+        S5["Stage 5: Non-Destructive State Reconciler (OrchestratorOutputEnvelope)"]
     end
 
-    subgraph Intelligence["3. Knowledge Intelligence Layer"]
-        LLM["LLM Engine (Google Gemini 2.5 Flash + Deterministic Fallback)"]
-        GB["Graph Builder (DAG Node/Edge Mapper & 6-Region Classifier)"]
-        VE["Validation Engine (Schema, Anti-Orphan, Anti-Cycle, Reason Guard)"]
-        REF["Reference Layer (OpenStax, Campbell, Guyton, Peer-Reviewed)"]
+    subgraph Engine["3. Intelligence & Engine Layer"]
+        GEMINI["Google Gemini 2.5 Flash (Structured JSON Mode)"]
+        FALLBACK["Deterministic Graph & Cross-Link Fallback Engine"]
     end
 
-    VM --> OV
-    OV -->|Add Exploration / Source| OR
-    OR --> LLM
-    LLM --> REF
-    REF --> GB
-    GB --> VE
-    VE -->|Non-Destructive Merge JSON| ST
-    ST <--> KL
-    OV <--> KL
-    ST -->|Expand Node Request| OR
-    KL -->|Safe Diff Preview Request| OR
+    VP --> TRIG
+    TRIG -->|POST /api/orchestrate| S1
+    S1 --> S2A
+    S1 --> S2B
+    S2A --> GEMINI
+    S2B --> S3
+    GEMINI --> S3
+    FALLBACK -.-> S3
+    S3 --> S4
+    S4 --> S5
+    S5 -->|OrchestratorOutputEnvelope + Trace| TREE
+    TREE <--> LIB
 ```
+
+### Kontrak JSON Masuk & Keluar Orkestrator (`src/types/knowledge.ts`)
+- **Kontrak Input (`OrchestratorInputEnvelope`):**
+  - `requestId`, `intent` (`SEED_FIRST_NODE` | `OPEN_NODE` | `BRANCH_NEW_NODE` | `ANALYZE_RELATIONS`), `lang` (`en` | `id`)
+  - `vaultContext`: `{ vaultId, vaultName, mainInterest, description, focusQuestion, learningGoal, relatedInterests, preferredDepth }`
+  - `nodeAction`: `{ targetNodeId?, parentNodeId?, topicTitle, openMode: 'instant_ai' | 'with_material', inputKind?: 'custom_prompt' | 'user_note' | 'book_chapter', inputTitle?, inputContent?, preferredRegion? }`
+  - `existingGraphSnapshot`: daftar ringkas seluruh node (`id`, `title`, `region`, `explored`, `summarySnippet`, `keyTakeaways`) dan edge di dalam Vault untuk dianalisis keterkaitannya.
+- **Kontrak Output (`OrchestratorOutputEnvelope`):**
+  - `ok`: `boolean`, `vault`: objek `KnowledgeVault` yang telah divalidasi DAG & ditata ulang posisinya secara organik.
+  - `trace` (`OrchestratorStageTrace`): `{ requestId, intent, engineUsed, openedNodeId, spawnedFrontierNodeIds, crossLinksDiscovered, dagValid, executionMs }`.
 
 ---
 
@@ -159,8 +184,8 @@ flowchart TD
 
 - **Model AI yang Digunakan:** Google Gemini (`gemini-2.5-flash`).
 - **Bagian Produk yang Memanfaatkan AI:**
-  1. `/api/explore`: Memproses permintaan *Add Exploration* (`From Material` atau `From Curiosity`) di dalam Vault, menyusun atau memperluas peta pengetahuan ke dalam 6 *Knowledge Regions*, mengklasifikasikan 5 jenis *edge*, serta melakukan *non-destructive merge* yang menjaga catatan **`User Edited`** dan menandai **`Needs Review`** bila perlu.
-  2. `/api/expand`: Memekarkan cabang konsep baru secara kontekstual dari node yang dipilih pengguna di dalam Vault.
+  1. `/api/orchestrate` (**Curiora 5-Stage AI Knowledge Orchestrator** — `src/lib/ai-orchestrator.ts`): Menerima paket terstruktur `OrchestratorInputEnvelope` saat pengguna memilih **Langsung Buka (`instant_ai`)** atau **Tambah Catatan / Materi Dulu (`custom_prompt`, `user_note`, `book_chapter`)** pada sebuah node, menjalankan **Cross-Node Relation Analyzer** untuk mendeteksi hubungan ilmiah dengan seluruh node yang sudah ada di Vault, memekarkan *Frontier Nodes* baru dalam status *Fog of War*, memvalidasi DAG & posisi organik (`validator.ts`), serta mengembalikan `OrchestratorOutputEnvelope` beserta `OrchestratorStageTrace`.
+  2. `/api/explore` & `/api/expand`: Mendukung inisialisasi peta pengetahuan dan pemekaran cabang kontekstual dari node yang dipilih pengguna di dalam Vault.
   3. `/api/revise-note`: Menghasilkan pratinjau revisi catatan yang diminta pengguna di **Knowledge Library** tanpa menimpa teks sebelum pengguna mengklik *Apply Revision*.
 - **Atribusi Referensi Materi Terbuka:**
   - *OpenStax Biology 2e* (Rice University, CC BY 4.0 License)

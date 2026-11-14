@@ -2,13 +2,23 @@
 
 import CreateVaultModal from "@/components/CreateVaultModal";
 import {
+  CurioraLogo,
   EmptyExplorerVector,
   HeroLearnerVector,
-  TrellisLogo,
 } from "@/components/Illustrations";
 import NodeInspector from "@/components/NodeInspector";
 import OverviewModal from "@/components/OverviewModal";
 import SkillTreeCanvas from "@/components/SkillTreeCanvas";
+import {
+  edgeDescription,
+  edgeShortLabel,
+  Language,
+  regionDescription,
+  regionName,
+  regionShortName,
+  ThemeMode,
+  UI_COPY,
+} from "@/lib/i18n";
 import { PRESET_VAULTS } from "@/lib/presets";
 import { EDGE_RELATIONS, KNOWLEDGE_REGIONS } from "@/lib/regions";
 import {
@@ -19,7 +29,6 @@ import {
 } from "@/types/knowledge";
 import {
   ArrowRight,
-  BookOpen,
   CheckCircle2,
   CloudFog,
   Compass,
@@ -34,20 +43,99 @@ import {
   Layers,
   Maximize2,
   Menu,
+  Moon,
   MousePointerClick,
   Network,
   RotateCcw,
   Search,
   Sparkles,
+  Sun,
   Trash2,
   X,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 
-const STORAGE_KEY = "trellis_vaults_v1";
-const LEGACY_STORAGE_KEY = "nexusvault_ai_vaults_v1";
+const STORAGE_KEY = "curiora_vaults_v1";
+const LEGACY_VAULT_KEYS = ["trellis_vaults_v1", "nexusvault_ai_vaults_v1"];
+const THEME_KEY = "curiora_theme_v1";
+const LEGACY_THEME_KEY = "trellis_theme_v1";
+const LANG_KEY = "curiora_lang_v1";
+const LEGACY_LANG_KEY = "trellis_lang_v1";
 
 type AppTab = "home" | "vaults" | "presets" | "tree" | "guide";
+
+function cleanLegacyText(text?: string): string {
+  if (!text) return "";
+  return text
+    .replace(/\s*\(REG-0[1-6]\)/g, "")
+    .replace(/\bREG-0[1-6]\s*[·:\-–]?\s*/g, "")
+    .replace(/Lintas-Region/g, "Lintas-Bidang")
+    .replace(/\bd\(([^)]*?)\s+[&/+-]+\s*\)\/dt/g, "d($1)/dt")
+    .replace(/^(Pendalaman:\s*Dinamika\s*){2,}/i, "Pendalaman: Dinamika ")
+    .replace(/^(Deeper Dynamics:\s*){2,}/i, "Deeper Dynamics: ");
+}
+
+function sanitizeNode(
+  node: KnowledgeVault["nodes"][number]
+): KnowledgeVault["nodes"][number] {
+  return {
+    ...node,
+    title: cleanLegacyText(node.title),
+    summary: cleanLegacyText(node.summary),
+    formula: node.formula ? cleanLegacyText(node.formula) : node.formula,
+    application: cleanLegacyText(node.application),
+    reference: cleanLegacyText(node.reference),
+    levels: {
+      simple: cleanLegacyText(node.levels.simple),
+      standard: cleanLegacyText(node.levels.standard),
+      deep: cleanLegacyText(node.levels.deep),
+    },
+  };
+}
+
+function sanitizeEdge(
+  edge: KnowledgeVault["edges"][number]
+): KnowledgeVault["edges"][number] {
+  return {
+    ...edge,
+    reason: cleanLegacyText(edge.reason),
+  };
+}
+
+function mergePresetUpdates(cached: KnowledgeVault[]): KnowledgeVault[] {
+  const presetMap = new Map(PRESET_VAULTS.map((p) => [p.id, p]));
+  return cached.map((v) => {
+    const fresh = presetMap.get(v.id);
+    if (!fresh) {
+      return {
+        ...v,
+        name: cleanLegacyText(v.name),
+        nodes: v.nodes.map(sanitizeNode),
+        edges: v.edges.map(sanitizeEdge),
+      };
+    }
+    const oldNodeMap = new Map(v.nodes.map((n) => [n.id, n]));
+    const freshNodeIds = new Set(fresh.nodes.map((n) => n.id));
+    const mergedNodes = fresh.nodes.map((fn) => {
+      const old = oldNodeMap.get(fn.id);
+      return old ? { ...fn, explored: old.explored, mastered: old.mastered } : fn;
+    });
+    const extraNodes = v.nodes
+      .filter((n) => !freshNodeIds.has(n.id))
+      .map(sanitizeNode);
+    const freshEdgeIds = new Set(fresh.edges.map((e) => e.id));
+    const extraEdges = v.edges
+      .filter((e) => !freshEdgeIds.has(e.id))
+      .map(sanitizeEdge);
+    return {
+      ...v,
+      name: fresh.name,
+      overview: fresh.overview,
+      nodes: [...mergedNodes, ...extraNodes],
+      edges: [...fresh.edges, ...extraEdges],
+    };
+  });
+}
 
 export default function HomePage() {
   const [vaults, setVaults] = useState<KnowledgeVault[]>(PRESET_VAULTS);
@@ -57,6 +145,10 @@ export default function HomePage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Appearance & language preferences
+  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [lang, setLang] = useState<Language>("en");
 
   // Filters & search
   const [vaultSearch, setVaultSearch] = useState("");
@@ -74,23 +166,62 @@ export default function HomePage() {
   const [expandedRegions, setExpandedRegions] = useState<RegionCode[]>([]);
   const [expandToast, setExpandToast] = useState<string | null>(null);
 
-  // Hydrate persisted Vaults
+  const t = UI_COPY[lang];
+  const isDark = theme === "dark";
+
+  // Hydrate persisted Vaults, Theme, Language
   useEffect(() => {
     try {
+      const savedTheme =
+        localStorage.getItem(THEME_KEY) || localStorage.getItem(LEGACY_THEME_KEY);
+      if (savedTheme === "dark" || savedTheme === "light") {
+        setTheme(savedTheme);
+        document.documentElement.classList.toggle("dark", savedTheme === "dark");
+      }
+      const savedLang =
+        localStorage.getItem(LANG_KEY) || localStorage.getItem(LEGACY_LANG_KEY);
+      if (savedLang === "en" || savedLang === "id") {
+        setLang(savedLang);
+        document.documentElement.lang = savedLang;
+      }
       const raw =
         localStorage.getItem(STORAGE_KEY) ||
-        localStorage.getItem(LEGACY_STORAGE_KEY);
+        LEGACY_VAULT_KEYS.map((k) => localStorage.getItem(k)).find(Boolean) ||
+        null;
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setVaults(parsed);
-          setActiveVaultId(parsed[0].id);
+          const merged = mergePresetUpdates(parsed);
+          setVaults(merged);
+          setActiveVaultId(merged[0].id);
         }
       }
     } catch {
       // ignore storage errors
     }
   }, []);
+
+  const toggleTheme = () => {
+    const next: ThemeMode = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.classList.toggle("dark", next === "dark");
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      // ignore
+    }
+  };
+
+  const toggleLang = () => {
+    const next: Language = lang === "en" ? "id" : "en";
+    setLang(next);
+    document.documentElement.lang = next;
+    try {
+      localStorage.setItem(LANG_KEY, next);
+    } catch {
+      // ignore
+    }
+  };
 
   // Keyboard shortcut Ctrl+K / Cmd+K for search
   useEffect(() => {
@@ -131,7 +262,6 @@ export default function HomePage() {
   const handleSelectNode = (nodeId: string | null) => {
     setSelectedNodeId(nodeId);
     if (!nodeId) return;
-    // Lift Fog of War immediately when user clicks a shrouded frontier node
     const targetNode = activeVault.nodes.find((n) => n.id === nodeId);
     if (targetNode && !targetNode.explored) {
       const updatedVaults = vaults.map((v) => {
@@ -183,7 +313,7 @@ export default function HomePage() {
       const res = await fetch("/api/explore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vaultName, inputContext }),
+        body: JSON.stringify({ vaultName, inputContext, lang }),
       });
       const data = await res.json();
       if (data?.ok && data.vault) {
@@ -211,6 +341,7 @@ export default function HomePage() {
         body: JSON.stringify({
           vault: activeVault,
           targetNodeId: nodeId,
+          lang,
         }),
       });
       const data = await res.json();
@@ -223,12 +354,17 @@ export default function HomePage() {
 
         const newNodes = updatedVault.nodes.filter((n) => !prevIds.has(n.id));
         const touchedRegs = Array.from(new Set(newNodes.map((n) => n.region)));
+        const touchedLabels = touchedRegs
+          .map((r) => regionShortName(r, lang))
+          .join(" & ");
         setNewlyAddedIds(newNodes.map((n) => n.id));
         setExpandedRegions(touchedRegs);
         setExpandToast(
-          `${newNodes.length} new branch${
-            newNodes.length > 1 ? "es" : ""
-          } mapped · ${touchedRegs.join(" & ")} expanded`
+          `${
+            newNodes.length === 1
+              ? t.tree.branchSingleAdded
+              : `${newNodes.length} ${t.tree.branchesAdded}`
+          }${touchedLabels ? ` · ${touchedLabels}` : ""}`
         );
         setTimeout(() => setExpandToast(null), 5000);
 
@@ -282,44 +418,60 @@ export default function HomePage() {
   });
 
   const navItems: { id: AppTab; label: string; icon: React.ReactNode }[] = [
-    { id: "home", label: "Home", icon: <Home className="h-4 w-4" /> },
+    { id: "home", label: t.nav.home, icon: <Home className="h-4 w-4" /> },
     {
       id: "vaults",
-      label: "My Vaults",
+      label: t.nav.vaults,
       icon: <Folder className="h-4 w-4" />,
     },
     {
       id: "presets",
-      label: "Explore Presets",
+      label: t.nav.presets,
       icon: <Compass className="h-4 w-4" />,
     },
     {
       id: "tree",
-      label: "Knowledge Tree",
+      label: t.nav.tree,
       icon: <Network className="h-4 w-4" />,
     },
     {
       id: "guide",
-      label: "Getting Started",
+      label: t.nav.guide,
       icon: <HelpCircle className="h-4 w-4" />,
     },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-[#F3F6FC] text-[#17233C]">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-[#F3F6FC] dark:bg-[#0B1120] text-[#17233C] dark:text-[#F1F5F9] transition-colors">
       {/* Mobile Header */}
-      <header className="flex lg:hidden items-center justify-between bg-[#17263C] px-4 py-3 text-white sticky top-0 z-40">
+      <header className="flex lg:hidden items-center justify-between bg-[#17263C] dark:bg-[#0B1120] dark:border-b dark:border-slate-800 px-4 py-3 text-white sticky top-0 z-40">
         <div className="flex items-center gap-2.5">
-          <TrellisLogo size={32} />
-          <span className="text-lg font-extrabold tracking-tight">Trellis</span>
+          <CurioraLogo size={32} />
+          <span className="text-lg font-extrabold tracking-tight">Curiora</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={isDark ? t.nav.light : t.nav.dark}
+            className="rounded-lg border border-white/15 bg-white/5 hover:bg-white/15 p-1.5 text-white"
+          >
+            {isDark ? <Sun className="h-4 w-4 text-amber-300" /> : <Moon className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={toggleLang}
+            aria-label="Switch language"
+            className="rounded-lg border border-white/15 bg-white/5 hover:bg-white/15 px-2 py-1 text-[11px] font-extrabold text-white"
+          >
+            {lang === "en" ? "EN" : "ID"}
+          </button>
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
-            className="rounded-lg bg-[#2F80ED] px-3 py-1.5 text-xs font-bold text-white"
+            className="rounded-lg bg-[#2F80ED] px-2.5 py-1.5 text-xs font-bold text-white"
           >
-            + New Vault
+            {t.nav.newVaultShort}
           </button>
           <button
             type="button"
@@ -336,22 +488,22 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Left Navy Navigation Sidebar (#17263C matching Figma Screens 01-06) */}
+      {/* Left Navy Navigation Sidebar */}
       <aside
         className={`${
           mobileMenuOpen ? "flex" : "hidden"
-        } lg:flex lg:w-64 lg:shrink-0 flex-col justify-between bg-[#17263C] text-white p-4 lg:sticky lg:top-0 lg:h-screen z-30`}
+        } lg:flex lg:w-64 lg:shrink-0 flex-col justify-between bg-[#17263C] dark:bg-[#0F172A] dark:border-r dark:border-slate-800 text-white p-4 lg:sticky lg:top-0 lg:h-screen z-30 transition-colors`}
       >
         <div className="space-y-6">
-          {/* Brand Logo (Preserved icon + Trellis name) */}
+          {/* Brand Logo */}
           <div className="hidden lg:flex items-center gap-3 px-2 pt-1">
-            <TrellisLogo size={36} />
-            <div>
-              <div className="text-xl font-extrabold tracking-tight text-white">
-                Trellis
+            <CurioraLogo size={36} />
+            <div className="min-w-0">
+              <div className="text-xl font-extrabold tracking-tight text-white leading-tight">
+                Curiora
               </div>
-              <div className="text-[10.5px] font-medium text-[#8FA2BD]">
-                Your Knowledge Cosmos
+              <div className="text-[10.5px] font-medium text-[#8FA2BD] truncate">
+                {t.nav.cosmosTag}
               </div>
             </div>
           </div>
@@ -384,9 +536,9 @@ export default function HomePage() {
           {/* Recent Vaults Switcher */}
           <div>
             <div className="px-2 mb-2 text-[10.5px] font-bold uppercase tracking-wider text-[#647B99]">
-              Recent Vaults
+              {t.nav.recentVaults}
             </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
               {vaults.slice(0, 6).map((v) => {
                 const isCur = v.id === activeVault.id && activeTab === "tree";
                 return (
@@ -409,17 +561,57 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Bottom Storage Note + Primary CTA */}
-        <div className="space-y-3 pt-4 border-t border-white/10">
-          <div className="rounded-xl bg-[#1E314D] p-3 text-xs">
-            <div className="flex items-center gap-2 font-bold text-[#DCE6F5]">
-              <Database className="h-4 w-4 text-[#60A5FA]" />
-              Saved on this device
+        {/* Bottom Appearance/Language Switch + Storage Pill + Primary CTA */}
+        <div className="space-y-2.5 pt-4 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/15 px-3 py-2 text-xs font-bold text-[#DCE6F5] transition-colors"
+            >
+              {isDark ? (
+                <>
+                  <Sun className="h-3.5 w-3.5 text-amber-300" />
+                  <span>{t.nav.light}</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="h-3.5 w-3.5 text-blue-300" />
+                  <span>{t.nav.dark}</span>
+                </>
+              )}
+            </button>
+            <div className="flex rounded-xl bg-white/10 p-0.5 text-[11px] font-extrabold">
+              <button
+                type="button"
+                onClick={() => lang !== "en" && toggleLang()}
+                className={`flex-1 rounded-lg py-1.5 transition-colors ${
+                  lang === "en"
+                    ? "bg-[#2F80ED] text-white"
+                    : "text-[#B4C2D6] hover:text-white"
+                }`}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => lang !== "id" && toggleLang()}
+                className={`flex-1 rounded-lg py-1.5 transition-colors ${
+                  lang === "id"
+                    ? "bg-[#2F80ED] text-white"
+                    : "text-[#B4C2D6] hover:text-white"
+                }`}
+              >
+                ID
+              </button>
             </div>
-            <p className="mt-0.5 text-[11px] text-[#8FA2BD]">
-              Autosaved locally · Always ready
-            </p>
           </div>
+
+          <div className="rounded-xl bg-[#1E314D] dark:bg-slate-800/80 px-3 py-2.5 text-xs flex items-center gap-2 font-semibold text-[#DCE6F5]">
+            <Database className="h-4 w-4 text-[#60A5FA] shrink-0" />
+            <span>{t.nav.localDevice}</span>
+          </div>
+
           <button
             type="button"
             onClick={() => {
@@ -429,14 +621,14 @@ export default function HomePage() {
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] py-2.5 px-4 text-xs font-bold text-white shadow-md shadow-[#2F80ED]/25 transition-all"
           >
             <FolderPlus className="h-4 w-4" />
-            + Create New Vault
+            {t.nav.createNewVault}
           </button>
         </div>
       </aside>
 
       {/* Main Content Stage */}
       <main className="flex-1 min-w-0">
-        {/* Top Utility Search & Actions Strip (when not in full Tree view, or slim in Tree view) */}
+        {/* Top Utility Search & Actions Strip */}
         {activeTab !== "tree" && (
           <div className="mx-auto max-w-[1260px] px-4 sm:px-8 pt-5 pb-2 flex flex-wrap items-center justify-between gap-3">
             <div className="relative flex-1 max-w-md">
@@ -451,10 +643,10 @@ export default function HomePage() {
                     setActiveTab("vaults");
                   }
                 }}
-                placeholder="Search your vaults..."
-                className="w-full rounded-xl border border-[#DFE6F0] bg-white pl-10 pr-14 py-2.5 text-sm text-[#17233C] placeholder:text-[#94A3B8] shadow-sm focus:border-[#2F80ED] focus:outline-none"
+                placeholder={t.topbar.searchPlaceholder}
+                className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-[#111827] pl-10 pr-14 py-2.5 text-sm text-[#17233C] dark:text-slate-100 placeholder:text-[#94A3B8] shadow-sm focus:border-[#2F80ED] focus:outline-none"
               />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#DFE6F0] bg-[#F3F6FC] px-1.5 py-0.5 text-[10px] font-bold text-[#6F7E93]">
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#DFE6F0] dark:border-slate-700 bg-[#F3F6FC] dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-[#6F7E93] dark:text-slate-300">
                 Ctrl K
               </span>
             </div>
@@ -464,66 +656,59 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setShowEmptyDemo((d) => !d)}
-                  className="rounded-xl border border-[#DFE6F0] bg-white hover:border-[#2F80ED] px-3 py-2 text-xs font-semibold text-[#6F7E93] hover:text-[#17233C]"
-                  title="Preview first-time empty state layout"
+                  className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-[#111827] hover:border-[#2F80ED] px-3 py-2 text-xs font-semibold text-[#6F7E93] dark:text-slate-300 hover:text-[#17233C] dark:hover:text-white transition-colors"
                 >
-                  {showEmptyDemo ? "Show Populated Home" : "Preview Empty State"}
+                  {showEmptyDemo
+                    ? t.topbar.showPopulated
+                    : t.topbar.previewEmpty}
                 </button>
               )}
               <button
                 type="button"
                 onClick={handleResetPresets}
-                title="Reset preset vaults"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] bg-white hover:bg-[#F8FAFC] px-3 py-2 text-xs font-semibold text-[#6F7E93] hover:text-[#17233C]"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-[#111827] hover:bg-[#F8FAFC] dark:hover:bg-slate-800 px-3 py-2 text-xs font-semibold text-[#6F7E93] dark:text-slate-300 hover:text-[#17233C] dark:hover:text-white transition-colors"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                Reset Presets
+                {t.topbar.resetPresets}
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("tree")}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#EAF2FF] hover:bg-[#DCEAFE] px-3.5 py-2 text-xs font-bold text-[#2F80ED]"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#EAF2FF] dark:bg-blue-950/60 hover:bg-[#DCEAFE] dark:hover:bg-blue-900/60 px-3.5 py-2 text-xs font-bold text-[#2F80ED] dark:text-blue-300 transition-colors"
               >
                 <Network className="h-3.5 w-3.5" />
-                Open Active Tree
+                {t.topbar.openTree}
               </button>
             </div>
           </div>
         )}
 
-        {/* TAB 1: HOME DASHBOARD (Figma Screen 01 & Screen 02) */}
+        {/* TAB 1: HOME DASHBOARD */}
         {activeTab === "home" && (
           <div className="mx-auto max-w-[1260px] px-4 sm:px-8 py-4 space-y-6">
             {/* Hero Welcome & Transparent Pure-SVG Illustration */}
             <section className="relative pt-2">
-              <div className="mb-4 max-w-xl">
-                <h1 className="text-[26px] sm:text-4xl font-extrabold tracking-tight text-[#17233C]">
-                  Your Knowledge{" "}
+              <div className="mb-4 max-w-xl md:max-w-[calc(100%-365px)] lg:max-w-[calc(100%-410px)] xl:max-w-xl relative z-10">
+                <h1 className="text-[26px] sm:text-4xl font-extrabold tracking-tight text-[#17233C] dark:text-slate-100">
+                  {t.home.heroLine1}{" "}
                   <span className="whitespace-nowrap">
-                    Cosmos
+                    {t.home.heroAccent}
                     <span className="inline-block ml-1.5 h-2.5 w-2.5 rounded-full bg-[#FFA33A] align-baseline" />
                   </span>
                 </h1>
-                <p className="mt-1.5 text-base text-[#6F7E93]">
-                  Where curiosity grows into a universe of connected knowledge.
+                <p className="mt-1.5 text-base text-[#6F7E93] dark:text-slate-400">
+                  {t.home.heroSubtitle}
                 </p>
               </div>
 
               <div className="relative overflow-visible">
-                <div
-                  style={{
-                    background:
-                      "linear-gradient(90deg, #2F80ED 0%, #3F8EFC 65%, #CFE2FF 100%)",
-                  }}
-                  className="rounded-3xl p-6 sm:p-8 text-white shadow-lg shadow-[#2F80ED]/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
-                >
+                <div className="rounded-3xl bg-gradient-to-r from-[#2F80ED] via-[#3F8EFC] to-[#CFE2FF] dark:from-[#1D4ED8] dark:via-[#2563EB] dark:to-[#1E3A8A] p-6 sm:p-8 text-white shadow-lg shadow-[#2F80ED]/20 dark:shadow-blue-950/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                   <div className="max-w-lg z-10">
                     <h2 className="text-xl sm:text-2xl font-extrabold">
-                      Start a new exploration
+                      {t.home.bannerTitle}
                     </h2>
                     <p className="mt-1.5 text-sm text-[#E3EEFF]">
-                      Begin from a study material or follow your personal
-                      curiosity in a living, ever-expanding knowledge tree.
+                      {t.home.bannerSubtitle}
                     </p>
                     <div className="mt-5 flex flex-wrap items-center gap-3">
                       <button
@@ -531,13 +716,13 @@ export default function HomePage() {
                         onClick={() => setIsCreateOpen(true)}
                         className="rounded-xl bg-white hover:bg-[#F8FAFC] px-5 py-2.5 text-sm font-bold text-[#2F80ED] shadow-sm transition-all"
                       >
-                        + Create New Vault
+                        {t.nav.createNewVault}
                       </button>
                       <button
                         type="button"
                         onClick={() => setActiveTab("tree")}
                         className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition-all"
-                        aria-label="Open Active Skill Tree"
+                        aria-label={t.topbar.openTree}
                       >
                         <ArrowRight className="h-5 w-5" />
                       </button>
@@ -546,28 +731,26 @@ export default function HomePage() {
                   <div className="hidden md:block w-[360px] h-[120px] shrink-0" />
                 </div>
 
-                {/* Overlapping transparent vector on desktop! */}
-                <div className="hidden md:block pointer-events-none absolute -top-24 right-4 w-[400px] h-[270px]">
+                {/* Overlapping transparent vector on desktop */}
+                <div className="hidden md:block pointer-events-none absolute -top-20 lg:-top-24 right-0 lg:right-4 w-[350px] lg:w-[400px] h-[236px] lg:h-[270px]">
                   <HeroLearnerVector className="w-full h-full drop-shadow-sm" />
                 </div>
               </div>
             </section>
 
             {showEmptyDemo ? (
-              /* Screen 02: Empty State First-Time User + Preset Shortcuts */
+              /* Empty State Layout */
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                <div className="lg:col-span-7 rounded-3xl border border-[#DFE6F0] bg-white p-6 flex flex-col sm:flex-row items-center gap-6 shadow-sm">
+                <div className="lg:col-span-7 rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-6 flex flex-col sm:flex-row items-center gap-6 shadow-sm">
                   <div className="w-56 h-48 shrink-0">
                     <EmptyExplorerVector />
                   </div>
                   <div className="space-y-3 text-center sm:text-left">
-                    <h3 className="text-xl font-extrabold text-[#17233C]">
-                      No vaults created yet
+                    <h3 className="text-xl font-extrabold text-[#17233C] dark:text-slate-100">
+                      {t.home.emptyTitle}
                     </h3>
-                    <p className="text-xs leading-relaxed text-[#6F7E93]">
-                      Create your first Knowledge Vault from a school chapter
-                      (Mode A) or a personal curiosity (Mode B), or explore a
-                      ready-made preset right away.
+                    <p className="text-xs leading-relaxed text-[#6F7E93] dark:text-slate-400">
+                      {t.home.emptySubtitle}
                     </p>
                     <div className="flex flex-wrap justify-center sm:justify-start gap-2.5 pt-1">
                       <button
@@ -576,15 +759,15 @@ export default function HomePage() {
                         className="inline-flex items-center gap-1.5 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-4 py-2.5 text-xs font-bold text-white"
                       >
                         <FolderPlus className="h-4 w-4" />
-                        Create First Vault
+                        {t.home.createFirst}
                       </button>
                       <button
                         type="button"
                         onClick={() => setActiveTab("presets")}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#EAF2FF] hover:bg-[#DCEAFE] px-4 py-2.5 text-xs font-bold text-[#2F80ED]"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#EAF2FF] dark:bg-blue-950/60 hover:bg-[#DCEAFE] dark:hover:bg-blue-900/60 px-4 py-2.5 text-xs font-bold text-[#2F80ED] dark:text-blue-300"
                       >
                         <Compass className="h-4 w-4" />
-                        Browse {PRESET_VAULTS.length} Presets
+                        {t.home.browsePresets}
                       </button>
                     </div>
                   </div>
@@ -592,15 +775,15 @@ export default function HomePage() {
 
                 <div className="lg:col-span-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-base font-extrabold text-[#17233C]">
-                      Explore Presets
+                    <h3 className="text-base font-extrabold text-[#17233C] dark:text-slate-100">
+                      {t.home.explorePresets}
                     </h3>
                     <button
                       type="button"
                       onClick={() => setActiveTab("presets")}
-                      className="text-xs font-bold text-[#2F80ED] hover:underline"
+                      className="text-xs font-bold text-[#2F80ED] dark:text-blue-400 hover:underline"
                     >
-                      View all →
+                      {t.home.viewAll} →
                     </button>
                   </div>
                   {PRESET_VAULTS.map((pv) => {
@@ -608,27 +791,27 @@ export default function HomePage() {
                     return (
                       <div
                         key={pv.id}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-[#DFE6F0] bg-white p-3.5 shadow-sm"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-3.5 shadow-sm"
                       >
                         <div className="min-w-0">
-                          <div className="text-sm font-extrabold text-[#17233C] truncate">
+                          <div className="text-sm font-extrabold text-[#17233C] dark:text-slate-100 truncate">
                             {pv.name}
                           </div>
-                          <div className="text-xs text-[#6F7E93] mt-0.5">
-                            {pv.nodes.length} mapped · {pv.overview.startingRegion}
+                          <div className="text-xs text-[#6F7E93] dark:text-slate-400 mt-0.5">
+                            {pv.nodes.length} {t.home.mapped}
                           </div>
                           <span
                             className={`mt-1.5 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${reg.badgeClass}`}
                           >
-                            {reg.code} · {reg.shortName}
+                            {regionShortName(pv.overview.startingRegion, lang)}
                           </span>
                         </div>
                         <button
                           type="button"
                           onClick={() => openVaultInTree(pv.id)}
-                          className="shrink-0 rounded-xl bg-[#EAF2FF] hover:bg-[#DCEAFE] px-3 py-2 text-xs font-bold text-[#2F80ED]"
+                          className="shrink-0 rounded-xl bg-[#EAF2FF] dark:bg-blue-950/60 hover:bg-[#DCEAFE] dark:hover:bg-blue-900/60 px-3 py-2 text-xs font-bold text-[#2F80ED] dark:text-blue-300"
                         >
-                          Open →
+                          {t.home.openBtn} →
                         </button>
                       </div>
                     );
@@ -639,72 +822,72 @@ export default function HomePage() {
               <>
                 {/* 4 Open Activity Metrics */}
                 <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="rounded-2xl border border-[#DFE6F0] bg-white p-4 flex items-center gap-3.5 shadow-sm">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFF4E5] text-[#FFA33A]">
+                  <div className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-4 flex items-center gap-3.5 shadow-sm">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFF4E5] dark:bg-amber-950/60 text-[#FFA33A]">
                       <Folder className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-2xl font-extrabold text-[#17233C]">
+                      <div className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
                         {vaults.length}
                       </div>
-                      <div className="text-xs font-medium text-[#6F7E93]">
-                        Total Vaults
+                      <div className="text-xs font-medium text-[#6F7E93] dark:text-slate-400">
+                        {t.home.statVaults}
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[#DFE6F0] bg-white p-4 flex items-center gap-3.5 shadow-sm">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EAF2FF] text-[#2F80ED]">
+                  <div className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-4 flex items-center gap-3.5 shadow-sm">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EAF2FF] dark:bg-blue-950/60 text-[#2F80ED] dark:text-blue-400">
                       <Network className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-2xl font-extrabold text-[#17233C]">
+                      <div className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
                         {totalMappedAllVaults}
                       </div>
-                      <div className="text-xs font-medium text-[#6F7E93]">
-                        Concepts Mapped
+                      <div className="text-xs font-medium text-[#6F7E93] dark:text-slate-400">
+                        {t.home.statMapped}
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[#DFE6F0] bg-white p-4 flex items-center gap-3.5 shadow-sm">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FEF9C3] text-[#CA8A04]">
+                  <div className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-4 flex items-center gap-3.5 shadow-sm">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FEF9C3] dark:bg-yellow-950/60 text-[#CA8A04] dark:text-yellow-400">
                       <CheckCircle2 className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-2xl font-extrabold text-[#17233C]">
+                      <div className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
                         {totalMasteredAllVaults}
                       </div>
-                      <div className="text-xs font-medium text-[#6F7E93]">
-                        Mastered Notes
+                      <div className="text-xs font-medium text-[#6F7E93] dark:text-slate-400">
+                        {t.home.statMastered}
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[#DFE6F0] bg-white p-4 flex items-center gap-3.5 shadow-sm">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ECFDF5] text-[#0D9468]">
+                  <div className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-4 flex items-center gap-3.5 shadow-sm">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ECFDF5] dark:bg-emerald-950/60 text-[#0D9468] dark:text-emerald-400">
                       <Layers className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-2xl font-extrabold text-[#17233C]">
-                        {globalRegionsExplored.length} / 6
+                      <div className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
+                        {globalRegionsExplored.length}
                       </div>
-                      <div className="text-xs font-medium text-[#6F7E93]">
-                        Regions Explored
+                      <div className="text-xs font-medium text-[#6F7E93] dark:text-slate-400">
+                        {t.home.statRegions}
                       </div>
                     </div>
                   </div>
                 </section>
 
-                {/* Continue Exploring Vaults (NO progress bars or %!) */}
+                {/* Continue Exploring Vaults */}
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-extrabold text-[#17233C]">
-                      Continue Exploring
+                    <h2 className="text-lg font-extrabold text-[#17233C] dark:text-slate-100">
+                      {t.home.continueExploring}
                     </h2>
                     <button
                       type="button"
                       onClick={() => setActiveTab("vaults")}
-                      className="text-xs font-bold text-[#2F80ED] hover:underline"
+                      className="text-xs font-bold text-[#2F80ED] dark:text-blue-400 hover:underline"
                     >
-                      View all →
+                      {t.home.viewAll} →
                     </button>
                   </div>
 
@@ -720,41 +903,41 @@ export default function HomePage() {
                       return (
                         <div
                           key={v.id}
-                          className="rounded-2xl border border-[#DFE6F0] bg-white p-5 flex items-center justify-between gap-4 shadow-sm hover:border-[#2F80ED]/60 transition-all"
+                          className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 flex items-center justify-between gap-4 shadow-sm hover:border-[#2F80ED]/60 transition-all"
                         >
                           <div className="min-w-0 space-y-2">
                             <div>
-                              <h3 className="text-base font-extrabold text-[#17233C] truncate">
+                              <h3 className="text-base font-extrabold text-[#17233C] dark:text-slate-100 truncate">
                                 {v.name}
                               </h3>
-                              <p className="text-xs text-[#6F7E93] truncate">
-                                {reg.name} · {v.nodes.length} mapped ·{" "}
-                                {vRegions} regions
+                              <p className="text-xs text-[#6F7E93] dark:text-slate-400 truncate">
+                                {regionName(reg.code, lang)} · {v.nodes.length}{" "}
+                                {t.home.mapped} · {vRegions} {t.home.regions}
                               </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span
                                 className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${reg.badgeClass}`}
                               >
-                                {reg.code} · {reg.shortName}
+                                {regionShortName(reg.code, lang)}
                               </span>
-                              <span className="rounded-full bg-[#EAF2FF] px-2.5 py-0.5 text-[11px] font-bold text-[#2F80ED]">
+                              <span className="rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 px-2.5 py-0.5 text-[11px] font-bold text-[#2F80ED] dark:text-blue-300">
                                 {v.inputContext.mode === "mode_a"
-                                  ? "Mode A · Material"
-                                  : "Mode B · Interest"}
+                                  ? t.home.modeMaterial
+                                  : t.home.modeCuriosity}
                               </span>
-                            </div>
-                            <div className="text-[11px] font-semibold text-[#6F7E93]">
-                              {vMastered} mastered · Open unbounded workspace
+                              <span className="text-[11px] font-semibold text-[#0D9468] dark:text-emerald-400">
+                                · {vMastered} {t.home.mastered}
+                              </span>
                             </div>
                           </div>
 
                           <button
                             type="button"
                             onClick={() => openVaultInTree(v.id)}
-                            className="shrink-0 rounded-xl bg-[#EAF2FF] hover:bg-[#2F80ED] text-[#2F80ED] hover:text-white px-4 py-2.5 text-xs font-bold transition-all"
+                            className="shrink-0 rounded-xl bg-[#EAF2FF] dark:bg-blue-950/60 hover:bg-[#2F80ED] text-[#2F80ED] dark:text-blue-300 hover:text-white px-4 py-2.5 text-xs font-bold transition-all"
                           >
-                            Continue →
+                            {t.home.continueBtn} →
                           </button>
                         </div>
                       );
@@ -765,15 +948,15 @@ export default function HomePage() {
                 {/* Quick Start Presets Strip */}
                 <section className="space-y-3 pb-4">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-extrabold text-[#17233C]">
-                      Quick Start Presets
+                    <h2 className="text-lg font-extrabold text-[#17233C] dark:text-slate-100">
+                      {t.home.quickStart}
                     </h2>
                     <button
                       type="button"
                       onClick={() => setActiveTab("presets")}
-                      className="text-xs font-bold text-[#2F80ED] hover:underline"
+                      className="text-xs font-bold text-[#2F80ED] dark:text-blue-400 hover:underline"
                     >
-                      Explore Presets →
+                      {t.home.explorePresets} →
                     </button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -784,22 +967,22 @@ export default function HomePage() {
                           type="button"
                           key={pv.id}
                           onClick={() => openVaultInTree(pv.id)}
-                          className="rounded-2xl border border-[#DFE6F0] bg-white hover:border-[#2F80ED] p-4 text-left flex items-center justify-between gap-3 shadow-sm transition-all"
+                          className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] hover:border-[#2F80ED] p-4 text-left flex items-center justify-between gap-3 shadow-sm transition-all"
                         >
                           <div className="min-w-0">
                             <span
                               className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${reg.badgeClass}`}
                             >
-                              {reg.code} · {reg.shortName}
+                              {regionShortName(reg.code, lang)}
                             </span>
-                            <div className="mt-2 text-sm font-extrabold text-[#17233C] truncate">
+                            <div className="mt-2 text-sm font-extrabold text-[#17233C] dark:text-slate-100 truncate">
                               {pv.name}
                             </div>
-                            <div className="text-xs text-[#6F7E93] truncate mt-0.5">
+                            <div className="text-xs text-[#6F7E93] dark:text-slate-400 truncate mt-0.5">
                               {pv.overview.coreFormulaOrPrinciple}
                             </div>
                           </div>
-                          <ArrowRight className="h-4 w-4 text-[#2F80ED] shrink-0" />
+                          <ArrowRight className="h-4 w-4 text-[#2F80ED] dark:text-blue-400 shrink-0" />
                         </button>
                       );
                     })}
@@ -810,26 +993,20 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* TAB 2: MY VAULTS LIBRARY (Figma Screen 05) */}
+        {/* TAB 2: MY VAULTS LIBRARY */}
         {activeTab === "vaults" && (
           <div className="mx-auto max-w-[1260px] px-4 sm:px-8 py-4 space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-extrabold text-[#17233C]">
-                  My Knowledge Vaults
-                </h1>
-                <p className="text-xs text-[#6F7E93]">
-                  Keep every study map organized in its own workspace — explore
-                  and branch out freely with zero limits.
-                </p>
-              </div>
+              <h1 className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
+                {t.vaults.title}
+              </h1>
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
                 className="inline-flex items-center gap-2 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-4 py-2.5 text-xs font-bold text-white shadow-sm"
               >
                 <FolderPlus className="h-4 w-4" />
-                + Create New Vault
+                {t.nav.createNewVault}
               </button>
             </div>
 
@@ -847,38 +1024,44 @@ export default function HomePage() {
                 return (
                   <div
                     key={v.id}
-                    className="rounded-2xl border border-[#DFE6F0] bg-white p-5 flex flex-col justify-between gap-4 shadow-sm hover:border-[#2F80ED]/60 transition-all"
+                    className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 flex flex-col justify-between gap-4 shadow-sm hover:border-[#2F80ED]/60 transition-all"
                   >
                     <div className="space-y-2.5">
                       <div className="flex items-start justify-between gap-2">
                         <span
                           className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${reg.badgeClass}`}
                         >
-                          {reg.code} · {reg.shortName}
+                          {regionShortName(reg.code, lang)}
                         </span>
-                        <span className="rounded-full bg-[#F3F6FC] px-2.5 py-0.5 text-[11px] font-bold text-[#6F7E93]">
+                        <span className="rounded-full bg-[#F3F6FC] dark:bg-slate-800 px-2.5 py-0.5 text-[11px] font-bold text-[#6F7E93] dark:text-slate-300">
                           {v.inputContext.mode === "mode_a"
-                            ? "Mode A"
-                            : "Mode B"}
+                            ? t.home.modeMaterial
+                            : t.home.modeCuriosity}
                         </span>
                       </div>
 
-                      <h3 className="text-base font-extrabold text-[#17233C]">
+                      <h3 className="text-base font-extrabold text-[#17233C] dark:text-slate-100">
                         {v.name}
                       </h3>
-                      <p className="text-xs text-[#6F7E93] line-clamp-2">
+                      <p className="text-xs text-[#6F7E93] dark:text-slate-400 line-clamp-2">
                         {v.overview.summary}
                       </p>
                     </div>
 
-                    <div className="space-y-3 pt-2 border-t border-[#DFE6F0]">
-                      <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6F7E93]">
-                        <span>{v.nodes.length} mapped</span>
-                        <span>{vOpened} opened</span>
-                        <span className="text-[#0D9468]">
-                          {vMastered} mastered
+                    <div className="space-y-3 pt-2 border-t border-[#DFE6F0] dark:border-slate-800">
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6F7E93] dark:text-slate-400">
+                        <span>
+                          {v.nodes.length} {t.home.mapped}
                         </span>
-                        <span>{vRegs}/6 regions</span>
+                        <span>
+                          {vOpened} {t.home.opened}
+                        </span>
+                        <span className="text-[#0D9468] dark:text-emerald-400">
+                          {vMastered} {t.home.mastered}
+                        </span>
+                        <span>
+                          {vRegs} {t.home.regions}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -887,14 +1070,14 @@ export default function HomePage() {
                           onClick={() => openVaultInTree(v.id)}
                           className="flex-1 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] py-2 px-3 text-xs font-bold text-white transition-all"
                         >
-                          Open Skill Tree →
+                          {t.vaults.openTree} →
                         </button>
                         {!v.isPreset && (
                           <button
                             type="button"
                             onClick={() => handleDeleteVault(v.id)}
-                            title="Delete custom Vault"
-                            className="rounded-xl border border-[#DFE6F0] p-2 text-[#6F7E93] hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
+                            title={t.vaults.deleteTitle}
+                            className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 p-2 text-[#6F7E93] dark:text-slate-400 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -908,18 +1091,12 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* TAB 3: EXPLORE PRESETS (Figma Screen 06) */}
+        {/* TAB 3: EXPLORE PRESETS */}
         {activeTab === "presets" && (
           <div className="mx-auto max-w-[1260px] px-4 sm:px-8 py-4 space-y-5">
-            <div>
-              <h1 className="text-2xl font-extrabold text-[#17233C]">
-                Explore Preset Vaults
-              </h1>
-              <p className="text-xs text-[#6F7E93]">
-                Try curated science knowledge trees ready to open, read, and
-                expand freely from study chapters or personal questions.
-              </p>
-            </div>
+            <h1 className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
+              {t.presets.title}
+            </h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               {PRESET_VAULTS.map((pv) => {
@@ -927,46 +1104,46 @@ export default function HomePage() {
                 return (
                   <div
                     key={pv.id}
-                    className="rounded-3xl border border-[#DFE6F0] bg-white p-6 flex flex-col justify-between gap-4 shadow-sm"
+                    className="rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-6 flex flex-col justify-between gap-4 shadow-sm"
                   >
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span
                           className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${reg.badgeClass}`}
                         >
-                          {reg.code} · {reg.shortName}
+                          {regionShortName(reg.code, lang)}
                         </span>
-                        <span className="rounded-full bg-[#EAF2FF] px-2.5 py-0.5 text-[11px] font-bold text-[#2F80ED]">
+                        <span className="rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 px-2.5 py-0.5 text-[11px] font-bold text-[#2F80ED] dark:text-blue-300">
                           {pv.inputContext.mode === "mode_a"
-                            ? "Mode A · Material"
-                            : "Mode B · Goal"}
+                            ? t.home.modeMaterial
+                            : t.home.modeCuriosity}
                         </span>
                       </div>
 
-                      <h2 className="text-lg font-extrabold text-[#17233C]">
+                      <h2 className="text-lg font-extrabold text-[#17233C] dark:text-slate-100">
                         {pv.name}
                       </h2>
-                      <p className="text-xs leading-relaxed text-[#6F7E93]">
+                      <p className="text-xs leading-relaxed text-[#6F7E93] dark:text-slate-400">
                         {pv.overview.summary}
                       </p>
 
-                      <div className="rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] p-3">
-                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#6F7E93]">
-                          Key Path
+                      <div className="rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-800/60 p-3">
+                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#6F7E93] dark:text-slate-400">
+                          {t.presets.keyPath}
                         </div>
-                        <div className="mt-1 font-mono text-[11px] font-semibold text-[#17233C]">
+                        <div className="mt-1 font-mono text-[11px] font-semibold text-[#17233C] dark:text-slate-200">
                           {pv.overview.coreFormulaOrPrinciple}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-2 border-t border-[#DFE6F0]">
+                    <div className="flex items-center gap-2 pt-2 border-t border-[#DFE6F0] dark:border-slate-800">
                       <button
                         type="button"
                         onClick={() => openVaultInTree(pv.id)}
                         className="flex-1 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] py-2.5 px-4 text-xs font-bold text-white"
                       >
-                        Open Skill Tree →
+                        {t.presets.openTree} →
                       </button>
                       <button
                         type="button"
@@ -974,9 +1151,9 @@ export default function HomePage() {
                           setActiveVaultId(pv.id);
                           setIsOverviewOpen(true);
                         }}
-                        className="rounded-xl border border-[#DFE6F0] bg-white hover:bg-[#F3F6FC] py-2.5 px-3 text-xs font-bold text-[#17233C]"
+                        className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-[#F3F6FC] dark:hover:bg-slate-700 py-2.5 px-3 text-xs font-bold text-[#17233C] dark:text-slate-100"
                       >
-                        Foundation
+                        {t.presets.overview}
                       </button>
                     </div>
                   </div>
@@ -986,7 +1163,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* TAB 4: KNOWLEDGE TREE WORKSPACE (Full-Screen Clean Canvas + Node Study Modal) */}
+        {/* TAB 4: KNOWLEDGE TREE WORKSPACE */}
         {activeTab === "tree" && (
           <div className="relative w-full h-[calc(100vh-56px)] lg:h-screen">
             <SkillTreeCanvas
@@ -999,66 +1176,61 @@ export default function HomePage() {
               onUnlockAllFog={handleUnlockAllFog}
               newlyAddedIds={newlyAddedIds}
               expandedRegions={expandedRegions}
-            />
+              lang={lang}
+              theme={theme}
+              onToggleTheme={toggleTheme}
+              onToggleLang={toggleLang}
+            >
+              {/* Floating Node Study Modal (anchored inside canvas below topbar) */}
+              <NodeInspector
+                vault={activeVault}
+                node={selectedNode}
+                onSelectNode={handleSelectNode}
+                onClose={() => setSelectedNodeId(null)}
+                onMarkMastered={handleMarkMastered}
+                onExpandNode={handleExpandNode}
+                isExpanding={isExpanding}
+                lang={lang}
+                theme={theme}
+              />
+            </SkillTreeCanvas>
 
-            {/* Floating Expansion Toast (does not consume permanent canvas space) */}
+            {/* Floating Expansion Toast */}
             {expandToast && (
               <div className="pointer-events-none fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-4 w-full max-w-lg flex justify-center">
-                <div className="pointer-events-auto rounded-2xl border border-[#2F80ED] bg-white/95 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between gap-4 shadow-xl">
+                <div className="pointer-events-auto rounded-2xl border border-[#2F80ED] bg-white/95 dark:bg-[#111827]/95 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between gap-4 shadow-xl">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#FFF3E0] text-[#FFA33A]">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#FFF3E0] dark:bg-amber-950/70 text-[#FFA33A]">
                       <Sparkles className="h-3.5 w-3.5" />
                     </div>
-                    <div>
-                      <div className="text-xs font-extrabold text-[#17233C]">
-                        {expandToast}
-                      </div>
-                      <div className="text-[11px] text-[#6F7E93]">
-                        New concepts organized smoothly inside their Region.
-                      </div>
+                    <div className="text-xs font-extrabold text-[#17233C] dark:text-slate-100">
+                      {expandToast}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setExpandToast(null)}
-                    className="text-xs font-bold text-[#2F80ED] hover:underline shrink-0"
+                    className="text-xs font-bold text-[#2F80ED] dark:text-blue-400 hover:underline shrink-0"
                   >
-                    Dismiss
+                    {t.tree.dismiss}
                   </button>
                 </div>
               </div>
             )}
-
-            {/* Node Material Modal (Appears only when a node is selected; Close unselects node) */}
-            <NodeInspector
-              vault={activeVault}
-              node={selectedNode}
-              onSelectNode={handleSelectNode}
-              onClose={() => setSelectedNodeId(null)}
-              onMarkMastered={handleMarkMastered}
-              onExpandNode={handleExpandNode}
-              isExpanding={isExpanding}
-            />
           </div>
         )}
 
-        {/* TAB 5: GETTING STARTED APP TUTORIAL & REFERENCE GUIDE */}
+        {/* TAB 5: GETTING STARTED APP GUIDE */}
         {activeTab === "guide" && (
           <div className="mx-auto max-w-[1160px] px-4 sm:px-8 py-6 space-y-6">
             {/* Hero Intro */}
-            <div className="rounded-3xl border border-[#DFE6F0] bg-white p-6 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+            <div className="rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-6 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
               <div className="space-y-1.5 max-w-2xl">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF2FF] px-3 py-0.5 text-[11px] font-bold text-[#2F80ED]">
-                  <HelpCircle className="h-3.5 w-3.5" />
-                  Trellis User Guide
-                </span>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#17233C]">
-                  Getting Started with Trellis
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#17233C] dark:text-slate-100">
+                  {t.guide.title}
                 </h1>
-                <p className="text-sm text-[#6F7E93]">
-                  Everything you need to know to map study topics, uncover hidden
-                  connections, and grow your personal Knowledge Cosmos step by
-                  step.
+                <p className="text-sm text-[#6F7E93] dark:text-slate-400">
+                  {t.guide.subtitle}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2.5 shrink-0">
@@ -1068,135 +1240,112 @@ export default function HomePage() {
                   className="inline-flex items-center gap-1.5 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-4 py-2.5 text-xs font-bold text-white shadow-sm"
                 >
                   <FolderPlus className="h-4 w-4" />
-                  + Create New Vault
+                  {t.nav.createNewVault}
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab("tree")}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] hover:border-[#2F80ED] px-4 py-2.5 text-xs font-bold text-[#17233C]"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] px-4 py-2.5 text-xs font-bold text-[#17233C] dark:text-slate-100"
                 >
-                  <Network className="h-4 w-4 text-[#2F80ED]" />
-                  Open Tree Canvas
+                  <Network className="h-4 w-4 text-[#2F80ED] dark:text-blue-400" />
+                  {t.guide.openTree}
                 </button>
               </div>
             </div>
 
             {/* 4-Step Practical Tutorial */}
             <section className="space-y-3">
-              <h2 className="text-base font-extrabold text-[#17233C]">
-                How to Explore in 4 Simple Steps
+              <h2 className="text-base font-extrabold text-[#17233C] dark:text-slate-100">
+                {t.guide.stepsTitle}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  {
-                    step: "Step 1",
-                    title: "Create or Open a Vault",
-                    desc: "Click + Create New Vault and pick From Material (when studying a textbook or chapter) or From Interest (when following a curiosity question). Not sure yet? Open a ready-made Preset first.",
-                    tip: "Action: + Create New Vault",
-                    icon: <FolderPlus className="h-5 w-5 text-[#2F80ED]" />,
-                    bg: "bg-[#EAF2FF]",
-                  },
-                  {
-                    step: "Step 2",
-                    title: "Navigate & Lift the Fog",
-                    desc: "Drag the canvas to pan, use scroll or +/- to zoom, and click any hazy node labeled FOG to unlock it. Switch between Aura: Soft, Aura: Pure, Borders: Solid, or Outline list anytime.",
-                    tip: "Action: Click FOG node · Aura toggle",
-                    icon: <CloudFog className="h-5 w-5 text-[#0D9468]" />,
-                    bg: "bg-[#ECFDF5]",
-                  },
-                  {
-                    step: "Step 3",
-                    title: "Read & Test in the Modal",
-                    desc: "Click any node to open its Concept Reader modal. Enlarge it for focused reading, switch between Easy Analogy, Standard, and Advanced depth, then test yourself with Quick Check.",
-                    tip: "Action: Click Enlarge (⤢) or × / Canvas to close",
-                    icon: <Maximize2 className="h-5 w-5 text-[#7C3AED]" />,
-                    bg: "bg-[#F5F3FF]",
-                  },
-                  {
-                    step: "Step 4",
-                    title: "Expand Without Limits",
-                    desc: "Want to dive deeper from any concept? Click Expand This Node inside its study modal to generate new branches and cross-disciplinary bridges automatically.",
-                    tip: "Action: Expand This Node",
-                    icon: <Sparkles className="h-5 w-5 text-[#FFA33A]" />,
-                    bg: "bg-[#FFF4E5]",
-                  },
-                ].map((card) => (
-                  <div
-                    key={card.step}
-                    className="rounded-2xl border border-[#DFE6F0] bg-white p-5 flex flex-col justify-between gap-3 shadow-sm"
-                  >
-                    <div className="space-y-2.5">
+                {t.guide.steps.map((card, i) => {
+                  const icons = [
+                    {
+                      icon: <FolderPlus className="h-5 w-5 text-[#2F80ED] dark:text-blue-400" />,
+                      bg: "bg-[#EAF2FF] dark:bg-blue-950/60",
+                    },
+                    {
+                      icon: <CloudFog className="h-5 w-5 text-[#0D9468] dark:text-emerald-400" />,
+                      bg: "bg-[#ECFDF5] dark:bg-emerald-950/60",
+                    },
+                    {
+                      icon: <Maximize2 className="h-5 w-5 text-[#7C3AED] dark:text-violet-400" />,
+                      bg: "bg-[#F5F3FF] dark:bg-violet-950/60",
+                    },
+                    {
+                      icon: <Sparkles className="h-5 w-5 text-[#FFA33A]" />,
+                      bg: "bg-[#FFF4E5] dark:bg-amber-950/60",
+                    },
+                  ][i];
+                  return (
+                    <div
+                      key={card.step}
+                      className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 space-y-2.5 shadow-sm"
+                    >
                       <div className="flex items-center justify-between">
                         <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.bg}`}
+                          className={`flex h-10 w-10 items-center justify-center rounded-xl ${icons.bg}`}
                         >
-                          {card.icon}
+                          {icons.icon}
                         </div>
-                        <span className="rounded-full bg-[#F3F6FC] px-2.5 py-0.5 text-[10.5px] font-bold text-[#6F7E93]">
+                        <span className="rounded-full bg-[#F3F6FC] dark:bg-slate-800 px-2.5 py-0.5 text-[10.5px] font-bold text-[#6F7E93] dark:text-slate-300">
                           {card.step}
                         </span>
                       </div>
-                      <h3 className="text-sm font-extrabold text-[#17233C]">
+                      <h3 className="text-sm font-extrabold text-[#17233C] dark:text-slate-100">
                         {card.title}
                       </h3>
-                      <p className="text-xs leading-relaxed text-[#6F7E93]">
+                      <p className="text-xs leading-relaxed text-[#6F7E93] dark:text-slate-400">
                         {card.desc}
                       </p>
                     </div>
-                    <div className="rounded-xl bg-[#F8FAFC] border border-[#DFE6F0] px-3 py-1.5 text-[11px] font-semibold text-[#17233C]">
-                      {card.tip}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
 
-            {/* Understanding Connection Lines & Regions */}
+            {/* Knowledge Regions & Connection Lines */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              {/* 6 Knowledge Regions Guide (moved cleanly out of Tree canvas!) */}
-              <section className="lg:col-span-7 rounded-2xl border border-[#DFE6F0] bg-white p-5 space-y-3 shadow-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-sm font-extrabold text-[#17233C] flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-[#2F80ED]" />
-                      Understanding the 6 Knowledge Regions
-                    </h2>
-                    <p className="text-xs text-[#6F7E93] mt-0.5">
-                      Every concept belongs to a domain region on the map so you
-                      can see how topics cross between different fields.
-                    </p>
-                  </div>
-                </div>
+              {/* 6 Knowledge Regions (Zero REG-0x codes!) */}
+              <section className="lg:col-span-7 rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 space-y-3 shadow-sm">
+                <h2 className="text-sm font-extrabold text-[#17233C] dark:text-slate-100 flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-[#2F80ED] dark:text-blue-400" />
+                  {t.guide.regionsTitle}
+                </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {Object.values(KNOWLEDGE_REGIONS).map((reg) => (
                     <div
                       key={reg.code}
-                      className="rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] p-3 text-xs space-y-1"
+                      className="rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-800/60 p-3 text-xs space-y-1.5"
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${reg.badgeClass}`}
-                        >
-                          {reg.code}
-                        </span>
-                        <span className="font-bold text-[#17233C] truncate">
-                          {reg.shortName}
+                          style={{
+                            backgroundColor: isDark
+                              ? reg.darkPillTextHex
+                              : reg.accentHex,
+                          }}
+                          className="h-2.5 w-2.5 rounded-full shrink-0"
+                        />
+                        <span className="font-bold text-[#17233C] dark:text-slate-100 truncate">
+                          {regionName(reg.code, lang)}
                         </span>
                       </div>
-                      <p className="text-[11px] leading-relaxed text-[#6F7E93]">
-                        {reg.description}
+                      <p className="text-[11px] leading-relaxed text-[#6F7E93] dark:text-slate-400">
+                        {regionDescription(reg.code, lang)}
                       </p>
                     </div>
                   ))}
                 </div>
               </section>
 
-              {/* 5 Connection Styles + Tips */}
+              {/* Connection Lines + Shortcuts */}
               <section className="lg:col-span-5 space-y-4">
-                <div className="rounded-2xl border border-[#DFE6F0] bg-white p-5 space-y-3 shadow-sm">
-                  <h2 className="text-sm font-extrabold text-[#17233C] flex items-center gap-2">
-                    <GitBranch className="h-4 w-4 text-[#4F46E5]" />
-                    Reading Connection Lines
+                <div className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 space-y-3 shadow-sm">
+                  <h2 className="text-sm font-extrabold text-[#17233C] dark:text-slate-100 flex items-center gap-2">
+                    <GitBranch className="h-4 w-4 text-[#4F46E5] dark:text-indigo-400" />
+                    {t.guide.relationsTitle}
                   </h2>
                   <div className="space-y-2.5">
                     {(Object.keys(EDGE_RELATIONS) as EdgeRelationType[]).map(
@@ -1205,21 +1354,23 @@ export default function HomePage() {
                         return (
                           <div
                             key={rt}
-                            className="rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] p-2.5 flex items-start gap-3"
+                            className="rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-800/60 p-2.5 flex items-start gap-3"
                           >
                             <span
                               style={{
-                                borderColor: rel.strokeColor,
+                                borderColor: isDark
+                                  ? rel.darkStrokeColor
+                                  : rel.strokeColor,
                                 borderStyle: rel.dashArray ? "dashed" : "solid",
                               }}
                               className="mt-2 inline-block w-7 shrink-0 border-t-2"
                             />
                             <div className="min-w-0">
-                              <div className="text-xs font-extrabold text-[#17233C]">
-                                {rel.shortLabel}
+                              <div className="text-xs font-extrabold text-[#17233C] dark:text-slate-100">
+                                {edgeShortLabel(rt, lang)}
                               </div>
-                              <p className="text-[11px] leading-snug text-[#6F7E93]">
-                                {rel.description}
+                              <p className="text-[11px] leading-snug text-[#6F7E93] dark:text-slate-400">
+                                {edgeDescription(rt, lang)}
                               </p>
                             </div>
                           </div>
@@ -1229,36 +1380,33 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-[#DFE6F0] bg-white p-5 space-y-2.5 shadow-sm">
-                  <h2 className="text-sm font-extrabold text-[#17233C] flex items-center gap-2">
+                <div className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 space-y-2.5 shadow-sm">
+                  <h2 className="text-sm font-extrabold text-[#17233C] dark:text-slate-100 flex items-center gap-2">
                     <Keyboard className="h-4 w-4 text-[#FFA33A]" />
-                    Quick Controls &amp; Shortcuts
+                    {t.guide.shortcutsTitle}
                   </h2>
-                  <ul className="space-y-1.5 text-xs text-[#6F7E93]">
-                    <li className="flex items-center gap-2">
-                      <MousePointerClick className="h-3.5 w-3.5 text-[#2F80ED] shrink-0" />
-                      <span>
-                        Click an empty canvas area or press{" "}
-                        <strong className="text-[#17233C]">Esc</strong> to close
-                        and unselect the active node modal.
-                      </span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Search className="h-3.5 w-3.5 text-[#2F80ED] shrink-0" />
-                      <span>
-                        Press{" "}
-                        <strong className="text-[#17233C]">Ctrl + K</strong> on
-                        the dashboard to jump straight to searching your Vaults.
-                      </span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Eye className="h-3.5 w-3.5 text-[#2F80ED] shrink-0" />
-                      <span>
-                        Toggle <strong className="text-[#17233C]">Aura</strong>{" "}
-                        in the tree topbar to switch between soft glows and
-                        crisp territory borders.
-                      </span>
-                    </li>
+                  <ul className="space-y-2 text-xs text-[#6F7E93] dark:text-slate-400">
+                    {t.guide.shortcuts.map((sc, idx) => {
+                      const scIcon =
+                        idx === 0 ? (
+                          <MousePointerClick className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400 shrink-0" />
+                        ) : idx === 1 ? (
+                          <Search className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400 shrink-0" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400 shrink-0" />
+                        );
+                      return (
+                        <li key={sc.keyLabel} className="flex items-start gap-2">
+                          <span className="mt-0.5">{scIcon}</span>
+                          <span>
+                            <strong className="text-[#17233C] dark:text-slate-100">
+                              {sc.keyLabel}
+                            </strong>{" "}
+                            — {sc.text}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </section>
@@ -1273,11 +1421,13 @@ export default function HomePage() {
         onClose={() => setIsCreateOpen(false)}
         onCreateVault={handleCreateVault}
         isLoading={isCreating}
+        lang={lang}
       />
       <OverviewModal
         isOpen={isOverviewOpen}
         onClose={() => setIsOverviewOpen(false)}
         vault={activeVault}
+        lang={lang}
       />
     </div>
   );

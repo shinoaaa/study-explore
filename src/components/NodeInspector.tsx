@@ -1,5 +1,13 @@
 "use client";
 
+import {
+  difficultyLabel,
+  edgeShortLabel,
+  Language,
+  regionShortName,
+  ThemeMode,
+  UI_COPY,
+} from "@/lib/i18n";
 import { EDGE_RELATIONS, KNOWLEDGE_REGIONS } from "@/lib/regions";
 import {
   ExplanationDepth,
@@ -32,6 +40,8 @@ interface NodeInspectorProps {
   onMarkMastered: (nodeId: string) => void;
   onExpandNode: (nodeId: string) => Promise<void>;
   isExpanding: boolean;
+  lang: Language;
+  theme: ThemeMode;
 }
 
 export default function NodeInspector({
@@ -42,7 +52,10 @@ export default function NodeInspector({
   onMarkMastered,
   onExpandNode,
   isExpanding,
+  lang,
+  theme,
 }: NodeInspectorProps) {
+  const t = UI_COPY[lang];
   const [depth, setDepth] = useState<ExplanationDepth>("standard");
   const [showQuiz, setShowQuiz] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -74,9 +87,9 @@ export default function NodeInspector({
     return () => window.removeEventListener("keydown", handleEsc);
   }, [node, isMaximized, onClose]);
 
-  // No selected node -> keep full viewport uncluttered for the Knowledge Tree
   if (!node) return null;
 
+  const isDark = theme === "dark";
   const regDef = KNOWLEDGE_REGIONS[node.region] || KNOWLEDGE_REGIONS["REG-01"];
   const incomingEdges = vault.edges.filter((e) => e.target === node.id);
   const outgoingEdges = vault.edges.filter((e) => e.source === node.id);
@@ -100,22 +113,22 @@ export default function NodeInspector({
       onClick={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal={isMaximized ? "true" : "false"}
-      aria-label={`Study material for ${node.title}`}
-      className={`flex flex-col justify-between bg-white border border-[#DFE6F0] overflow-hidden transition-all ${
+      aria-label={node.title}
+      className={`flex flex-col justify-between bg-white dark:bg-[#111827] border border-[#DFE6F0] dark:border-slate-800 overflow-hidden transition-all ${
         isMaximized
           ? "w-full max-w-3xl max-h-[88vh] rounded-3xl shadow-2xl"
-          : "h-full w-full rounded-2xl shadow-xl shadow-[#17263C]/12"
+          : "h-full w-full rounded-2xl shadow-xl shadow-[#17263C]/12 dark:shadow-black/50"
       }`}
     >
       {/* Clean Header Strip with Size Toggle & Close */}
-      <div className="flex items-center justify-between gap-2 border-b border-[#DFE6F0] px-5 py-3.5 bg-white shrink-0">
+      <div className="flex items-center justify-between gap-2 border-b border-[#DFE6F0] dark:border-slate-800 px-5 py-3.5 bg-white dark:bg-[#111827] shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[#17233C]">
-            <BookOpen className="h-4 w-4 text-[#2F80ED] shrink-0" />
-            Concept Reader
+          <span className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[#17233C] dark:text-slate-100">
+            <BookOpen className="h-4 w-4 text-[#2F80ED] dark:text-blue-400 shrink-0" />
+            {t.reader.title}
           </span>
-          <span className="rounded-full bg-[#F3F6FC] border border-[#DFE6F0] px-2.5 py-0.5 text-[11px] font-semibold text-[#6F7E93] truncate">
-            {node.difficulty}
+          <span className="rounded-full bg-[#F3F6FC] dark:bg-slate-800 border border-[#DFE6F0] dark:border-slate-700 px-2.5 py-0.5 text-[11px] font-semibold text-[#6F7E93] dark:text-slate-300 truncate">
+            {difficultyLabel(node.difficulty, lang)}
           </span>
         </div>
 
@@ -123,32 +136,26 @@ export default function NodeInspector({
           <button
             type="button"
             onClick={() => setIsMaximized((m) => !m)}
-            title={
-              isMaximized
-                ? "Restore compact panel size"
-                : "Enlarge reading modal"
-            }
-            aria-label={isMaximized ? "Restore size" : "Enlarge modal"}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] hover:border-[#2F80ED] hover:bg-[#EAF2FF] px-2.5 py-1.5 text-[11px] font-bold text-[#17233C] transition-colors"
+            aria-label={isMaximized ? t.reader.compact : t.reader.enlarge}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] hover:bg-[#EAF2FF] dark:hover:bg-slate-700 px-2.5 py-1.5 text-[11px] font-bold text-[#17233C] dark:text-slate-200 transition-colors"
           >
             {isMaximized ? (
               <>
-                <Minimize2 className="h-3.5 w-3.5 text-[#2F80ED]" />
-                <span className="hidden sm:inline">Compact</span>
+                <Minimize2 className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400" />
+                <span className="hidden sm:inline">{t.reader.compact}</span>
               </>
             ) : (
               <>
-                <Maximize2 className="h-3.5 w-3.5 text-[#2F80ED]" />
-                <span className="hidden sm:inline">Enlarge</span>
+                <Maximize2 className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400" />
+                <span className="hidden sm:inline">{t.reader.enlarge}</span>
               </>
             )}
           </button>
           <button
             type="button"
             onClick={onClose}
-            title="Close & unselect node"
-            aria-label="Close modal and unselect node"
-            className="rounded-xl border border-[#DFE6F0] bg-white hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 p-1.5 text-[#6F7E93] transition-colors"
+            aria-label="Close"
+            className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:border-rose-200 dark:hover:border-rose-800 hover:text-rose-600 dark:hover:text-rose-400 p-1.5 text-[#6F7E93] dark:text-slate-400 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -163,77 +170,79 @@ export default function NodeInspector({
             <span
               className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${regDef.badgeClass}`}
             >
-              {regDef.code} · {regDef.shortName}
+              {regionShortName(node.region, lang)}
             </span>
             {node.mastered ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] border border-[#A7F3D0] px-2.5 py-0.5 text-xs font-bold text-[#047857]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] dark:bg-emerald-950/60 border border-[#A7F3D0] dark:border-emerald-700/60 px-2.5 py-0.5 text-xs font-bold text-[#047857] dark:text-emerald-300">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Mastered
+                {t.reader.mastered}
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF2FF] px-2.5 py-0.5 text-xs font-bold text-[#2F80ED]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 px-2.5 py-0.5 text-xs font-bold text-[#2F80ED] dark:text-blue-300">
                 <Eye className="h-3.5 w-3.5" />
-                Opened
+                {t.reader.opened}
               </span>
             )}
           </div>
 
           <h2
-            className={`font-extrabold leading-snug text-[#17233C] ${
+            className={`font-extrabold leading-snug text-[#17233C] dark:text-slate-100 ${
               isMaximized ? "text-2xl" : "text-xl"
             }`}
           >
             {node.title}
           </h2>
 
-          {connectedFromNode && primaryRelDef && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-[#6F7E93]">
-              <span>Connected from</span>
+          {connectedFromNode && primaryRelDef && primaryEdge && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-[#6F7E93] dark:text-slate-400">
+              <span>{t.reader.connectedFrom}</span>
               <button
                 type="button"
                 onClick={() => onSelectNode(connectedFromNode.id)}
-                className="rounded-full border border-[#DFE6F0] bg-[#F3F6FC] hover:border-[#2F80ED] px-2.5 py-0.5 font-semibold text-[#17233C]"
+                className="rounded-full border border-[#DFE6F0] dark:border-slate-700 bg-[#F3F6FC] dark:bg-slate-800 hover:border-[#2F80ED] px-2.5 py-0.5 font-semibold text-[#17233C] dark:text-slate-200"
               >
                 {connectedFromNode.title}
               </button>
               <span
-                style={{ color: primaryRelDef.strokeColor }}
+                style={{
+                  color: isDark
+                    ? primaryRelDef.darkStrokeColor
+                    : primaryRelDef.strokeColor,
+                }}
                 className="font-bold"
               >
-                → {primaryRelDef.shortLabel}
+                → {edgeShortLabel(primaryEdge.relation, lang)}
               </span>
             </div>
           )}
         </div>
 
-        {/* Clean Connection Context (no leaked internal codes) */}
-        <div className="relative overflow-hidden rounded-xl border border-[#C7D2FE] bg-[#F5F7FF] p-3.5 pl-4">
-          <div className="absolute inset-y-0 left-0 w-1 bg-[#4F46E5]" />
+        {/* Clean Connection Reason */}
+        <div className="relative overflow-hidden rounded-xl border border-[#C7D2FE] dark:border-indigo-800/60 bg-[#F5F7FF] dark:bg-indigo-950/35 p-3.5 pl-4">
+          <div className="absolute inset-y-0 left-0 w-1 bg-[#4F46E5] dark:bg-indigo-400" />
           <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-[#4F46E5]">
+            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-[#4F46E5] dark:text-indigo-300">
               <Link2 className="h-3.5 w-3.5" />
-              Why This Connects
+              {t.reader.whyConnects}
             </span>
             {primaryEdge?.isCrossRegion && (
-              <span className="rounded-full bg-[#FAE8FF] border border-[#F0ABFC] px-2 py-0.5 text-[10px] font-bold text-[#86198F]">
-                Cross-Region
+              <span className="rounded-full bg-[#FAE8FF] dark:bg-fuchsia-950/60 border border-[#F0ABFC] dark:border-fuchsia-700/60 px-2 py-0.5 text-[10px] font-bold text-[#86198F] dark:text-fuchsia-300">
+                {t.reader.crossRegion}
               </span>
             )}
           </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-[#17233C]">
-            {primaryEdge
-              ? primaryEdge.reason
-              : "Starting anchor of this Knowledge Vault — expand outward from here to uncover related foundations and deeper ideas."}
+          <p className="mt-1.5 text-xs leading-relaxed text-[#17233C] dark:text-slate-200">
+            {primaryEdge ? primaryEdge.reason : t.reader.rootWhy}
           </p>
         </div>
 
         {/* 3-Level Explanation Switcher */}
-        <div className="grid grid-cols-3 gap-1 rounded-xl border border-[#DFE6F0] bg-[#F3F6FC] p-1">
+        <div className="grid grid-cols-3 gap-1 rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F3F6FC] dark:bg-slate-900 p-1">
           {(
             [
-              { key: "simple", label: "Easy Analogy" },
-              { key: "standard", label: "Standard" },
-              { key: "deep", label: "Advanced" },
+              { key: "simple", label: t.reader.simple },
+              { key: "standard", label: t.reader.standard },
+              { key: "deep", label: t.reader.deep },
             ] as const
           ).map((item) => (
             <button
@@ -243,7 +252,7 @@ export default function NodeInspector({
               className={`rounded-lg py-1.5 px-2 text-xs font-bold transition-colors ${
                 depth === item.key
                   ? "bg-[#2F80ED] text-white shadow-sm"
-                  : "text-[#6F7E93] hover:text-[#17233C]"
+                  : "text-[#6F7E93] dark:text-slate-400 hover:text-[#17233C] dark:hover:text-slate-200"
               }`}
             >
               {item.label}
@@ -253,34 +262,34 @@ export default function NodeInspector({
 
         {/* Concept Note Content */}
         <p
-          className={`leading-relaxed text-[#334155] ${
+          className={`leading-relaxed text-[#334155] dark:text-slate-300 ${
             isMaximized ? "text-[15px]" : "text-sm"
           }`}
         >
           {node.levels[depth]}
         </p>
 
-        {/* Key Equation & Application */}
+        {/* Key Principle & Real Life */}
         <div
           className={`grid gap-3 ${
             isMaximized ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
           }`}
         >
-          <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-3.5 py-2.5">
-            <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#B45309]">
-              Key Equation / Principle
+          <div className="rounded-xl border border-[#FDE68A] dark:border-amber-800/60 bg-[#FFFBEB] dark:bg-amber-950/35 px-3.5 py-2.5">
+            <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#B45309] dark:text-amber-300">
+              {t.reader.formula}
             </div>
-            <div className="mt-1 font-mono text-xs font-semibold text-[#78350F]">
+            <div className="mt-1 font-mono text-xs font-semibold text-[#78350F] dark:text-amber-100">
               {node.formula}
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] p-3">
-            <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-[#0D9468]">
+          <div className="rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-800/60 p-3">
+            <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-[#0D9468] dark:text-emerald-400">
               <FlaskConical className="h-3.5 w-3.5" />
-              Real-World Context
+              {t.reader.realWorld}
             </div>
-            <p className="mt-1 text-xs leading-relaxed text-[#475569]">
+            <p className="mt-1 text-xs leading-relaxed text-[#475569] dark:text-slate-300">
               {node.application}
             </p>
           </div>
@@ -288,10 +297,11 @@ export default function NodeInspector({
 
         {/* Connected Concepts */}
         <div>
-          <div className="flex items-center justify-between text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93] mb-2">
-            <span>Connected Concepts</span>
+          <div className="flex items-center justify-between text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93] dark:text-slate-400 mb-2">
+            <span>{t.reader.connectedConcepts}</span>
             <span>
-              {incomingEdges.length} in · {outgoingEdges.length} out
+              {incomingEdges.length} {t.reader.inWord} · {outgoingEdges.length}{" "}
+              {t.reader.outWord}
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -299,20 +309,22 @@ export default function NodeInspector({
               const src = vault.nodes.find((n) => n.id === edge.source);
               if (!src) return null;
               const rel = EDGE_RELATIONS[edge.relation];
+              const stroke = isDark ? rel.darkStrokeColor : rel.strokeColor;
               return (
                 <button
                   type="button"
                   key={edge.id}
                   onClick={() => onSelectNode(src.id)}
                   style={{
-                    backgroundColor: rel.bgHex,
-                    borderColor: `${rel.strokeColor}66`,
+                    backgroundColor: isDark ? rel.darkBgHex : rel.bgHex,
+                    borderColor: `${stroke}66`,
+                    color: isDark ? "#F1F5F9" : "#17233C",
                   }}
-                  className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold text-[#17233C] hover:brightness-95"
+                  className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold hover:brightness-95 dark:hover:brightness-110 transition-all"
                 >
                   <ArrowLeft
                     className="h-3 w-3 shrink-0"
-                    style={{ color: rel.strokeColor }}
+                    style={{ color: stroke }}
                   />
                   <span className="truncate max-w-[160px]">{src.title}</span>
                 </button>
@@ -322,20 +334,22 @@ export default function NodeInspector({
               const tgt = vault.nodes.find((n) => n.id === edge.target);
               if (!tgt) return null;
               const rel = EDGE_RELATIONS[edge.relation];
+              const stroke = isDark ? rel.darkStrokeColor : rel.strokeColor;
               return (
                 <button
                   type="button"
                   key={edge.id}
                   onClick={() => onSelectNode(tgt.id)}
                   style={{
-                    backgroundColor: rel.bgHex,
-                    borderColor: `${rel.strokeColor}66`,
+                    backgroundColor: isDark ? rel.darkBgHex : rel.bgHex,
+                    borderColor: `${stroke}66`,
+                    color: isDark ? "#F1F5F9" : "#17233C",
                   }}
-                  className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold text-[#17233C] hover:brightness-95"
+                  className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold hover:brightness-95 dark:hover:brightness-110 transition-all"
                 >
                   <ArrowRight
                     className="h-3 w-3 shrink-0"
-                    style={{ color: rel.strokeColor }}
+                    style={{ color: stroke }}
                   />
                   <span className="truncate max-w-[160px]">{tgt.title}</span>
                 </button>
@@ -346,11 +360,11 @@ export default function NodeInspector({
 
         {/* 1-Click Quick Check Card */}
         {showQuiz && (
-          <div className="rounded-xl border border-[#BFDBFE] bg-[#F8FAFC] p-3.5 space-y-2">
-            <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#2F80ED]">
-              Quick Check
+          <div className="rounded-xl border border-[#BFDBFE] dark:border-blue-900/60 bg-[#F8FAFC] dark:bg-slate-900 p-3.5 space-y-2">
+            <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#2F80ED] dark:text-blue-400">
+              {t.reader.quickCheck}
             </div>
-            <p className="text-xs font-bold text-[#17233C]">
+            <p className="text-xs font-bold text-[#17233C] dark:text-slate-100">
               {node.quickCheck.question}
             </p>
             <div className="space-y-1.5">
@@ -363,18 +377,16 @@ export default function NodeInspector({
                       onMarkMastered(node.id);
                       setQuizFeedback({
                         correct: true,
-                        message:
-                          "Correct! Concept marked as Mastered in your Vault.",
+                        message: t.reader.quizRight,
                       });
                     } else {
                       setQuizFeedback({
                         correct: false,
-                        message:
-                          "Not quite yet — try switching to Easy Analogy and review the idea.",
+                        message: t.reader.quizWrong,
                       });
                     }
                   }}
-                  className="w-full flex items-center justify-between gap-2 rounded-xl border border-[#DFE6F0] bg-white hover:border-[#2F80ED] p-2.5 text-left text-xs text-[#17233C] transition-colors"
+                  className="w-full flex items-center justify-between gap-2 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-[#2F80ED] p-2.5 text-left text-xs text-[#17233C] dark:text-slate-200 transition-colors"
                 >
                   <span>{opt.text}</span>
                   <ArrowRight className="h-3.5 w-3.5 text-[#94A3B8] shrink-0" />
@@ -385,8 +397,8 @@ export default function NodeInspector({
               <div
                 className={`rounded-xl border p-2.5 text-xs font-semibold ${
                   quizFeedback.correct
-                    ? "border-[#A7F3D0] bg-[#ECFDF5] text-[#047857]"
-                    : "border-amber-300 bg-amber-50 text-amber-800"
+                    ? "border-[#A7F3D0] dark:border-emerald-700/60 bg-[#ECFDF5] dark:bg-emerald-950/60 text-[#047857] dark:text-emerald-300"
+                    : "border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200"
                 }`}
               >
                 {quizFeedback.message}
@@ -397,18 +409,18 @@ export default function NodeInspector({
 
         {/* References */}
         <div>
-          <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93] mb-1">
-            References
+          <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93] dark:text-slate-400 mb-1">
+            {t.reader.references}
           </div>
-          <div className="flex items-start gap-2 text-xs font-medium text-[#17233C]">
-            <BookOpen className="h-4 w-4 text-[#2F80ED] shrink-0 mt-0.5" />
+          <div className="flex items-start gap-2 text-xs font-medium text-[#17233C] dark:text-slate-300">
+            <BookOpen className="h-4 w-4 text-[#2F80ED] dark:text-blue-400 shrink-0 mt-0.5" />
             <span>{node.reference}</span>
           </div>
         </div>
       </div>
 
       {/* Footer Actions */}
-      <div className="border-t border-[#DFE6F0] bg-[#F8FAFC] p-4 space-y-2.5 shrink-0">
+      <div className="border-t border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-[#0F172A] p-4 space-y-2.5 shrink-0">
         <button
           type="button"
           onClick={() => onExpandNode(node.id)}
@@ -418,12 +430,12 @@ export default function NodeInspector({
           {isExpanding ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Growing New Branches...
+              {t.reader.expanding}
             </>
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
-              Expand This Node
+              {t.reader.expandNode}
             </>
           )}
         </button>
@@ -432,22 +444,22 @@ export default function NodeInspector({
           <button
             type="button"
             onClick={() => setShowQuiz((q) => !q)}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#DFE6F0] bg-white hover:border-[#2F80ED] py-2 px-3 text-xs font-bold text-[#17233C] transition-colors"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-[#2F80ED] py-2 px-3 text-xs font-bold text-[#17233C] dark:text-slate-200 transition-colors"
           >
             <Zap className="h-3.5 w-3.5 text-[#FFA33A]" />
-            Quick Check
+            {t.reader.quickCheck}
           </button>
           <button
             type="button"
             onClick={() => onMarkMastered(node.id)}
             className={`flex items-center justify-center gap-1.5 rounded-xl py-2 px-3 text-xs font-bold transition-colors ${
               node.mastered
-                ? "bg-[#ECFDF5] text-[#047857] border border-[#A7F3D0]"
-                : "bg-[#EAF2FF] text-[#2F80ED] hover:bg-[#DCEAFE]"
+                ? "bg-[#ECFDF5] dark:bg-emerald-950/60 text-[#047857] dark:text-emerald-300 border border-[#A7F3D0] dark:border-emerald-700/60"
+                : "bg-[#EAF2FF] dark:bg-blue-950/60 text-[#2F80ED] dark:text-blue-300 hover:bg-[#DCEAFE] dark:hover:bg-blue-900/60"
             }`}
           >
             <Check className="h-3.5 w-3.5" />
-            {node.mastered ? "Mastered ✓" : "Mark Mastered"}
+            {node.mastered ? t.reader.masteredCheck : t.reader.markMastered}
           </button>
         </div>
       </div>
@@ -458,7 +470,7 @@ export default function NodeInspector({
     return (
       <div
         onClick={onClose}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-[#17263C]/45 backdrop-blur-sm p-3 sm:p-6"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-[#17263C]/45 dark:bg-black/65 backdrop-blur-sm p-3 sm:p-6"
       >
         {modalCard}
       </div>
@@ -466,7 +478,10 @@ export default function NodeInspector({
   }
 
   return (
-    <div className="fixed inset-x-3 bottom-3 top-[120px] sm:inset-x-auto sm:top-[120px] lg:top-[68px] sm:right-4 sm:bottom-4 sm:w-[400px] z-30 pointer-events-auto">
+    <div
+      onMouseDown={(e) => e.stopPropagation()}
+      className="absolute inset-x-3 bottom-3 top-3 sm:inset-x-auto sm:top-3.5 sm:right-3.5 sm:bottom-3.5 sm:w-[400px] z-30 pointer-events-auto"
+    >
       {modalCard}
     </div>
   );

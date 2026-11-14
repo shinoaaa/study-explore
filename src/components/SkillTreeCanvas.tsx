@@ -1,5 +1,14 @@
 "use client";
 
+import {
+  difficultyLabel,
+  edgeShortLabel,
+  Language,
+  regionName,
+  regionShortName,
+  ThemeMode,
+  UI_COPY,
+} from "@/lib/i18n";
 import { EDGE_RELATIONS, KNOWLEDGE_REGIONS } from "@/lib/regions";
 import {
   layoutGraphWithRegionContainment,
@@ -29,10 +38,12 @@ import {
   LocateFixed,
   Maximize2,
   Minus,
+  Moon,
   Network,
   Plus,
   Search,
   Sparkles,
+  Sun,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
@@ -48,6 +59,11 @@ interface SkillTreeCanvasProps {
   onUnlockAllFog: () => void;
   newlyAddedIds?: string[];
   expandedRegions?: RegionCode[];
+  lang: Language;
+  theme: ThemeMode;
+  onToggleTheme: () => void;
+  onToggleLang: () => void;
+  children?: React.ReactNode;
 }
 
 function trimToCardEdge(
@@ -78,7 +94,14 @@ export default function SkillTreeCanvas({
   onUnlockAllFog,
   newlyAddedIds = [],
   expandedRegions = [],
+  lang,
+  theme,
+  onToggleTheme,
+  onToggleLang,
+  children,
 }: SkillTreeCanvasProps) {
+  const t = UI_COPY[lang];
+  const isDark = theme === "dark";
   const [viewMode, setViewMode] = useState<"graph" | "outline">("graph");
   const [regionFilter, setRegionFilter] = useState<RegionCode | "ALL">("ALL");
   const [relationFilter, setRelationFilter] = useState<EdgeRelationType | "ALL">(
@@ -234,17 +257,17 @@ export default function SkillTreeCanvas({
 
   const visualModeLabel =
     regionVisualMode === "hybrid"
-      ? "Aura: Soft"
+      ? t.tree.auraSoft
       : regionVisualMode === "aura_only"
-      ? "Aura: Pure"
-      : "Borders: Solid";
+      ? t.tree.auraPure
+      : t.tree.bordersSolid;
 
   return (
-    <section className="flex flex-col h-[calc(100vh-56px)] lg:h-screen w-full bg-white overflow-hidden">
+    <section className="flex flex-col h-[calc(100vh-56px)] lg:h-screen w-full bg-white dark:bg-[#090F1C] overflow-hidden transition-colors">
       {/* Unified Clean Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#DFE6F0] bg-white px-4 py-2.5 shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] px-4 py-2.5 shrink-0 transition-colors">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#EAF2FF] text-[#2F80ED] shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#EAF2FF] dark:bg-blue-950/70 text-[#2F80ED] dark:text-blue-400 shrink-0">
             <Network className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex flex-wrap items-center gap-2">
@@ -252,7 +275,7 @@ export default function SkillTreeCanvas({
               aria-label="Select Active Vault"
               value={vault.id}
               onChange={(e) => onSwitchVault(e.target.value)}
-              className="max-w-[240px] sm:max-w-[290px] truncate rounded-xl border border-[#DFE6F0] bg-[#F8FAFC] px-2.5 py-1 text-xs font-extrabold text-[#17233C] hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
+              className="max-w-[220px] sm:max-w-[260px] truncate rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 px-2.5 py-1 text-xs font-extrabold text-[#17233C] dark:text-slate-100 hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
             >
               {vaults.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -260,42 +283,43 @@ export default function SkillTreeCanvas({
                 </option>
               ))}
             </select>
-            <span className="hidden sm:inline-flex rounded-full bg-[#EAF2FF] px-2.5 py-0.5 text-[11px] font-semibold text-[#2F80ED]">
+            <span className="hidden sm:inline-flex rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 px-2.5 py-0.5 text-[11px] font-semibold text-[#2F80ED] dark:text-blue-300">
               {vault.inputContext.mode === "mode_a"
-                ? "From Material"
-                : "From Interest"}
+                ? t.home.modeMaterial
+                : t.home.modeCuriosity}
             </span>
-            <span className="hidden md:inline text-[11px] font-medium text-[#6F7E93]">
-              {vault.nodes.length} concepts · {activeRegionCount} of 6 regions
+            <span className="hidden md:inline text-[11px] font-medium text-[#6F7E93] dark:text-slate-400">
+              {vault.nodes.length} {t.home.concepts} · {activeRegionCount}{" "}
+              {t.home.regions}
             </span>
           </div>
         </div>
 
-        {/* Right Controls: Overview, Tree/Outline, Search, Aura Toggle, Filters */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Right Controls */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={onOpenOverview}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] bg-white hover:border-[#2F80ED] hover:bg-[#EAF2FF]/60 px-2.5 py-1.5 text-xs font-bold text-[#17233C] transition-colors"
-            title="View Foundation Overview"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-[#2F80ED] hover:bg-[#EAF2FF]/60 dark:hover:bg-slate-700 px-2.5 py-1.5 text-xs font-bold text-[#17233C] dark:text-slate-100 transition-colors"
+            title={t.tree.overview}
           >
-            <BookOpen className="h-3.5 w-3.5 text-[#2F80ED]" />
-            <span className="hidden xl:inline">Overview</span>
+            <BookOpen className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400" />
+            <span className="hidden xl:inline">{t.tree.overview}</span>
           </button>
 
           {/* Tree / Outline Switcher */}
-          <div className="flex items-center rounded-xl border border-[#DFE6F0] bg-[#F3F6FC] p-1">
+          <div className="flex items-center rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F3F6FC] dark:bg-slate-900 p-0.5">
             <button
               type="button"
               onClick={() => setViewMode("graph")}
               className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                 viewMode === "graph"
                   ? "bg-[#2F80ED] text-white shadow-sm"
-                  : "text-[#6F7E93] hover:text-[#17233C]"
+                  : "text-[#6F7E93] dark:text-slate-400 hover:text-[#17233C] dark:hover:text-slate-200"
               }`}
             >
               <GitBranch className="h-3.5 w-3.5" />
-              Tree
+              {t.tree.treeView}
             </button>
             <button
               type="button"
@@ -303,11 +327,11 @@ export default function SkillTreeCanvas({
               className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                 viewMode === "outline"
                   ? "bg-[#2F80ED] text-white shadow-sm"
-                  : "text-[#6F7E93] hover:text-[#17233C]"
+                  : "text-[#6F7E93] dark:text-slate-400 hover:text-[#17233C] dark:hover:text-slate-200"
               }`}
             >
               <ListTree className="h-3.5 w-3.5" />
-              Outline
+              {t.tree.outlineView}
             </button>
           </div>
 
@@ -318,8 +342,8 @@ export default function SkillTreeCanvas({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search concepts..."
-              className="w-36 sm:w-44 rounded-xl border border-[#DFE6F0] bg-[#F3F6FC] pl-8 pr-2.5 py-1.5 text-xs text-[#17233C] placeholder:text-[#94A3B8] focus:border-[#2F80ED] focus:bg-white focus:outline-none"
+              placeholder={t.tree.searchConcepts}
+              className="w-32 sm:w-40 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F3F6FC] dark:bg-slate-800 pl-8 pr-2.5 py-1.5 text-xs text-[#17233C] dark:text-slate-100 placeholder:text-[#94A3B8] focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
             />
           </div>
 
@@ -328,74 +352,94 @@ export default function SkillTreeCanvas({
             <button
               type="button"
               onClick={cycleVisualMode}
-              title="Toggle Region boundary style: Soft Aura, Pure Aura, or Solid Borders"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#2F80ED]/40 bg-[#EAF2FF] hover:bg-[#DCEAFE] px-3 py-1.5 text-xs font-bold text-[#2F80ED] transition-all"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#2F80ED]/40 dark:border-blue-500/40 bg-[#EAF2FF] dark:bg-blue-950/60 hover:bg-[#DCEAFE] dark:hover:bg-blue-900/60 px-2.5 py-1.5 text-xs font-bold text-[#2F80ED] dark:text-blue-300 transition-all"
             >
               <Eye className="h-3.5 w-3.5" />
               {visualModeLabel}
             </button>
           )}
 
-          {/* Region Filter */}
+          {/* Region Filter (clean domain names only) */}
           <div className="relative flex items-center">
-            <Layers className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#6F7E93]" />
+            <Layers className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#6F7E93] dark:text-slate-400" />
             <select
-              aria-label="Filter Knowledge Region"
+              aria-label={t.tree.allRegions}
               value={regionFilter}
               onChange={(e) =>
                 setRegionFilter(e.target.value as RegionCode | "ALL")
               }
-              className="appearance-none rounded-xl border border-[#DFE6F0] bg-white pl-8 pr-7 py-1.5 text-xs font-semibold text-[#17233C] hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
+              className="appearance-none rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 pl-8 pr-7 py-1.5 text-xs font-semibold text-[#17233C] dark:text-slate-100 hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
             >
-              <option value="ALL">Regions: All 6</option>
+              <option value="ALL">{t.tree.allRegions}</option>
               {regionCodes.map((rc) => (
                 <option key={rc} value={rc}>
-                  {rc} · {KNOWLEDGE_REGIONS[rc].shortName} (
+                  {regionShortName(rc, lang)} (
                   {vault.nodes.filter((n) => n.region === rc).length})
                 </option>
               ))}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-[#6F7E93]" />
+            <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-[#6F7E93] dark:text-slate-400" />
           </div>
 
           {/* Edge Relation Filter */}
           <div className="relative flex items-center">
-            <GitBranch className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#6F7E93]" />
+            <GitBranch className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#6F7E93] dark:text-slate-400" />
             <select
-              aria-label="Filter Edge Relations"
+              aria-label={t.tree.allRelations}
               value={relationFilter}
               onChange={(e) =>
                 setRelationFilter(e.target.value as EdgeRelationType | "ALL")
               }
-              className="appearance-none rounded-xl border border-[#DFE6F0] bg-white pl-8 pr-7 py-1.5 text-xs font-semibold text-[#17233C] hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
+              className="appearance-none rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 pl-8 pr-7 py-1.5 text-xs font-semibold text-[#17233C] dark:text-slate-100 hover:border-[#2F80ED]/60 focus:border-[#2F80ED] focus:outline-none"
             >
-              <option value="ALL">Relations: All 5</option>
+              <option value="ALL">{t.tree.allRelations}</option>
               {relationTypes.map((rt) => (
                 <option key={rt} value={rt}>
-                  {EDGE_RELATIONS[rt].shortLabel}
+                  {edgeShortLabel(rt, lang)}
                 </option>
               ))}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-[#6F7E93]" />
+            <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-[#6F7E93] dark:text-slate-400" />
           </div>
 
-          {/* Singkap Semua Fog button */}
+          {/* Reveal Fog */}
           {fogCount > 0 && (
             <button
               type="button"
               onClick={onUnlockAllFog}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 text-xs font-semibold text-amber-800 transition-all"
-              title="Lift Fog of War on all nodes"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 px-2.5 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 transition-all"
             >
               <CloudFog className="h-3.5 w-3.5" />
-              Reveal Fog ({fogCount})
+              {t.tree.revealFog} ({fogCount})
             </button>
           )}
+
+          {/* Theme & Language Quick Controls (desktop) */}
+          <div className="hidden lg:inline-flex items-center gap-1 pl-1 border-l border-[#DFE6F0] dark:border-slate-700">
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              aria-label={isDark ? t.nav.light : t.nav.dark}
+              title={isDark ? t.nav.light : t.nav.dark}
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 text-[#17233C] dark:text-amber-300 hover:border-[#2F80ED] transition-colors"
+            >
+              {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleLang}
+              aria-label="Switch language"
+              className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-[#2F80ED] px-2.5 py-1.5 text-[11px] font-extrabold text-[#17233C] dark:text-slate-100 transition-colors"
+            >
+              {lang === "en" ? "EN" : "ID"}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Main Workspace Area: Interactive Tree Canvas OR Accessible Outline View */}
-      {viewMode === "graph" ? (
+      <div className="relative flex-1 min-h-0 flex flex-col">
+        {viewMode === "graph" ? (
         <div
           ref={containerRef}
           onMouseDown={handleMouseDown}
@@ -404,11 +448,12 @@ export default function SkillTreeCanvas({
           onMouseLeave={() => setIsPanning(false)}
           onWheel={handleWheel}
           style={{
-            backgroundImage:
-              "radial-gradient(#CFDCEB 1.25px, transparent 1.25px)",
+            backgroundImage: isDark
+              ? "radial-gradient(#1E293B 1.25px, transparent 1.25px)"
+              : "radial-gradient(#CFDCEB 1.25px, transparent 1.25px)",
             backgroundSize: "26px 26px",
           }}
-          className={`relative w-full flex-1 min-h-0 select-none overflow-hidden bg-[#F3F6FC] ${
+          className={`relative w-full flex-1 min-h-0 select-none overflow-hidden bg-[#F3F6FC] dark:bg-[#090F1C] transition-colors ${
             isPanning ? "cursor-grabbing" : "cursor-grab"
           }`}
         >
@@ -419,25 +464,25 @@ export default function SkillTreeCanvas({
               selectedNodeId ? "lg:pr-[416px]" : ""
             }`}
           >
-            <div className="pointer-events-auto inline-flex flex-wrap items-center gap-3 rounded-full border border-[#DFE6F0] bg-white/95 backdrop-blur-sm px-4 py-1.5 text-xs shadow-sm">
-              <span className="inline-flex items-center gap-1.5 font-semibold text-[#17233C]">
-                <Network className="h-3.5 w-3.5 text-[#2F80ED]" />
-                {vault.nodes.length} mapped
+            <div className="pointer-events-auto inline-flex flex-wrap items-center gap-3 rounded-full border border-[#DFE6F0] dark:border-slate-800 bg-white/95 dark:bg-[#111827]/95 backdrop-blur-sm px-4 py-1.5 text-xs shadow-sm">
+              <span className="inline-flex items-center gap-1.5 font-semibold text-[#17233C] dark:text-slate-100">
+                <Network className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400" />
+                {vault.nodes.length} {t.home.mapped}
               </span>
-              <span className="h-3.5 w-px bg-[#DFE6F0]" />
-              <span className="inline-flex items-center gap-1.5 font-semibold text-[#475569]">
-                <Eye className="h-3.5 w-3.5 text-[#6F7E93]" />
-                {openedCount} opened
+              <span className="h-3.5 w-px bg-[#DFE6F0] dark:bg-slate-700" />
+              <span className="inline-flex items-center gap-1.5 font-semibold text-[#475569] dark:text-slate-300">
+                <Eye className="h-3.5 w-3.5 text-[#6F7E93] dark:text-slate-400" />
+                {openedCount} {t.home.opened}
               </span>
-              <span className="h-3.5 w-px bg-[#DFE6F0]" />
-              <span className="inline-flex items-center gap-1.5 font-semibold text-[#0D9468]">
-                <CheckCircle2 className="h-3.5 w-3.5 text-[#0D9468]" />
-                {masteredCount} mastered
+              <span className="h-3.5 w-px bg-[#DFE6F0] dark:bg-slate-700" />
+              <span className="inline-flex items-center gap-1.5 font-semibold text-[#0D9468] dark:text-emerald-400">
+                <CheckCircle2 className="h-3.5 w-3.5 text-[#0D9468] dark:text-emerald-400" />
+                {masteredCount} {t.home.mastered}
               </span>
-              <span className="h-3.5 w-px bg-[#DFE6F0]" />
-              <span className="inline-flex items-center gap-1.5 font-semibold text-[#7C3AED]">
-                <Layers className="h-3.5 w-3.5 text-[#7C3AED]" />
-                {activeRegionCount} / 6 regions
+              <span className="h-3.5 w-px bg-[#DFE6F0] dark:bg-slate-700" />
+              <span className="inline-flex items-center gap-1.5 font-semibold text-[#7C3AED] dark:text-violet-400">
+                <Layers className="h-3.5 w-3.5 text-[#7C3AED] dark:text-violet-400" />
+                {activeRegionCount} {t.home.regions}
               </span>
             </div>
           </div>
@@ -447,14 +492,14 @@ export default function SkillTreeCanvas({
             data-canvas-ui="true"
             className="absolute left-3.5 top-3.5 z-20 flex flex-col items-center gap-2"
           >
-            <div className="flex flex-col rounded-xl border border-[#DFE6F0] bg-white/95 shadow-sm overflow-hidden">
+            <div className="flex flex-col rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-white/95 dark:bg-[#111827]/95 shadow-sm overflow-hidden">
               <button
                 type="button"
                 onClick={() =>
                   setZoom((z) => Math.min(1.8, Number((z + 0.12).toFixed(2))))
                 }
                 title="Zoom In"
-                className="p-2 text-[#17233C] hover:bg-[#F3F6FC] border-b border-[#DFE6F0]"
+                className="p-2 text-[#17233C] dark:text-slate-200 hover:bg-[#F3F6FC] dark:hover:bg-slate-800 border-b border-[#DFE6F0] dark:border-slate-800"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -464,23 +509,23 @@ export default function SkillTreeCanvas({
                   setZoom((z) => Math.max(0.42, Number((z - 0.12).toFixed(2))))
                 }
                 title="Zoom Out"
-                className="p-2 text-[#17233C] hover:bg-[#F3F6FC] border-b border-[#DFE6F0]"
+                className="p-2 text-[#17233C] dark:text-slate-200 hover:bg-[#F3F6FC] dark:hover:bg-slate-800 border-b border-[#DFE6F0] dark:border-slate-800"
               >
                 <Minus className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={centerOnOrigin}
-                title="Locate Origin Node"
-                className="p-2 text-[#17233C] hover:bg-[#F3F6FC] border-b border-[#DFE6F0]"
+                title="Center Origin"
+                className="p-2 text-[#17233C] dark:text-slate-200 hover:bg-[#F3F6FC] dark:hover:bg-slate-800 border-b border-[#DFE6F0] dark:border-slate-800"
               >
                 <LocateFixed className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={fitGraphToViewport}
-                title="Fit All Regions"
-                className="p-2 text-[#17233C] hover:bg-[#F3F6FC]"
+                title="Fit All"
+                className="p-2 text-[#17233C] dark:text-slate-200 hover:bg-[#F3F6FC] dark:hover:bg-slate-800"
               >
                 <Maximize2 className="h-4 w-4" />
               </button>
@@ -488,7 +533,7 @@ export default function SkillTreeCanvas({
             <button
               type="button"
               onClick={fitGraphToViewport}
-              className="rounded-lg border border-[#DFE6F0] bg-white/95 px-2 py-0.5 text-[11px] font-bold text-[#6F7E93] shadow-sm hover:text-[#17233C]"
+              className="rounded-lg border border-[#DFE6F0] dark:border-slate-800 bg-white/95 dark:bg-[#111827]/95 px-2 py-0.5 text-[11px] font-bold text-[#6F7E93] dark:text-slate-300 shadow-sm hover:text-[#17233C] dark:hover:text-white"
             >
               {Math.round(zoom * 100)}%
             </button>
@@ -512,7 +557,8 @@ export default function SkillTreeCanvas({
             >
               <defs>
                 {regionCodes.map((rc) => {
-                  const col = KNOWLEDGE_REGIONS[rc].accentHex;
+                  const reg = KNOWLEDGE_REGIONS[rc];
+                  const col = isDark ? reg.darkPillTextHex : reg.accentHex;
                   return (
                     <radialGradient
                       key={rc}
@@ -521,8 +567,16 @@ export default function SkillTreeCanvas({
                       cy="0.5"
                       r="0.5"
                     >
-                      <stop offset="0%" stopColor={col} stopOpacity="0.18" />
-                      <stop offset="60%" stopColor={col} stopOpacity="0.07" />
+                      <stop
+                        offset="0%"
+                        stopColor={col}
+                        stopOpacity={isDark ? "0.22" : "0.18"}
+                      />
+                      <stop
+                        offset="60%"
+                        stopColor={col}
+                        stopOpacity={isDark ? "0.08" : "0.07"}
+                      />
                       <stop offset="100%" stopColor={col} stopOpacity="0" />
                     </radialGradient>
                   );
@@ -530,7 +584,7 @@ export default function SkillTreeCanvas({
                 {relationTypes.map((rt) => (
                   <marker
                     key={rt}
-                    id={`trellis-arrow-${rt}`}
+                    id={`curiora-arrow-${rt}`}
                     viewBox="0 0 10 10"
                     refX="8.5"
                     refY="5"
@@ -540,7 +594,11 @@ export default function SkillTreeCanvas({
                   >
                     <path
                       d="M 0 1.2 L 9 5 L 0 8.8 z"
-                      fill={EDGE_RELATIONS[rt].strokeColor}
+                      fill={
+                        isDark
+                          ? EDGE_RELATIONS[rt].darkStrokeColor
+                          : EDGE_RELATIONS[rt].strokeColor
+                      }
                     />
                   </marker>
                 ))}
@@ -577,9 +635,23 @@ export default function SkillTreeCanvas({
                       width={box.width}
                       height={box.height}
                       rx={30}
-                      fill={reg.tintBg}
-                      fillOpacity={regionVisualMode === "aura_only" ? 0.34 : 0.52}
-                      stroke={showStroke ? reg.accentHex : "none"}
+                      fill={isDark ? reg.darkTintBg : reg.tintBg}
+                      fillOpacity={
+                        isDark
+                          ? regionVisualMode === "aura_only"
+                            ? 0.25
+                            : 0.36
+                          : regionVisualMode === "aura_only"
+                          ? 0.34
+                          : 0.52
+                      }
+                      stroke={
+                        showStroke
+                          ? isDark
+                            ? reg.darkPillTextHex
+                            : reg.accentHex
+                          : "none"
+                      }
                       strokeWidth={
                         isExpandedHere
                           ? 2
@@ -589,7 +661,13 @@ export default function SkillTreeCanvas({
                       }
                       strokeDasharray={isExpandedHere ? undefined : strokeDash}
                       strokeOpacity={
-                        isExpandedHere
+                        isDark
+                          ? isExpandedHere
+                            ? 0.65
+                            : regionVisualMode === "bordered"
+                            ? 0.52
+                            : 0.32
+                          : isExpandedHere
                           ? 0.72
                           : regionVisualMode === "bordered"
                           ? 0.65
@@ -608,6 +686,10 @@ export default function SkillTreeCanvas({
 
                 const relDef =
                   EDGE_RELATIONS[edge.relation] || EDGE_RELATIONS.extension;
+                const strokeCol = isDark
+                  ? relDef.darkStrokeColor
+                  : relDef.strokeColor;
+                const pillBg = isDark ? relDef.darkBgHex : relDef.bgHex;
                 const isSelectedEdge =
                   sNode.id === selectedNodeId || tNode.id === selectedNodeId;
                 const isDimmed =
@@ -682,7 +764,6 @@ export default function SkillTreeCanvas({
                     onMouseEnter={() => setHoveredEdge(edge)}
                     onMouseLeave={() => setHoveredEdge(null)}
                   >
-                    {/* Wide invisible hit target for easy hover */}
                     <path
                       d={pathData}
                       fill="none"
@@ -693,45 +774,47 @@ export default function SkillTreeCanvas({
                       <path
                         d={pathData}
                         fill="none"
-                        stroke={relDef.strokeColor}
+                        stroke={strokeCol}
                         strokeWidth={6.5}
-                        strokeOpacity={0.18}
+                        strokeOpacity={0.22}
                       />
                     )}
                     <path
                       d={pathData}
                       fill="none"
-                      stroke={relDef.strokeColor}
+                      stroke={strokeCol}
                       strokeWidth={isSelectedEdge ? 2.8 : 2.1}
                       strokeDasharray={relDef.dashArray}
                       strokeLinecap="round"
                       markerEnd={
                         relDef.hasArrow
-                          ? `url(#trellis-arrow-${edge.relation})`
+                          ? `url(#curiora-arrow-${edge.relation})`
                           : undefined
                       }
                     />
                     {(isCross || isSelectedEdge) && (
                       <g transform={`translate(${midX}, ${midY})`}>
                         <rect
-                          x={-38}
+                          x={-46}
                           y={-9.5}
-                          width={76}
+                          width={92}
                           height={19}
                           rx={9.5}
-                          fill={relDef.bgHex}
-                          stroke={relDef.strokeColor}
+                          fill={pillBg}
+                          stroke={strokeCol}
                           strokeWidth={1}
                         />
                         <text
                           x={0}
                           y={3.5}
                           textAnchor="middle"
-                          fill={relDef.strokeColor}
+                          fill={strokeCol}
                           fontSize="9.5"
                           fontWeight="700"
                         >
-                          {isCross ? "cross-region" : relDef.shortLabel}
+                          {isCross
+                            ? t.tree.crossRegionBadge
+                            : edgeShortLabel(edge.relation, lang)}
                         </text>
                       </g>
                     )}
@@ -755,26 +838,42 @@ export default function SkillTreeCanvas({
                   className="pointer-events-none absolute flex items-center justify-between gap-2"
                 >
                   <div
-                    style={{ borderColor: `${reg.accentHex}55` }}
-                    className="inline-flex min-w-0 items-center gap-1.5 rounded-full border bg-white/95 px-2.5 py-1 text-[11px] font-bold shadow-sm"
+                    style={{
+                      borderColor: isDark
+                        ? `${reg.darkPillTextHex}44`
+                        : `${reg.accentHex}55`,
+                    }}
+                    className="inline-flex min-w-0 items-center gap-1.5 rounded-full border bg-white/95 dark:bg-[#0F172A]/95 px-2.5 py-1 text-[11px] font-bold shadow-sm"
                   >
                     <span
-                      style={{ backgroundColor: reg.accentHex }}
+                      style={{
+                        backgroundColor: isDark
+                          ? reg.darkPillTextHex
+                          : reg.accentHex,
+                      }}
                       className="h-2.5 w-2.5 rounded-full shrink-0"
                     />
-                    <span style={{ color: reg.darkAccentHex }} className="truncate">
-                      {reg.code} · {reg.name}
+                    <span
+                      style={{
+                        color: isDark ? reg.darkPillTextHex : reg.darkAccentHex,
+                      }}
+                      className="truncate"
+                    >
+                      {regionName(box.region, lang)}
                     </span>
                   </div>
                   <span
                     className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10.5px] font-bold border ${
                       isExpandedHere
                         ? "bg-[#FFA33A] text-[#3A2200] border-[#F59E0B]"
-                        : "bg-white/95 text-[#6F7E93] border-[#DFE6F0]"
+                        : "bg-white/95 dark:bg-[#0F172A]/95 text-[#6F7E93] dark:text-slate-300 border-[#DFE6F0] dark:border-slate-700"
                     }`}
                   >
-                    {box.nodeCount} node{box.nodeCount !== 1 ? "s" : ""}
-                    {isExpandedHere ? " · +Expanded" : ""}
+                    {box.nodeCount}{" "}
+                    {box.nodeCount === 1
+                      ? t.tree.nodeSingular
+                      : t.tree.nodePlural}
+                    {isExpandedHere ? ` · ${t.tree.expandedTag}` : ""}
                   </span>
                 </div>
               );
@@ -811,8 +910,9 @@ export default function SkillTreeCanvas({
                     <div
                       aria-hidden="true"
                       style={{
-                        background:
-                          "radial-gradient(ellipse at center, rgba(203,213,225,0.68) 0%, rgba(226,232,240,0.42) 55%, rgba(243,246,252,0) 78%)",
+                        background: isDark
+                          ? "radial-gradient(ellipse at center, rgba(30,41,59,0.78) 0%, rgba(15,23,42,0.52) 55%, rgba(9,15,28,0) 78%)"
+                          : "radial-gradient(ellipse at center, rgba(203,213,225,0.68) 0%, rgba(226,232,240,0.42) 55%, rgba(243,246,252,0) 78%)",
                       }}
                       className="pointer-events-none absolute -inset-5 rounded-3xl blur-[2px]"
                     />
@@ -833,43 +933,45 @@ export default function SkillTreeCanvas({
                               ? "#FFA33A"
                               : node.mastered
                               ? "#2D9D78"
+                              : isDark
+                              ? reg.darkPillTextHex
                               : reg.accentHex,
                           }
                     }
                     className={`relative flex h-full w-full items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left transition-all ${
                       isSelected
-                        ? "z-20 ring-4 ring-[#2F80ED]/20 scale-[1.03]"
+                        ? "z-20 ring-4 ring-[#2F80ED]/25 scale-[1.03]"
                         : "z-10 hover:scale-[1.02]"
                     } ${
                       isRoot
                         ? "bg-gradient-to-br from-[#2F80ED] to-[#1D5BC7] text-white border border-[#1B4FA8] node-root-glow"
                         : !node.explored
-                        ? "bg-[#F8FAFC]/90 backdrop-blur-sm border border-dashed border-[#94A3B8] text-[#475569] hover:border-[#2F80ED] hover:bg-white"
-                        : "bg-white border-[1.75px] text-[#17233C] shadow-sm hover:shadow-md"
+                        ? "bg-[#F8FAFC]/90 dark:bg-slate-800/85 backdrop-blur-sm border border-dashed border-[#94A3B8] dark:border-slate-600 text-[#475569] dark:text-slate-300 hover:border-[#2F80ED] hover:bg-white dark:hover:bg-slate-800"
+                        : "bg-white dark:bg-[#111827] border-[1.75px] text-[#17233C] dark:text-slate-100 shadow-sm hover:shadow-md"
                     }`}
                   >
-                    {/* Corner Badges matching Figma */}
+                    {/* Corner Badges */}
                     {isRoot && (
                       <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#FFA33A] px-2.5 py-0.5 text-[9.5px] font-extrabold tracking-wider text-[#3A2200] shadow-sm">
-                        START
+                        {t.tree.startBadge}
                       </span>
                     )}
                     {!node.explored && !isRoot && (
-                      <span className="absolute -top-2 right-2 rounded-full border border-[#94A3B8] bg-[#E2E8F0] px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-[#475569]">
-                        FOG
+                      <span className="absolute -top-2 right-2 rounded-full border border-[#94A3B8] dark:border-slate-600 bg-[#E2E8F0] dark:bg-slate-700 px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-[#475569] dark:text-slate-200">
+                        {t.tree.fogBadge}
                       </span>
                     )}
                     {node.explored && node.mastered && !isRoot && (
                       <span
-                        title="Mastered"
-                        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#2D9D78] text-white ring-2 ring-white shadow-sm"
+                        title={t.reader.mastered}
+                        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#2D9D78] text-white ring-2 ring-white dark:ring-[#111827] shadow-sm"
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" />
                       </span>
                     )}
                     {isNew && node.explored && !node.mastered && (
                       <span className="absolute -top-2.5 right-2 rounded-full bg-[#FFA33A] px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-[#3A2200]">
-                        NEW
+                        {t.tree.newBadge}
                       </span>
                     )}
 
@@ -877,14 +979,22 @@ export default function SkillTreeCanvas({
                     <div
                       style={
                         !isRoot && node.explored
-                          ? { backgroundColor: reg.tintBg, color: reg.accentHex }
+                          ? isDark
+                            ? {
+                                backgroundColor: reg.darkTintBg,
+                                color: reg.darkPillTextHex,
+                              }
+                            : {
+                                backgroundColor: reg.tintBg,
+                                color: reg.accentHex,
+                              }
                           : undefined
                       }
                       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                         isRoot
                           ? "bg-white/20 text-white ring-1 ring-white/40"
                           : !node.explored
-                          ? "bg-[#E2E8F0] text-[#64748B]"
+                          ? "bg-[#E2E8F0] dark:bg-slate-700 text-[#64748B] dark:text-slate-300"
                           : ""
                       }`}
                     >
@@ -904,18 +1014,22 @@ export default function SkillTreeCanvas({
                           isRoot
                             ? "text-white"
                             : !node.explored
-                            ? "text-[#475569]"
-                            : "text-[#17233C]"
+                            ? "text-[#475569] dark:text-slate-300"
+                            : "text-[#17233C] dark:text-slate-100"
                         }`}
                       >
                         {node.title}
                       </div>
                       <div
                         className={`mt-0.5 text-[10px] font-medium truncate ${
-                          isRoot ? "text-[#E3EEFF]" : "text-[#6F7E93]"
+                          isRoot
+                            ? "text-[#E3EEFF]"
+                            : "text-[#6F7E93] dark:text-slate-400"
                         }`}
                       >
-                        {node.explored ? node.region : "In fog · click to unlock"}
+                        {node.explored
+                          ? regionShortName(node.region, lang)
+                          : t.tree.inFogHint}
                       </div>
                     </div>
                   </button>
@@ -926,29 +1040,30 @@ export default function SkillTreeCanvas({
 
           {/* Hovered Edge Reason Floating Callout */}
           {hoveredEdge && (
-            <div className="pointer-events-none absolute right-4 top-16 z-30 max-w-xs rounded-xl border border-[#C7D2FE] bg-white/95 backdrop-blur-sm p-3 shadow-lg">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[#4F46E5]">
-                Edge Reason · {EDGE_RELATIONS[hoveredEdge.relation].shortLabel}
+            <div className="pointer-events-none absolute right-4 top-16 z-30 max-w-xs rounded-xl border border-[#C7D2FE] dark:border-indigo-800/60 bg-white/95 dark:bg-[#111827]/95 backdrop-blur-sm p-3 shadow-lg">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#4F46E5] dark:text-indigo-300">
+                {t.tree.edgeReason} ·{" "}
+                {edgeShortLabel(hoveredEdge.relation, lang)}
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-[#17233C]">
+              <p className="mt-1 text-xs leading-relaxed text-[#17233C] dark:text-slate-200">
                 {hoveredEdge.reason}
               </p>
             </div>
           )}
 
-          {/* Bottom-Left Edge Relations Legend Card (Collapsible to preserve canvas space) */}
+          {/* Bottom-Left Edge Relations Legend Card */}
           <div
             data-canvas-ui="true"
-            className={`absolute bottom-3.5 left-3.5 z-20 rounded-2xl border border-[#DFE6F0] bg-white/95 backdrop-blur-sm shadow-sm transition-all ${
-              legendExpanded ? "w-[264px] px-3.5 py-2.5" : "px-3 py-2"
+            className={`absolute bottom-3.5 left-3.5 z-20 rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white/95 dark:bg-[#111827]/95 backdrop-blur-sm shadow-sm transition-all ${
+              legendExpanded ? "w-[272px] px-3.5 py-2.5" : "px-3 py-2"
             }`}
           >
             <button
               type="button"
               onClick={() => setLegendExpanded((s) => !s)}
-              className="flex w-full items-center justify-between gap-2 text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93]"
+              className="flex w-full items-center justify-between gap-2 text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93] dark:text-slate-300"
             >
-              <span>Edge Relations</span>
+              <span>{t.tree.edgeRelations}</span>
               {legendExpanded ? (
                 <ChevronDown className="h-3.5 w-3.5" />
               ) : (
@@ -967,25 +1082,19 @@ export default function SkillTreeCanvas({
                       <div className="flex items-center gap-2">
                         <span
                           style={{
-                            borderColor: r.strokeColor,
+                            borderColor: isDark
+                              ? r.darkStrokeColor
+                              : r.strokeColor,
                             borderStyle: r.dashArray ? "dashed" : "solid",
                           }}
                           className="inline-block w-6 border-t-2"
                         />
-                        <span className="font-bold text-[#17233C]">
-                          {r.shortLabel}
+                        <span className="font-bold text-[#17233C] dark:text-slate-100">
+                          {edgeShortLabel(rt, lang)}
                         </span>
                       </div>
-                      <span className="text-[10.5px] text-[#6F7E93]">
-                        {rt === "prerequisite"
-                          ? "Must know first"
-                          : rt === "extension"
-                          ? "Direct deepen"
-                          : rt === "application"
-                          ? "Real-world use"
-                          : rt === "related_concept"
-                          ? "Two-way link"
-                          : "Cross-region"}
+                      <span className="text-[10.5px] text-[#6F7E93] dark:text-slate-400">
+                        {t.tree.edgeLegendHint[rt]}
                       </span>
                     </div>
                   );
@@ -994,10 +1103,10 @@ export default function SkillTreeCanvas({
             )}
           </div>
 
-          {/* Bottom-Right Live Mini-map (shifts cleanly when Concept Reader modal is docked right) */}
+          {/* Bottom-Right Live Mini-map */}
           <div
             data-canvas-ui="true"
-            className={`hidden sm:block absolute bottom-3.5 z-20 rounded-xl border border-[#DFE6F0] bg-white/95 p-1.5 shadow-sm transition-all ${
+            className={`hidden sm:block absolute bottom-3.5 z-20 rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-white/95 dark:bg-[#111827]/95 p-1.5 shadow-sm transition-all ${
               selectedNodeId ? "right-3.5 lg:right-[424px]" : "right-3.5"
             }`}
           >
@@ -1005,7 +1114,7 @@ export default function SkillTreeCanvas({
               width={156}
               height={96}
               viewBox={`0 0 ${layout.canvasWidth} ${layout.canvasHeight}`}
-              className="rounded-lg bg-[#F8FAFC] border border-[#DFE6F0]"
+              className="rounded-lg bg-[#F8FAFC] dark:bg-[#090F1C] border border-[#DFE6F0] dark:border-slate-800"
             >
               {layout.regionBounds.map((box) => {
                 const reg = KNOWLEDGE_REGIONS[box.region];
@@ -1017,8 +1126,9 @@ export default function SkillTreeCanvas({
                     width={box.width}
                     height={box.height}
                     rx={20}
-                    fill={reg.tintBg}
-                    stroke={reg.accentHex}
+                    fill={isDark ? reg.darkTintBg : reg.tintBg}
+                    fillOpacity={isDark ? 0.55 : 0.9}
+                    stroke={isDark ? reg.darkPillTextHex : reg.accentHex}
                     strokeWidth={8}
                     strokeOpacity={0.7}
                   />
@@ -1034,7 +1144,9 @@ export default function SkillTreeCanvas({
                     n.id === selectedNodeId
                       ? "#2F80ED"
                       : n.explored
-                      ? KNOWLEDGE_REGIONS[n.region].accentHex
+                      ? isDark
+                        ? KNOWLEDGE_REGIONS[n.region].darkPillTextHex
+                        : KNOWLEDGE_REGIONS[n.region].accentHex
                       : "#94A3B8"
                   }
                 />
@@ -1044,7 +1156,7 @@ export default function SkillTreeCanvas({
         </div>
       ) : (
         /* Accessible Outline View */
-        <div className="flex-1 min-h-0 overflow-y-auto bg-[#F3F6FC] p-4 sm:p-6 space-y-2.5">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-[#F3F6FC] dark:bg-[#090F1C] p-4 sm:p-6 space-y-2.5 transition-colors">
           {filteredNodes
             .filter(
               (n) =>
@@ -1065,59 +1177,63 @@ export default function SkillTreeCanvas({
                   onClick={() => onSelectNode(node.id)}
                   className={`w-full text-left rounded-2xl border p-4 transition-all ${
                     isSelected
-                      ? "border-[#2F80ED] bg-white ring-2 ring-[#2F80ED]/15 shadow-sm"
-                      : "border-[#DFE6F0] bg-white hover:border-[#2F80ED]/50"
+                      ? "border-[#2F80ED] bg-white dark:bg-[#111827] ring-2 ring-[#2F80ED]/15 shadow-sm"
+                      : "border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] hover:border-[#2F80ED]/50"
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs font-semibold text-[#6F7E93]">
+                      <span className="font-mono text-xs font-semibold text-[#6F7E93] dark:text-slate-400">
                         #{idx + 1}
                       </span>
                       <span
                         className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${regDef.badgeClass}`}
                       >
-                        {regDef.code} · {regDef.shortName}
+                        {regionShortName(node.region, lang)}
                       </span>
-                      <span className="rounded-full bg-[#F3F6FC] px-2.5 py-0.5 text-xs font-semibold text-[#6F7E93]">
-                        {node.difficulty}
+                      <span className="rounded-full bg-[#F3F6FC] dark:bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-[#6F7E93] dark:text-slate-300">
+                        {difficultyLabel(node.difficulty, lang)}
                       </span>
                       {!node.explored && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-xs font-bold text-slate-600">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 px-2 py-0.5 text-xs font-bold text-slate-600 dark:text-slate-300">
                           <Lock className="h-3 w-3" />
-                          In Fog
+                          {t.tree.inFogPill}
                         </span>
                       )}
                       {node.mastered && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] border border-[#A7F3D0] px-2 py-0.5 text-xs font-bold text-[#047857]">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] dark:bg-emerald-950/60 border border-[#A7F3D0] dark:border-emerald-700/60 px-2 py-0.5 text-xs font-bold text-[#047857] dark:text-emerald-300">
                           <CheckCircle2 className="h-3 w-3" />
-                          Mastered
+                          {t.reader.mastered}
                         </span>
                       )}
                     </div>
-                    <span className="text-xs font-bold text-[#2F80ED]">
-                      Read Concept →
+                    <span className="text-xs font-bold text-[#2F80ED] dark:text-blue-400">
+                      {t.tree.readConcept} →
                     </span>
                   </div>
 
-                  <h3 className="text-sm font-extrabold text-[#17233C]">
+                  <h3 className="text-sm font-extrabold text-[#17233C] dark:text-slate-100">
                     {node.title}
                   </h3>
-                  <p className="mt-1 text-xs text-[#6F7E93] leading-relaxed">
+                  <p className="mt-1 text-xs text-[#6F7E93] dark:text-slate-400 leading-relaxed">
                     {node.summary}
                   </p>
 
-                  <div className="mt-2.5 flex flex-wrap items-center gap-4 text-[11px] text-[#6F7E93]">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-4 text-[11px] text-[#6F7E93] dark:text-slate-400">
                     <span>
-                      <strong className="text-[#17233C]">Incoming:</strong>{" "}
-                      {incoming.length} link
+                      <strong className="text-[#17233C] dark:text-slate-200">
+                        {t.tree.incoming}:
+                      </strong>{" "}
+                      {incoming.length} {t.tree.linkSingular}
                     </span>
                     <span>
-                      <strong className="text-[#17233C]">Outgoing:</strong>{" "}
-                      {outgoing.length} branch
+                      <strong className="text-[#17233C] dark:text-slate-200">
+                        {t.tree.outgoing}:
+                      </strong>{" "}
+                      {outgoing.length} {t.tree.branchSingular}
                     </span>
-                    <span className="text-[#2F80ED] font-medium truncate max-w-xs">
-                      Ref: {node.reference}
+                    <span className="text-[#2F80ED] dark:text-blue-400 font-medium truncate max-w-xs">
+                      {node.reference}
                     </span>
                   </div>
                 </button>
@@ -1125,6 +1241,8 @@ export default function SkillTreeCanvas({
             })}
         </div>
       )}
+        {children}
+      </div>
     </section>
   );
 }

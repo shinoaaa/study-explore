@@ -368,7 +368,7 @@ export default function VaultOverviewView({
             className="inline-flex items-center gap-1.5 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-5 py-3 text-xs font-bold text-white shadow-md shadow-[#2F80ED]/25 transition-all shrink-0"
           >
             <Sparkles className="h-4 w-4" />
-            {lang === "en" ? "+ Open First Node" : "+ Buka Node Pertama"}
+            {lang === "en" ? "Open First Node" : "Buka Node Pertama"}
           </button>
         </section>
       ) : (
@@ -424,10 +424,11 @@ export default function VaultOverviewView({
               <button
                 type="button"
                 onClick={() => onOpenAddExploration()}
+                data-testid="overview-add-node-btn"
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#EAF2FF] dark:bg-blue-950/70 hover:bg-[#2F80ED] text-[#2F80ED] dark:text-blue-300 hover:text-white px-3.5 py-2 text-xs font-bold transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
-                {lang === "en" ? "+ Add Node" : "+ Tambah Node"}
+                <span>{lang === "en" ? "Add Node" : "Tambah Node"}</span>
               </button>
             </div>
           </div>
@@ -442,20 +443,28 @@ export default function VaultOverviewView({
               return (
                 <div
                   key={node.id}
-                  className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 flex flex-col justify-between gap-4 shadow-sm hover:border-[#2F80ED]/60 transition-all"
+                  className={`rounded-2xl border p-5 flex flex-col justify-between gap-4 shadow-sm transition-all ${
+                    isLocked
+                      ? "border-dashed border-slate-300 dark:border-slate-700 bg-[#F8FAFC]/80 dark:bg-slate-900/60"
+                      : "border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] hover:border-[#2F80ED]/60"
+                  }`}
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span
-                          className={`rounded-full border px-2.5 py-0.5 text-[10.5px] font-bold ${reg.badgeClass}`}
+                          className={`rounded-full border px-2.5 py-0.5 text-[10.5px] font-bold ${
+                            isLocked
+                              ? "border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                              : reg.badgeClass
+                          }`}
                         >
                           {regionShortName(reg.code, lang)}
                         </span>
                         {isLocked && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#F3F6FC] dark:bg-slate-800 px-2.5 py-0.5 text-[10.5px] font-bold text-[#6F7E93] dark:text-slate-400">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-200/70 dark:bg-slate-800 px-2.5 py-0.5 text-[10.5px] font-bold text-[#6F7E93] dark:text-slate-400">
                             <Lock className="h-3 w-3" />
-                            {lang === "en" ? "Unopened" : "Belum Dibuka"}
+                            {lang === "en" ? "Fog · Unopened" : "Fog · Belum Dibuka"}
                           </span>
                         )}
                       </div>
@@ -476,13 +485,21 @@ export default function VaultOverviewView({
                       </button>
                     </div>
 
-                    <h3 className="text-base font-extrabold text-[#17233C] dark:text-slate-100">
+                    <h3
+                      className={`text-base font-extrabold ${
+                        isLocked
+                          ? "text-[#475569] dark:text-slate-300"
+                          : "text-[#17233C] dark:text-slate-100"
+                      }`}
+                    >
                       {node.title}
                     </h3>
 
-                    <p className="text-xs text-[#6F7E93] dark:text-slate-400 line-clamp-2 leading-relaxed">
-                      {node.summary}
-                    </p>
+                    {!isLocked && node.summary && (
+                      <p className="text-xs text-[#6F7E93] dark:text-slate-400 line-clamp-2 leading-relaxed">
+                        {node.summary}
+                      </p>
+                    )}
                   </div>
 
                   {/* Two Clean Action Buttons: 1) Read Material / Open Node  2) Go to Node in Tree */}

@@ -9,6 +9,7 @@ import {
   NodeOpenInputMode,
 } from "@/types/knowledge";
 import {
+  AlertTriangle,
   BookOpen,
   FileText,
   Loader2,
@@ -35,7 +36,9 @@ interface AddExplorationModalProps {
   vault: KnowledgeVault;
   targetNode?: KnowledgeNode | null;
   defaultParentNodeId?: string;
-  onSubmitExploration: (data: AddExplorationSubmitData) => Promise<void>;
+  onSubmitExploration: (
+    data: AddExplorationSubmitData
+  ) => Promise<{ ok: boolean; dangerMessage?: string } | void>;
   isLoading: boolean;
   lang: Language;
 }
@@ -66,6 +69,9 @@ export default function AddExplorationModal({
   const [inputTitle, setInputTitle] = useState("");
   const [inputContent, setInputContent] = useState("");
   const [depth, setDepth] = useState<ExplanationDepth>("standard");
+  const [dangerMessage, setDangerMessage] = useState<string | null>(null);
+
+  const exploredParentCandidates = vault.nodes.filter((n) => n.explored);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -74,6 +80,7 @@ export default function AddExplorationModal({
     setInputTitle("");
     setInputContent("");
     setDepth("standard");
+    setDangerMessage(null);
 
     if (targetNode) {
       setNodeTitle(targetNode.title);
@@ -85,7 +92,12 @@ export default function AddExplorationModal({
       setParentNodeId("");
     } else {
       setNodeTitle("");
-      setParentNodeId(defaultParentNodeId || vault.nodes[0]?.id || "");
+      const firstExplored =
+        exploredParentCandidates.find((n) => n.id === defaultParentNodeId)?.id ||
+        exploredParentCandidates[0]?.id ||
+        vault.nodes[0]?.id ||
+        "";
+      setParentNodeId(firstExplored);
     }
   }, [
     isOpen,
@@ -102,6 +114,7 @@ export default function AddExplorationModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setDangerMessage(null);
     const cleanTitle =
       (targetNode ? targetNode.title : nodeTitle.trim()) ||
       inputTitle.trim() ||
@@ -111,7 +124,7 @@ export default function AddExplorationModal({
     const effectiveOpenMode: NodeOpenInputMode =
       choiceMode === "direct" ? "instant_ai" : inputType;
 
-    await onSubmitExploration({
+    const result = await onSubmitExploration({
       targetNodeId: targetNode?.id,
       parentNodeId: !targetNode && parentNodeId ? parentNodeId : undefined,
       nodeTitle: cleanTitle,
@@ -120,6 +133,10 @@ export default function AddExplorationModal({
       inputContent: choiceMode === "direct" ? "" : inputContent.trim(),
       depth,
     });
+
+    if (result && result.ok === false && result.dangerMessage) {
+      setDangerMessage(result.dangerMessage);
+    }
   };
 
   return (
@@ -156,6 +173,24 @@ export default function AddExplorationModal({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          {/* Danger Alert ONLY when Pre-Join Relevance Gate rejects an out-of-scope topic */}
+          {dangerMessage && (
+            <div
+              data-testid="node-validation-danger"
+              className="flex items-start gap-2.5 rounded-2xl border border-red-300 dark:border-red-800/80 bg-red-50 dark:bg-red-950/60 p-3.5 text-xs text-red-700 dark:text-red-300"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+              <div className="space-y-0.5">
+                <div className="font-extrabold">
+                  {lang === "en"
+                    ? "Topic Too Far From Vault Focus"
+                    : "Topik Terlalu Jauh dari Fokus Vault"}
+                </div>
+                <p className="leading-relaxed font-medium">{dangerMessage}</p>
+              </div>
+            </div>
+          )}
+
           {/* Topic Title & Parent Node if creating a new node */}
           {!isUnlockingExisting && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -167,7 +202,10 @@ export default function AddExplorationModal({
                   type="text"
                   required
                   value={nodeTitle}
-                  onChange={(e) => setNodeTitle(e.target.value)}
+                  onChange={(e) => {
+                    setNodeTitle(e.target.value);
+                    if (dangerMessage) setDangerMessage(null);
+                  }}
                   placeholder={
                     lang === "en"
                       ? "e.g. Cellular Respiration & ATP"
@@ -177,7 +215,7 @@ export default function AddExplorationModal({
                 />
               </div>
 
-              {vault.nodes.length > 0 && (
+              {exploredParentCandidates.length > 0 && (
                 <div>
                   <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1.5">
                     {lang === "en" ? "Branch From" : "Cabang Dari Node"}
@@ -187,7 +225,7 @@ export default function AddExplorationModal({
                     onChange={(e) => setParentNodeId(e.target.value)}
                     className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800/90 px-3 py-2.5 text-xs font-semibold text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
                   >
-                    {vault.nodes.map((n) => (
+                    {exploredParentCandidates.map((n) => (
                       <option key={n.id} value={n.id}>
                         {n.title}
                       </option>

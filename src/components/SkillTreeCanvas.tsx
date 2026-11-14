@@ -133,8 +133,8 @@ export default function SkillTreeCanvas({
   const panOriginRef = useRef({ x: 0, y: 0, startPanX: 0, startPanY: 0 });
 
   const layout = useMemo(
-    () => layoutGraphWithRegionContainment(vault.nodes),
-    [vault.nodes]
+    () => layoutGraphWithRegionContainment(vault.nodes, vault.edges),
+    [vault.nodes, vault.edges]
   );
 
   const regionCodes = Object.keys(KNOWLEDGE_REGIONS) as RegionCode[];
@@ -437,18 +437,6 @@ export default function SkillTreeCanvas({
             </select>
             <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-[#6F7E93] dark:text-slate-400" />
           </div>
-
-          {/* Reveal Fog */}
-          {fogCount > 0 && (
-            <button
-              type="button"
-              onClick={onUnlockAllFog}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 px-2.5 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 transition-all"
-            >
-              <CloudFog className="h-3.5 w-3.5" />
-              {t.tree.revealFog} ({fogCount})
-            </button>
-          )}
 
           {/* Theme & Language Quick Controls (desktop) */}
           <div className="hidden lg:inline-flex items-center gap-1 pl-1 border-l border-[#DFE6F0] dark:border-slate-700">
@@ -855,7 +843,7 @@ export default function SkillTreeCanvas({
                           : undefined
                       }
                     />
-                    {(isCross || isSelectedEdge) && (
+                    {isSelectedEdge && (
                       <g transform={`translate(${midX}, ${midY})`}>
                         <rect
                           x={-46}
@@ -875,9 +863,7 @@ export default function SkillTreeCanvas({
                           fontSize="9.5"
                           fontWeight="700"
                         >
-                          {isCross
-                            ? t.tree.crossRegionBadge
-                            : edgeShortLabel(edge.relation, lang)}
+                          {edgeShortLabel(edge.relation, lang)}
                         </text>
                       </g>
                     )}
@@ -955,15 +941,19 @@ export default function SkillTreeCanvas({
                 node.summary.toLowerCase().includes(normalizedQuery);
 
               const showCallout = showNodeLabels || isSelected;
-              const accentColor = isRoot
-                ? "#2F80ED"
-                : isNew
-                  ? "#FFA33A"
-                  : node.mastered
-                    ? "#0D9468"
-                    : isDark
-                      ? reg.darkPillTextHex
-                      : reg.accentHex;
+              const accentColor = !node.explored
+                ? isDark
+                  ? "#64748B"
+                  : "#94A3B8"
+                : isRoot
+                  ? "#2F80ED"
+                  : isNew
+                    ? "#FFA33A"
+                    : node.mastered
+                      ? "#0D9468"
+                      : isDark
+                        ? reg.darkPillTextHex
+                        : reg.accentHex;
 
               return (
                 <div

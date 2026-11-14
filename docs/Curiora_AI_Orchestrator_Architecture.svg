@@ -23,7 +23,7 @@
   <!-- Top Header Banner -->
   <rect x="36" y="22" width="1528" height="66" rx="14" fill="#17263C" stroke="#0F172A" stroke-width="2"/>
   <text x="800" y="50" text-anchor="middle" fill="#FFFFFF" font-size="18" font-weight="800">ARSITEKTUR CURIORA 5-STAGE AI KNOWLEDGE ORCHESTRATOR (DRAW.IO ARCHITECTURE)</text>
-  <text x="800" y="73" text-anchor="middle" fill="#93C5FD" font-size="12.5" font-weight="600">Input Context Envelope  →  Intent Router &amp; Cross-Node Relation Analyzer  →  Gemini 2.5 Flash / Semantic Fallback  →  DAG &amp; Organic Layout Guard  →  Output Delta Envelope</text>
+  <text x="800" y="73" text-anchor="middle" fill="#93C5FD" font-size="12" font-weight="600">Input Context Envelope  →  Pre-AI Relevance &amp; Typo Gate + Cross-Region Spatial Planner  →  Gemini 2.5 Flash / Fallback  →  DAG &amp; Cross-Region Pull Layout  →  Output Envelope</text>
 
   <!-- SWIMLANE 1: CLIENT APPLICATION -->
   <rect x="36" y="106" width="340" height="824" rx="14" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
@@ -32,19 +32,20 @@
 
   <!-- Box 1A: Vault Identity -->
   <rect x="58" y="164" width="296" height="106" rx="10" fill="#EAF2FF" stroke="#2F80ED" stroke-width="2"/>
-  <text x="74" y="188" fill="#1E3A8A" font-size="13" font-weight="800">Vault Profile &amp; Identity</text>
+  <text x="74" y="188" fill="#1E3A8A" font-size="13" font-weight="800">Vault Profile &amp; Direct Nodes</text>
   <text x="74" y="210" fill="#17233C" font-size="11.5">• Vault Name &amp; Main Interest</text>
   <text x="74" y="230" fill="#17233C" font-size="11.5">• Focus Question &amp; Learning Goal</text>
   <text x="74" y="250" fill="#17233C" font-size="11.5">• Direct Nodes List (Baca Materi | Ke Tree)</text>
 
   <!-- Box 1B: Buka / Tambah Node Modal -->
-  <rect x="58" y="294" width="296" height="154" rx="10" fill="#FFFBEB" stroke="#F59E0B" stroke-width="2"/>
+  <rect x="58" y="294" width="296" height="162" rx="10" fill="#FFFBEB" stroke="#F59E0B" stroke-width="2"/>
   <text x="74" y="318" fill="#92400E" font-size="13" font-weight="800">Trigger: Buka / Tambah Node Baru</text>
   <text x="74" y="340" fill="#78350F" font-size="11.5" font-weight="700">Opsi 1: Langsung Buka (instant_ai)</text>
   <text x="74" y="362" fill="#78350F" font-size="11.5" font-weight="700">Opsi 2: Tambah Catatan / Materi Dulu:</text>
-  <text x="86" y="382" fill="#78350F" font-size="11.5">• Prompt / Pertanyaan Fokus (custom_prompt)</text>
+  <text x="86" y="382" fill="#78350F" font-size="11.5">• Prompt / Pertanyaan (custom_prompt)</text>
   <text x="86" y="402" fill="#78350F" font-size="11.5">• Catatan Pribadi Node (user_note)</text>
   <text x="86" y="422" fill="#78350F" font-size="11.5">• 1 Chapter Buku / Materi (book_chapter)</text>
+  <text x="74" y="442" fill="#DC2626" font-size="11" font-weight="700">• Danger Alert jika Topik Terlalu Jauh</text>
 
   <!-- Box 1C: Knowledge Tree Canvas -->
   <rect x="58" y="540" width="296" height="170" rx="10" fill="#ECFDF5" stroke="#0D9468" stroke-width="2"/>
@@ -52,18 +53,18 @@
   <text x="74" y="588" fill="#064E3B" font-size="11.5">• Circular Nodes (●) + 5 Gaya Garis Edge</text>
   <text x="74" y="608" fill="#064E3B" font-size="11.5">• Callout Topik di Atas Lingkaran (▼)</text>
   <text x="74" y="628" fill="#064E3B" font-size="11.5">• Tombol Hide/Show Keterangan Node</text>
-  <text x="74" y="648" fill="#064E3B" font-size="11.5">• Posisi Dinamis Staggered (Maju-Mundur)</text>
-  <text x="74" y="668" fill="#064E3B" font-size="11.5">• Progressive Node-by-Node Fog of War</text>
+  <text x="74" y="648" fill="#064E3B" font-size="11.5">• Fog Node Abu-abu (Hanya Judul Topik)</text>
+  <text x="74" y="668" fill="#064E3B" font-size="11.5">• Cross-Region Rapi (Tanpa Buka Fog Massal)</text>
   <text x="74" y="688" fill="#064E3B" font-size="11.5">• Collapsible Sidebar &amp; Light/Dark EN/ID</text>
 
   <!-- Box 1D: Node Reader & Library -->
   <rect x="58" y="736" width="296" height="164" rx="10" fill="#F5F3FF" stroke="#7C3AED" stroke-width="2"/>
-  <text x="74" y="760" fill="#4C1D95" font-size="13" font-weight="800">Node Material Reader &amp; Library</text>
-  <text x="74" y="782" fill="#4C1D95" font-size="11.5">• Tampilan Materi Bab / Prompt / Catatan</text>
-  <text x="74" y="802" fill="#4C1D95" font-size="11.5">• Penjelasan 3 Level (Simple/Standard/Deep)</text>
-  <text x="74" y="822" fill="#4C1D95" font-size="11.5">• Favorit ★ di Dalam Vault &amp; Node</text>
+  <text x="74" y="760" fill="#4C1D95" font-size="13" font-weight="800">Full-Page Pustaka Catatan &amp; Reader</text>
+  <text x="74" y="782" fill="#4C1D95" font-size="11.5">• Baca 1 Halaman Penuh (Tidak Terpotong)</text>
+  <text x="74" y="802" fill="#4C1D95" font-size="11.5">• Popup/Sidebar Daftar Node + Filter Region</text>
+  <text x="74" y="822" fill="#4C1D95" font-size="11.5">• Tombol Expand Cabang di Dalam Node</text>
   <text x="74" y="842" fill="#4C1D95" font-size="11.5">• Ask AI Revise Diff Preview &amp; History v1..vn</text>
-  <text x="74" y="862" fill="#4C1D95" font-size="11.5">• Perlindungan Non-Destruktif (Needs Review)</text>
+  <text x="74" y="862" fill="#4C1D95" font-size="11.5">• Favorit ★ di Dalam Vault &amp; Node</text>
 
   <!-- SWIMLANE 2: AI KNOWLEDGE ORCHESTRATOR -->
   <rect x="406" y="106" width="778" height="824" rx="14" fill="#EFF6FF" stroke="#2F80ED" stroke-width="2.5"/>
@@ -73,47 +74,47 @@
   <!-- Stage 1 -->
   <rect x="434" y="164" width="722" height="106" rx="10" fill="#FFFFFF" stroke="#2F80ED" stroke-width="2"/>
   <text x="452" y="188" fill="#1E3A8A" font-size="13" font-weight="800">STAGE 1 — Input Context Assembler (OrchestratorInputEnvelope)</text>
-  <text x="452" y="210" fill="#17233C" font-size="11.5">• Membungkus identitas Vault (Main Interest, Focus Question, Learning Goal) + Payload Aksi Node (targetNodeId, openMode, inputContent)</text>
-  <text x="452" y="230" fill="#17233C" font-size="11.5">• Menyusun ExistingGraphSnapshot ringkas: daftar seluruh Node [id, title, region, summary] &amp; Edge aktif di dalam Vault</text>
-  <text x="452" y="250" fill="#2F80ED" font-size="11" font-weight="700">Input Contract: { requestId, intent, lang, vaultContext, nodeAction, existingGraphSnapshot }</text>
+  <text x="452" y="210" fill="#17233C" font-size="11.5">• Membungkus identitas Vault + Aksi Node (SEED_FIRST_NODE | OPEN_NODE | BRANCH_NEW_NODE | EXPAND_FOG_BRANCHES)</text>
+  <text x="452" y="230" fill="#17233C" font-size="11.5">• Menyusun ExistingGraphSnapshot: daftar Node yang sudah dibuka (explored: true) &amp; Fog Stub (explored: false)</text>
+  <text x="452" y="250" fill="#2F80ED" font-size="11" font-weight="700">Input Contract: { requestId, intent, vaultContext, nodeAction, preValidationGate, spatialTopologyPlan, existingGraphSnapshot }</text>
 
   <!-- Stage 2A -->
   <rect x="434" y="294" width="348" height="142" rx="10" fill="#FFFFFF" stroke="#3B82F6" stroke-width="2"/>
-  <text x="450" y="318" fill="#1E3A8A" font-size="12.5" font-weight="800">STAGE 2A — Intent Router &amp; Prompt Compiler</text>
-  <text x="450" y="340" fill="#17233C" font-size="11.5">• Route Intent: SEED_FIRST_NODE | OPEN_NODE |</text>
-  <text x="460" y="358" fill="#17233C" font-size="11.5">BRANCH_NEW_NODE | ANALYZE_RELATIONS</text>
-  <text x="450" y="380" fill="#17233C" font-size="11.5">• Kompilasi Kontrak Skema JSON Ketat</text>
-  <text x="450" y="400" fill="#17233C" font-size="11.5">• Filter Anti-Bocoran Kode Internal (Zero Leak)</text>
+  <text x="450" y="318" fill="#1E3A8A" font-size="12.5" font-weight="800">STAGE 2A — Pre-AI Relevance &amp; Typo Gate</text>
+  <text x="450" y="340" fill="#17233C" font-size="11.5">• Validasi topik node vs topik Vault &amp; node lain</text>
+  <text x="450" y="360" fill="#17233C" font-size="11.5">• Jika typo ringan: koreksi otomatis tanpa warning</text>
+  <text x="450" y="380" fill="#DC2626" font-size="11.5" font-weight="700">• Jika terlalu jauh (rejected_too_far): blokir &amp; kirim</text>
+  <text x="460" y="398" fill="#DC2626" font-size="11.5" font-weight="700">Danger Alert sebelum masuk ke dalam Vault</text>
 
   <!-- Stage 2B -->
   <rect x="808" y="294" width="348" height="142" rx="10" fill="#FFF7ED" stroke="#EA580C" stroke-width="2"/>
-  <text x="824" y="318" fill="#9A3412" font-size="12.5" font-weight="800">STAGE 2B — Cross-Node Relation Analyzer</text>
-  <text x="824" y="340" fill="#7C2D12" font-size="11.5">• Memindai SELURUH node yang sudah ada di Vault</text>
-  <text x="834" y="358" fill="#7C2D12" font-size="11.5">setiap kali node baru dibuka / ditambahkan</text>
-  <text x="824" y="380" fill="#7C2D12" font-size="11.5">• Mendeteksi keterkaitan lintas-cabang &amp; lintas-region</text>
-  <text x="824" y="400" fill="#7C2D12" font-size="11.5">• Menghasilkan OrchestratorCrossLink[] + Reason</text>
+  <text x="824" y="318" fill="#9A3412" font-size="12.5" font-weight="800">STAGE 2B — Pre-AI Cross-Region Planner</text>
+  <text x="824" y="340" fill="#7C2D12" font-size="11.5">• Berjalan di backend SEBELUM memanggil API AI</text>
+  <text x="824" y="360" fill="#7C2D12" font-size="11.5">• Petakan ketetanggaan 6 Region (2x3 Grid) &amp; batas</text>
+  <text x="834" y="378" fill="#7C2D12" font-size="11.5">agar relasi lintas-region rapi &amp; tidak semrawut</text>
+  <text x="824" y="398" fill="#7C2D12" font-size="11.5">• Analisis relasi hanya ke node yang sudah dibuka</text>
 
   <!-- Stage 3 -->
   <rect x="434" y="462" width="722" height="114" rx="10" fill="#FFFFFF" stroke="#0D9468" stroke-width="2"/>
-  <text x="452" y="486" fill="#065F46" font-size="13" font-weight="800">STAGE 3 — Node Material Synthesizer &amp; Progressive Frontier Spawner</text>
-  <text x="452" y="508" fill="#17233C" font-size="11.5">• Menyusun materi Node utama (memadukan Prompt / Catatan / 1 Chapter Buku pengguna dengan sintesis AI 3-Level, Rumus &amp; Aplikasi)</text>
-  <text x="452" y="528" fill="#17233C" font-size="11.5">• Memekarkan 2–3 Frontier Nodes berikutnya dalam status Fog of War (explored: false) agar eksplorasi berjalan bertahap per node</text>
-  <text x="452" y="548" fill="#0D9468" font-size="11" font-weight="700">Output Stage 3: primaryNode (explored: true) + frontierNodes[] (explored: false) + crossLinks[]</text>
+  <text x="452" y="486" fill="#065F46" font-size="13" font-weight="800">STAGE 3 — Node Material Synthesizer &amp; True Fog-of-War Lifecycle Engine</text>
+  <text x="452" y="508" fill="#17233C" font-size="11.5">• Buka Node (OPEN_NODE): generate materi khusus di node tersebut &amp; analisis relasi ke node explored (tanpa auto-buka node lain)</text>
+  <text x="452" y="528" fill="#17233C" font-size="11.5">• Expand Node (EXPAND_FOG_BRANCHES dari dalam node): spawn Fog Stub abu-abu (hanya judul topik, belum ada isi &amp; relasi lain)</text>
+  <text x="452" y="548" fill="#0D9468" font-size="11" font-weight="700">Output Stage 3: primaryNode (explored: true) | fogStubNodes[] (explored: false, title-only) | crossLinks[]</text>
 
   <!-- Stage 4 -->
   <rect x="434" y="602" width="722" height="114" rx="10" fill="#FFFFFF" stroke="#7C3AED" stroke-width="2"/>
-  <text x="452" y="626" fill="#4C1D95" font-size="13" font-weight="800">STAGE 4 — DAG Validator, Anti-Orphan Guard &amp; Dynamic Organic Layout (validator.ts)</text>
-  <text x="452" y="648" fill="#17233C" font-size="11.5">• Memvalidasi Directed Acyclic Graph (bebas siklus prerequisite, bebas duplikasi &amp; orphan edge) serta 6 Knowledge Regions</text>
-  <text x="452" y="668" fill="#17233C" font-size="11.5">• Menghitung koordinat lingkaran node secara dinamis (Staggered Wave X/Y maju-mundur) di dalam batas Region Aura (NFR-09)</text>
-  <text x="452" y="688" fill="#7C3AED" font-size="11" font-weight="700">Guarantees: dagAcyclic = true · 100% Region Containment · Zero Callout Collision</text>
+  <text x="452" y="626" fill="#4C1D95" font-size="13" font-weight="800">STAGE 4 — DAG Validator, Single-Edge Guard &amp; Cross-Region Pull Layout (validator.ts)</text>
+  <text x="452" y="648" fill="#17233C" font-size="11.5">• Validasi DAG bebas siklus, hapus duplikasi edge paralel, &amp; pastikan Fog Stub hanya memiliki 1 edge dari induknya</text>
+  <text x="452" y="668" fill="#17233C" font-size="11.5">• Hitung koordinat Cross-Region Pull Vector + Staggered Wave X/Y agar node lintas-region menghadap rapi di dalam Region</text>
+  <text x="452" y="688" fill="#7C3AED" font-size="11" font-weight="700">Guarantees: dagAcyclic = true · 100% Region Containment · Clean Cross-Region Alignment</text>
 
   <!-- Stage 5 -->
   <rect x="434" y="742" width="722" height="158" rx="10" fill="#1E3A8A" stroke="#0F172A" stroke-width="2"/>
   <text x="452" y="768" fill="#FFFFFF" font-size="13" font-weight="800">STAGE 5 — Non-Destructive State Reconciler &amp; Output Envelope (OrchestratorOutputEnvelope)</text>
   <text x="452" y="792" fill="#E2E8F0" font-size="11.5">• Menyimpan materi bab/prompt/catatan langsung pada properti node (nodeInputMode, nodeSourceTitle, nodeSourceContent)</text>
-  <text x="452" y="812" fill="#E2E8F0" font-size="11.5">• Menjaga seluruh catatan User Edited tetap aman tanpa tertimpa (otomatis menandai Needs Review jika ada pembaruan konteks)</text>
-  <text x="452" y="832" fill="#E2E8F0" font-size="11.5">• Mengembalikan paket JSON terstruktur ke aplikasi beserta telemetri jejak eksekusi (OrchestratorStageTrace)</text>
-  <text x="452" y="858" fill="#93C5FD" font-size="11" font-weight="700">Output Contract: { ok: true, trace: { openedNodeId, spawnedFrontierNodeIds, crossLinksDiscovered, dagValid }, vault }</text>
+  <text x="452" y="812" fill="#E2E8F0" font-size="11.5">• Menjaga seluruh catatan User Edited tetap aman tanpa tertimpa &amp; mengembalikan hasil validasi / graf ke aplikasi</text>
+  <text x="452" y="832" fill="#E2E8F0" font-size="11.5">• Mengembalikan paket JSON terstruktur beserta telemetri jejak eksekusi (OrchestratorStageTrace)</text>
+  <text x="452" y="858" fill="#93C5FD" font-size="11" font-weight="700">Output Contract: { ok, validationGate, trace: { validationStatus, openedNodeId, spawnedFrontierNodeIds, crossLinksDiscovered }, vault }</text>
 
   <!-- SWIMLANE 3: INTELLIGENCE & FALLBACK LAYER -->
   <rect x="1214" y="106" width="350" height="824" rx="14" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
@@ -124,16 +125,16 @@
   <rect x="1236" y="280" width="306" height="145" rx="10" fill="#EAF2FF" stroke="#2F80ED" stroke-width="2"/>
   <text x="1252" y="305" fill="#1E3A8A" font-size="13" font-weight="800">Google Gemini 2.5 Flash API</text>
   <text x="1252" y="328" fill="#17233C" font-size="11.5">• Structured JSON Mode</text>
-  <text x="1252" y="348" fill="#17233C" font-size="11.5">• Sintesis Kontekstual Materi Bab/Prompt</text>
-  <text x="1252" y="368" fill="#17233C" font-size="11.5">• Analisis Semantik Hubungan Lintas-Node</text>
+  <text x="1252" y="348" fill="#17233C" font-size="11.5">• Menerima Spatial Topology Directive</text>
+  <text x="1252" y="368" fill="#17233C" font-size="11.5">• Sintesis Materi Node &amp; Cek Relevansi</text>
   <text x="1252" y="388" fill="#17233C" font-size="11.5">• Penentuan 5 Jenis Relasi Edge &amp; Reason</text>
 
   <!-- Box 3B: Deterministic Engine -->
   <rect x="1236" y="455" width="306" height="145" rx="10" fill="#ECFDF5" stroke="#0D9468" stroke-width="2"/>
   <text x="1252" y="480" fill="#065F46" font-size="13" font-weight="800">Deterministic Graph &amp; Link Engine</text>
   <text x="1252" y="503" fill="#064E3B" font-size="11.5">• Zero-Downtime Local Fallback</text>
-  <text x="1252" y="523" fill="#064E3B" font-size="11.5">• Keyword &amp; Cross-Region Overlap Scorer</text>
-  <text x="1252" y="543" fill="#064E3B" font-size="11.5">• Ekstraksi Subtopik Bab Otomatis</text>
+  <text x="1252" y="523" fill="#064E3B" font-size="11.5">• Typo Normalizer &amp; Out-of-Scope Detector</text>
+  <text x="1252" y="543" fill="#064E3B" font-size="11.5">• Orthogonal Cross-Region Overlap Scorer</text>
   <text x="1252" y="563" fill="#064E3B" font-size="11.5">• Menjamin Aplikasi 100% Jalan Tanpa API Key</text>
 
   <!-- Box 3C: Safe Note Diff API -->

@@ -77,33 +77,42 @@ export function normalizeNode(
   fallbackTimestamp?: string
 ): KnowledgeNode {
   const ts = node.updatedAt || fallbackTimestamp || new Date().toISOString();
-  const levels: ExplanationLevels = {
-    simple: cleanLegacyText(node.levels?.simple),
-    standard: cleanLegacyText(node.levels?.standard),
-    deep: cleanLegacyText(node.levels?.deep),
-  };
-  const summary = cleanLegacyText(node.summary);
-  const formula = cleanLegacyText(node.formula);
-  const application = cleanLegacyText(node.application);
-  const reference = cleanLegacyText(node.reference);
+  const isExplored = Boolean(node.explored);
+  const levels: ExplanationLevels = isExplored
+    ? {
+        simple: cleanLegacyText(node.levels?.simple),
+        standard: cleanLegacyText(node.levels?.standard),
+        deep: cleanLegacyText(node.levels?.deep),
+      }
+    : {
+        simple: "",
+        standard: "",
+        deep: "",
+      };
+  const summary = isExplored ? cleanLegacyText(node.summary) : "";
+  const formula = isExplored ? cleanLegacyText(node.formula) : "";
+  const application = isExplored ? cleanLegacyText(node.application) : "";
+  const reference = isExplored ? cleanLegacyText(node.reference) : "";
 
   const revisions: NodeRevision[] =
     Array.isArray(node.revisions) && node.revisions.length > 0
       ? node.revisions
-      : [
-          {
-            id: `rev-${node.id}-1`,
-            version: 1,
-            createdAt: ts,
-            kind: "initial_ai",
-            label: "Initial AI Draft",
-            summary,
-            levels,
-            formula,
-            application,
-            userAnnotation: node.userAnnotation,
-          },
-        ];
+      : isExplored
+        ? [
+            {
+              id: `rev-${node.id}-1`,
+              version: 1,
+              createdAt: ts,
+              kind: "initial_ai",
+              label: "Initial AI Draft",
+              summary,
+              levels,
+              formula,
+              application,
+              userAnnotation: node.userAnnotation,
+            },
+          ]
+        : [];
 
   const sourceIds =
     Array.isArray(node.sourceIds) && node.sourceIds.length > 0
@@ -227,10 +236,15 @@ export function normalizeVault(vault: KnowledgeVault): KnowledgeVault {
   }
 
   const fallbackSourceId = learningSources[0]?.id;
-  const nodes = (vault.nodes || []).map((n) =>
+  const rawNodes = (vault.nodes || []).map((n) =>
     normalizeNode(n, fallbackSourceId, ts)
   );
-  const edges = (vault.edges || []).map(sanitizeEdge);
+  const rawEdges = (vault.edges || []).map(sanitizeEdge);
+
+  const validated =
+    rawNodes.length > 0
+      ? validateAndBuildGraph(rawNodes, rawEdges)
+      : { nodes: [], edges: [], validation: vault.validation };
 
   return {
     ...vault,
@@ -249,8 +263,9 @@ export function normalizeVault(vault: KnowledgeVault): KnowledgeVault {
       ),
       primaryReference: cleanLegacyText(vault.overview?.primaryReference || ""),
     },
-    nodes,
-    edges,
+    nodes: validated.nodes,
+    edges: validated.edges,
+    validation: validated.validation || vault.validation,
   };
 }
 

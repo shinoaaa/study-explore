@@ -557,7 +557,9 @@ export default function HomePage() {
   };
 
   // Step 2: Open / Add Node via Curiora 5-Stage AI Knowledge Orchestrator
-  const handleSubmitExploration = async (data: AddExplorationSubmitData) => {
+  const handleSubmitExploration = async (
+    data: AddExplorationSubmitData
+  ): Promise<{ ok: boolean; dangerMessage?: string } | void> => {
     setIsAddingExploration(true);
     try {
       const intent = data.targetNodeId
@@ -585,6 +587,14 @@ export default function HomePage() {
         }),
       });
       const json = await res.json();
+
+      if (json?.ok === false && json.validationGate?.dangerMessage) {
+        return {
+          ok: false,
+          dangerMessage: json.validationGate.dangerMessage,
+        };
+      }
+
       if (json?.ok && json.vault) {
         const updatedVault = normalizeVault(json.vault);
         const nextVaults = vaults.map((v) =>
@@ -627,26 +637,74 @@ export default function HomePage() {
           lang === "en" ? "Node opened" : "Node dibuka",
           frontierIds.length > 0
             ? lang === "en"
-              ? `${frontierIds.length} new frontier nodes`
-              : `${frontierIds.length} node cabang baru`
+              ? `${frontierIds.length} new fog branches`
+              : `${frontierIds.length} cabang fog baru`
             : "",
           crossLinksCount > 0
             ? lang === "en"
-              ? `${crossLinksCount} cross-node links discovered`
+              ? `${crossLinksCount} cross-node link discovered`
               : `${crossLinksCount} hubungan lintas-node ditemukan`
             : "",
         ].filter(Boolean);
 
         setExpandToast(msgParts.join(" · "));
         setTimeout(() => setExpandToast(null), 5000);
+        return { ok: true };
       }
     } finally {
       setIsAddingExploration(false);
     }
   };
 
+  // Expand Node from inside an already-opened node -> Spawns lightweight Fog stub nodes (`explored: false`, title only)
   const handleExpandNode = async (nodeId: string) => {
-    handleOpenAddExploration(undefined, nodeId);
+    setIsExpanding(true);
+    try {
+      const res = await fetch("/api/orchestrate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          intent: "EXPAND_FOG_BRANCHES",
+          vault: activeVault,
+          nodeAction: {
+            targetNodeId: nodeId,
+            openMode: "instant_ai",
+          },
+          lang,
+        }),
+      });
+      const json = await res.json();
+      if (json?.ok && json.vault) {
+        const updatedVault = normalizeVault(json.vault);
+        const nextVaults = vaults.map((v) =>
+          v.id === activeVault.id ? updatedVault : v
+        );
+        persistVaults(nextVaults);
+
+        const frontierIds: string[] = Array.isArray(
+          json.trace?.spawnedFrontierNodeIds
+        )
+          ? json.trace.spawnedFrontierNodeIds
+          : [];
+        const touchedNodes = updatedVault.nodes.filter((n) =>
+          frontierIds.includes(n.id)
+        );
+        const touchedRegs = Array.from(
+          new Set(touchedNodes.map((n) => n.region))
+        );
+
+        setNewlyAddedIds(frontierIds);
+        setExpandedRegions(touchedRegs);
+        setExpandToast(
+          lang === "en"
+            ? `Expanded ${frontierIds.length} new Fog of War nodes (click any gray node to open)`
+            : `${frontierIds.length} node cabang baru (Fog) ditambahkan — klik node abu-abu untuk membuka`
+        );
+        setTimeout(() => setExpandToast(null), 5000);
+      }
+    } finally {
+      setIsExpanding(false);
+    }
   };
 
   const handleDeleteVault = (vaultId: string) => {
@@ -1590,7 +1648,11 @@ export default function HomePage() {
               onRestoreRevision={handleRestoreRevision}
               onSaveSource={handleSaveSource}
               onViewInTree={(nid) => openVaultInTree(activeVault.id, nid)}
-              onOpenAddExploration={() => handleOpenAddExploration()}
+              onOpenAddExploration={(targetNode) =>
+                handleOpenAddExploration(targetNode)
+              }
+              onExpandNode={handleExpandNode}
+              isExpandingNode={isExpanding}
               openAddSourceTrigger={addSourceTrigger}
               lang={lang}
             />

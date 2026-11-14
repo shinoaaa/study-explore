@@ -23,6 +23,7 @@ export type OrchestratorIntent =
   | "SEED_FIRST_NODE"
   | "OPEN_NODE"
   | "BRANCH_NEW_NODE"
+  | "EXPAND_FOG_BRANCHES"
   | "ANALYZE_RELATIONS"
   | "REVISE_NOTE";
 
@@ -226,6 +227,23 @@ export interface OrchestratorNodePayload {
   preferredDepth?: ExplanationDepth;
 }
 
+export interface OrchestratorValidationGate {
+  status: "valid" | "typo_corrected" | "rejected_too_far";
+  originalTitle: string;
+  normalizedTitle: string;
+  dangerMessage?: string;
+}
+
+export interface OrchestratorSpatialTopologyPlan {
+  primaryRegion: RegionCode;
+  adjacentRegionCandidates: RegionCode[];
+  activeRegions: RegionCode[];
+  regionNodeCounts: Record<RegionCode, number>;
+  maxCrossRegionLinksPerNode: number;
+  boundaryNodeIdsByRegion: Partial<Record<RegionCode, string[]>>;
+  layoutDirective: string;
+}
+
 export interface OrchestratorInputEnvelope {
   requestId: string;
   intent: OrchestratorIntent;
@@ -236,6 +254,8 @@ export interface OrchestratorInputEnvelope {
     identity: VaultIdentity;
   };
   nodeAction: OrchestratorNodePayload;
+  preValidationGate: OrchestratorValidationGate;
+  spatialTopologyPlan: OrchestratorSpatialTopologyPlan;
   existingGraphSnapshot: {
     nodes: OrchestratorGraphDigestNode[];
     edges: OrchestratorGraphDigestEdge[];
@@ -254,6 +274,7 @@ export interface OrchestratorStageTrace {
   requestId: string;
   intent: OrchestratorIntent;
   engineUsed: string;
+  validationStatus: "valid" | "typo_corrected" | "rejected_too_far";
   openedNodeId: string;
   spawnedFrontierNodeIds: string[];
   crossLinksDiscovered: OrchestratorCrossLink[];
@@ -264,6 +285,7 @@ export interface OrchestratorStageTrace {
 
 export interface OrchestratorOutputEnvelope {
   ok: boolean;
+  validationGate?: OrchestratorValidationGate;
   trace: OrchestratorStageTrace;
   vault: KnowledgeVault;
 }

@@ -70,16 +70,19 @@ Untuk menjaga keakuratan hubungan konsep dan stabilitas aplikasi:
 2. **Streamlined Vault Overview — Direct Nodes Section (`Overview` | `Knowledge Tree` | `Knowledge Library`):** Di bawah kartu **Vault Profile**, tampilan *Vault Overview* langsung menyajikan bagian **Nodes** tanpa kotak statistik yang membingungkan. Setiap kartu Node memiliki tombol bintang **Favorite ★** di dalam Vault serta **2 tombol aksi langsung**:
    - **Baca Materi (`Read Material` / `Buka Node`)** — langsung membaca materi node atau membuka node baru.
    - **Ke Node di Tree (`View in Tree`)** — langsung melompat dan memfokuskan node tersebut di kanvas *Knowledge Tree*.
-3. **Node-Centric Material Input & Progressive Node-by-Node Exploration (`FEAT-02`):** Eksplorasi berjalan bertahap dari satu node ke node berikutnya tanpa perlu halaman *Source Note* terpisah. Saat membuka node baru (atau menambah cabang node baru), pengguna diberi **2 pilihan utama**:
-   - **Langsung Buka (`Open Directly`):** AI langsung menyintesis materi node dari konteks Vault & prasyaratnya.
-   - **Tambah Catatan / Materi Dulu (`Add Note / Material First`):** Pengguna dapat memasukkan **Prompt / Pertanyaan Fokus**, **Catatan Pribadi**, atau **1 Chapter Buku / Materi** langsung ke dalam node tersebut sebelum dibuka.
-4. **Curiora 5-Stage AI Knowledge Orchestrator & Cross-Node Relation Analyzer (`/api/orchestrate`):** Setiap kali sebuah node dibuka atau ditambahkan, orkestrator AI 5-tahap (`src/lib/ai-orchestrator.ts`) menyusun *Input Context Envelope*, menganalisis **keterkaitan lintas-node (`Cross-Node Relation Analyzer`)** terhadap seluruh node yang sudah ada di dalam Vault, memekarkan *Frontier Nodes* berikutnya dalam status *Fog of War*, memvalidasi DAG & *Region Containment*, serta mengembalikan *Output Delta Envelope* beserta telemetri `OrchestratorStageTrace`.
+3. **Node-Centric Material Input, Pre-Join Relevance Gate & True Fog-of-War Lifecycle (`FEAT-02`):**
+   - Saat membuka node baru (atau menambah cabang node baru), pengguna diberi **2 pilihan utama**:
+     - **Langsung Buka (`Open Directly`):** AI langsung menyintesis materi node dari konteks Vault & prasyaratnya.
+     - **Tambah Catatan / Materi Dulu (`Add Note / Material First`):** Pengguna dapat memasukkan **Prompt / Pertanyaan Fokus**, **Catatan Pribadi**, atau **1 Chapter Buku / Materi** langsung ke dalam node tersebut sebelum dibuka.
+   - **Pre-Join Topic Relevance & Typo Gate:** Sebelum node baru masuk ke Vault, orkestrator memeriksa keterkaitannya dengan topik Vault & node yang ada. Jika ada *typo* ringan, ejaan dikoreksi otomatis dan langsung masuk tanpa peringatan; jika topik terlalu jauh dari fokus Vault (`rejected_too_far`), modal menampilkan peringatan **Danger** dan memblokir node tersebut.
+   - **True Fog-of-War Lifecycle (Tanpa Buka Fog Massal):** Node yang belum dibuka (`explored: false`) berwarna abu-abu dan **hanya memiliki judul topik (`title`)** tanpa isi materi maupun relasi ke node lain. Saat node dibuka (`OPEN_NODE`), AI men-generate materi khusus untuk node tersebut (tanpa otomatis membuka node lain). Untuk memekarkan cabang baru, pengguna menekan tombol **Kembangkan Cabang (`Expand Branches`)** di dalam node yang sudah dibuka (`EXPAND_FOG_BRANCHES`), yang menghasilkan *Fog Stub* abu-abu baru.
+4. **Curiora 5-Stage AI Knowledge Orchestrator & Pre-AI Cross-Region Spatial Planner (`/api/orchestrate`):** Orkestrator AI 5-tahap (`src/lib/ai-orchestrator.ts`) menjalankan **Pre-AI Cross-Region Spatial Planner** sebelum memanggil API AI untuk memetakan ketetanggaan 6 Knowledge Regions pada grid 2x3, menjaga relasi lintas-region hanya ke node yang sudah dibuka pada Region tetangga ortogonal, serta menata posisi node dengan *Cross-Region Pull Vector* (`validator.ts`) agar garis lintas-region rapi dan tidak semrawut.
 5. **Circular Skill Tree Nodes, Topic Callout Box & Dynamic Staggered Layout (`FEAT-04` & `FEAT-05`):**
    - Setiap node dirender sebagai **lingkaran bersih (`r = 22px`)** yang dihubungkan oleh 5 gaya garis *edge* (`prerequisite`, `extension`, `application`, `related_concept`, `cross_disciplinary`).
    - Topik node tampil sebagai **kotak keterangan (*callout box*) dengan panah segitiga (`▼`) tepat di atas lingkaran node**.
    - Dilengkapi tombol ikon **Hide / Show Node Labels** di toolbar kanvas (tanpa teks keterangan bertele-tele): ketika dalam mode *Hide*, seluruh label di atas node disembunyikan agar peta bersih, namun **ketika salah satu lingkaran node diklik, keterangan node yang dipilih tersebut langsung muncul sendiri**.
-   - Posisi lingkaran node diatur secara **dinamis maju-mundur (*Organic Wave Stagger X/Y*)** di dalam batas *Region Aura* agar nyaman dibaca dan tidak kaku.
-6. **Persistent Knowledge Library, Safe Editing & Revision History (`FEAT-06`):** Workspace dua-panel untuk membaca materi node (beserta lampiran *1 Chapter Buku / Prompt / Catatan* yang diinput pada node), menandai **Favorites ★** di dalam Vault, menulis anotasi pribadi (**`User Edited`**), meminta **`Ask AI Revise`** dengan pratinjau diff (`/api/revise-note`), meninjau **`Revision History`** (`v1`..`vn`) beserta **Restore** non-destruktif, serta perlindungan otomatis **`Needs Review`**.
+   - Posisi lingkaran node diatur secara **dinamis maju-mundur (*Organic Wave Stagger X/Y*)** dan menghadap ke Region pasangannya di dalam batas *Region Aura*.
+6. **Full-Page Pustaka Catatan (Knowledge Library), Popup/Sidebar Daftar Node & Filter by Region (`FEAT-06`):** Halaman **Pustaka Catatan** dirancang sebagai pembaca **1 halaman penuh (*Full-Page Single-Column Node Reader*)** yang lega dan tidak terpotong-potong, dilengkapi tombol **Daftar Node** berupa *Popup / Slide-Over Sidebar*, **Filter by Region** (`Semua Bidang` + 6 *Knowledge Regions*), tombol **Favorites ★**, **Edit Catatan**, **`Minta AI Revisi`** dengan pratinjau diff (`/api/revise-note`), **Kembangkan Cabang**, serta **`Riwayat Revisi`** (`v1`..`vn`).
 7. **Bilingual EN/ID, Light/Dark Mode & Zero Internal Code Leak (`FEAT-07`–`FEAT-09`):** Beralih tema **Light/Dark** dan bahasa **EN/ID**, 3 tingkat kedalaman penjelasan (*Simple/Standard/Deep*), *1-Click Quick Check*, serta filter ketat yang menjamin nol kebocoran kode internal lomba di UI.
 
 ---
@@ -129,13 +132,15 @@ flowchart TD
 
 ### Kontrak JSON Masuk & Keluar Orkestrator (`src/types/knowledge.ts`)
 - **Kontrak Input (`OrchestratorInputEnvelope`):**
-  - `requestId`, `intent` (`SEED_FIRST_NODE` | `OPEN_NODE` | `BRANCH_NEW_NODE` | `ANALYZE_RELATIONS`), `lang` (`en` | `id`)
-  - `vaultContext`: `{ vaultId, vaultName, mainInterest, description, focusQuestion, learningGoal, relatedInterests, preferredDepth }`
-  - `nodeAction`: `{ targetNodeId?, parentNodeId?, topicTitle, openMode: 'instant_ai' | 'with_material', inputKind?: 'custom_prompt' | 'user_note' | 'book_chapter', inputTitle?, inputContent?, preferredRegion? }`
-  - `existingGraphSnapshot`: daftar ringkas seluruh node (`id`, `title`, `region`, `explored`, `summarySnippet`, `keyTakeaways`) dan edge di dalam Vault untuk dianalisis keterkaitannya.
+  - `requestId`, `intent` (`SEED_FIRST_NODE` | `OPEN_NODE` | `BRANCH_NEW_NODE` | `EXPAND_FOG_BRANCHES` | `ANALYZE_RELATIONS`), `lang` (`en` | `id`)
+  - `vaultContext`: `{ vaultId, vaultName, identity }`
+  - `nodeAction`: `{ targetNodeId?, parentNodeId?, nodeTitle?, openMode: 'instant_ai' | 'custom_prompt' | 'user_note' | 'book_chapter', inputTitle?, inputContent?, preferredDepth? }`
+  - `preValidationGate`: `{ status: 'valid' | 'typo_corrected' | 'rejected_too_far', originalTitle, normalizedTitle, dangerMessage? }`
+  - `spatialTopologyPlan`: `{ primaryRegion, adjacentRegionCandidates, activeRegions, regionNodeCounts, maxCrossRegionLinksPerNode, layoutDirective }`
+  - `existingGraphSnapshot`: daftar ringkas node yang sudah dibuka (`explored: true`) maupun *Fog Stub* (`explored: false`).
 - **Kontrak Output (`OrchestratorOutputEnvelope`):**
-  - `ok`: `boolean`, `vault`: objek `KnowledgeVault` yang telah divalidasi DAG & ditata ulang posisinya secara organik.
-  - `trace` (`OrchestratorStageTrace`): `{ requestId, intent, engineUsed, openedNodeId, spawnedFrontierNodeIds, crossLinksDiscovered, dagValid, executionMs }`.
+  - `ok`: `boolean`, `validationGate`: hasil gerbang validasi topik/typo, `vault`: objek `KnowledgeVault` yang telah divalidasi DAG & ditata ulang posisinya dengan *Cross-Region Pull Vector*.
+  - `trace` (`OrchestratorStageTrace`): `{ requestId, intent, engineUsed, validationStatus, openedNodeId, spawnedFrontierNodeIds, crossLinksDiscovered, dagValid, processedAt }`.
 
 ---
 

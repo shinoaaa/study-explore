@@ -61,13 +61,26 @@ const REGION_ROWS: RegionCode[][] = [
   ["REG-04", "REG-05", "REG-06"],
 ];
 
+const REGION_GRID_POS: Record<RegionCode, { gx: number; gy: number }> = {
+  "REG-01": { gx: 0, gy: 0 },
+  "REG-02": { gx: 1, gy: 0 },
+  "REG-03": { gx: 2, gy: 0 },
+  "REG-04": { gx: 0, gy: 1 },
+  "REG-05": { gx: 1, gy: 1 },
+  "REG-06": { gx: 2, gy: 1 },
+};
+
 /**
  * Menghitung tata letak Region & posisi pusat setiap node (NFR-09):
  * 1) Menjamin 100% node berada secara matematis di dalam batas Region-nya.
- * 2) Menjamin nol tumpukan (zero overlap) antar-node maupun antar-Region meski node bertambah tanpa batas (NFR-11).
- * 3) Region otomatis membesar ke arah luar ketika node bertambah (+ Expand).
+ * 2) Menempatkan node lintas-region menghadap ke sisi Region tujuannya (Cross-Region Pull Vector)
+ *    agar garis lintas-region tidak saling menyilang berantakan.
+ * 3) Menjamin nol tumpukan (zero overlap) dengan posisi dinamis maju-mundur (Organic Wave Stagger).
  */
-export function layoutGraphWithRegionContainment(nodes: KnowledgeNode[]): {
+export function layoutGraphWithRegionContainment(
+  nodes: KnowledgeNode[],
+  edges: KnowledgeEdge[] = []
+): {
   nodes: KnowledgeNode[];
   regionBounds: RegionBounds[];
   canvasWidth: number;
@@ -76,19 +89,40 @@ export function layoutGraphWithRegionContainment(nodes: KnowledgeNode[]): {
   const byRegion = new Map<RegionCode, KnowledgeNode[]>();
   VALID_REGIONS.forEach((rc) => byRegion.set(rc, []));
 
+  const nodeRegionMap = new Map<string, RegionCode>();
   for (const node of nodes) {
     const safeReg = VALID_REGIONS.includes(node.region) ? node.region : "REG-01";
+    nodeRegionMap.set(node.id, safeReg);
     byRegion.get(safeReg)!.push({ ...node, region: safeReg });
   }
 
-  const cellW = 196;
-  const cellH = 104;
-  const gapX = 38;
-  const gapY = 34;
-  const padX = 48;
-  const padTop = 88;
-  const padBot = 42;
-  const sectorChannel = 68;
+  // Hitung vektor tarikan lintas-region (pullX, pullY) untuk setiap node agar menghadap ke Region pasangannya
+  const pullVector = new Map<string, { px: number; py: number }>();
+  for (const node of nodes) {
+    pullVector.set(node.id, { px: 0, py: 0 });
+  }
+  for (const edge of edges) {
+    const rA = nodeRegionMap.get(edge.source);
+    const rB = nodeRegionMap.get(edge.target);
+    if (!rA || !rB || rA === rB) continue;
+    const gA = REGION_GRID_POS[rA];
+    const gB = REGION_GRID_POS[rB];
+    const curA = pullVector.get(edge.source)!;
+    const curB = pullVector.get(edge.target)!;
+    curA.px += gB.gx - gA.gx;
+    curA.py += gB.gy - gA.gy;
+    curB.px += gA.gx - gB.gx;
+    curB.py += gA.gy - gB.gy;
+  }
+
+  const cellW = 198;
+  const cellH = 108;
+  const gapX = 42;
+  const gapY = 38;
+  const padX = 52;
+  const padTop = 90;
+  const padBot = 44;
+  const sectorChannel = 74;
   const outerMargin = 36;
 
   // Hitung dimensi intrinsik setiap Region yang berisi minimal 1 node
@@ -101,13 +135,16 @@ export function layoutGraphWithRegionContainment(nodes: KnowledgeNode[]): {
     const rawList = byRegion.get(rc) || [];
     if (rawList.length === 0) continue;
 
-    // Sort root first, then preserve existing spatial stability (y, then x)
+    // Urutkan berdasarkan arah tarikan vertikal (py) lalu horizontal (px) agar node yang berelasi lintas-region berada di tepi yang menghadap region tujuannya
     const list = [...rawList].sort((a, b) => {
-      const aRoot = a.relationToOrigin === "root" || a.id === "root" ? 0 : 1;
-      const bRoot = b.relationToOrigin === "root" || b.id === "root" ? 0 : 1;
-      if (aRoot !== bRoot) return aRoot - bRoot;
-      if (Math.abs((a.y || 0) - (b.y || 0)) > 24) return (a.y || 0) - (b.y || 0);
-      return (a.x || 0) - (b.x || 0);
+      const pA = pullVector.get(a.id) || { px: 0, py: 0 };
+      const pB = pullVector.get(b.id) || { px: 0, py: 0 };
+      if (pA.py !== pB.py) return pA.py - pB.py;
+      if (pA.px !== pB.px) return pA.px - pB.px;
+      const aExplored = a.explored ? 0 : 1;
+      const bExplored = b.explored ? 0 : 1;
+      if (aExplored !== bExplored) return aExplored - bExplored;
+      return a.id.localeCompare(b.id);
     });
 
     const cols = list.length <= 1 ? 1 : list.length <= 4 ? 2 : 3;
@@ -210,8 +247,11 @@ export function layoutGraphWithRegionContainment(nodes: KnowledgeNode[]): {
 /**
  * Menempatkan seluruh node ke dalam batas wilayah Knowledge Region-nya (NFR-09)
  */
-export function assignRegionCoordinates(nodes: KnowledgeNode[]): KnowledgeNode[] {
-  return layoutGraphWithRegionContainment(nodes).nodes;
+export function assignRegionCoordinates(
+  nodes: KnowledgeNode[],
+  edges: KnowledgeEdge[] = []
+): KnowledgeNode[] {
+  return layoutGraphWithRegionContainment(nodes, edges).nodes;
 }
 
 /**
@@ -291,27 +331,44 @@ export function validateAndBuildGraph(
       ? n.difficulty
       : "Intermediate";
 
+    const isExplored = Boolean(n.explored);
+
     uniqueNodes.push({
       ...n,
+      explored: isExplored,
+      mastered: isExplored ? Boolean(n.mastered) : false,
       region: safeRegion,
       difficulty: safeDiff,
-      summary: n.summary || n.levels?.standard || "Konsep eksplorasi terhubung.",
-      levels: {
-        simple:
-          n.levels?.simple ||
-          "Penjelasan analogi sederhana untuk memudahkan pemahaman konsep dasar.",
-        standard:
-          n.levels?.standard ||
-          n.summary ||
-          "Penjelasan konsep sesuai standar materi pembelajaran.",
-        deep:
-          n.levels?.deep ||
-          "Penjelasan mekanisme ilmiah mendalam beserta keterkaitan sistemik.",
-      },
-      formula: n.formula || "Prinsip Konseptual Terkait",
-      application:
-        n.application || "Penerapan konsep pada fenomena nyata dan studi kasus.",
-      reference: n.reference || "OpenStax / Literatur Akademik Terverifikasi",
+      // Fog of War nodes (!isExplored) only hold their topic title — material is generated when opened!
+      summary: isExplored
+        ? n.summary || n.levels?.standard || "Konsep eksplorasi terhubung."
+        : "",
+      levels: isExplored
+        ? {
+            simple:
+              n.levels?.simple ||
+              "Penjelasan analogi sederhana untuk memudahkan pemahaman konsep dasar.",
+            standard:
+              n.levels?.standard ||
+              n.summary ||
+              "Penjelasan konsep sesuai standar materi pembelajaran.",
+            deep:
+              n.levels?.deep ||
+              "Penjelasan mekanisme ilmiah mendalam beserta keterkaitan sistemik.",
+          }
+        : {
+            simple: "",
+            standard: "",
+            deep: "",
+          },
+      formula: isExplored ? n.formula || "Prinsip Konseptual Terkait" : "",
+      application: isExplored
+        ? n.application ||
+          "Penerapan konsep pada fenomena nyata dan studi kasus."
+        : "",
+      reference: isExplored
+        ? n.reference || "OpenStax / Literatur Akademik Terverifikasi"
+        : "",
       quickCheck:
         n.quickCheck && n.quickCheck.options?.length >= 2
           ? n.quickCheck
@@ -333,23 +390,48 @@ export function validateAndBuildGraph(
     });
   }
 
-  const positionedNodes = assignRegionCoordinates(uniqueNodes);
-  const nodeMap = new Map<string, KnowledgeNode>(
-    positionedNodes.map((n) => [n.id, n])
+  const rawNodeMap = new Map<string, KnowledgeNode>(
+    uniqueNodes.map((n) => [n.id, n])
   );
 
   let orphanEdgesRemoved = 0;
   const validInitialEdges: KnowledgeEdge[] = [];
+  const seenUndirectedPairs = new Set<string>();
+  const fogIncomingAssigned = new Set<string>();
 
   for (let i = 0; i < rawEdges.length; i++) {
     const e = rawEdges[i];
-    const sourceNode = nodeMap.get(e.source);
-    const targetNode = nodeMap.get(e.target);
+    const sourceNode = rawNodeMap.get(e.source);
+    const targetNode = rawNodeMap.get(e.target);
 
-    if (!sourceNode || !targetNode) {
+    if (!sourceNode || !targetNode || e.source === e.target) {
       orphanEdgesRemoved++;
       continue;
     }
+
+    // Rule: A Fog node (!explored) only connects from 1 opened (explored) parent node,
+    // and an unopened Fog node cannot already branch or cross-link to other nodes before it is opened.
+    if (!sourceNode.explored) {
+      orphanEdgesRemoved++;
+      continue;
+    }
+    if (!targetNode.explored) {
+      if (fogIncomingAssigned.has(targetNode.id)) {
+        orphanEdgesRemoved++;
+        continue;
+      }
+      fogIncomingAssigned.add(targetNode.id);
+    }
+
+    // Deduplicate parallel edges between the exact same pair of nodes
+    const pairKey =
+      e.source < e.target
+        ? `${e.source}::${e.target}`
+        : `${e.target}::${e.source}`;
+    if (seenUndirectedPairs.has(pairKey)) {
+      continue;
+    }
+    seenUndirectedPairs.add(pairKey);
 
     let relation: EdgeRelationType = VALID_RELATIONS.includes(e.relation)
       ? e.relation
@@ -376,10 +458,17 @@ export function validateAndBuildGraph(
     });
   }
 
+  // Filter out any unopened Fog node that ended up disconnected from all opened nodes
+  const finalRawNodes = uniqueNodes.filter(
+    (n) => n.explored || fogIncomingAssigned.has(n.id)
+  );
+
   const { acyclic, sanitizedEdges } = hasCycleInEdges(
-    Array.from(nodeMap.keys()),
+    finalRawNodes.map((n) => n.id),
     validInitialEdges
   );
+
+  const positionedNodes = assignRegionCoordinates(finalRawNodes, sanitizedEdges);
 
   const regionsCovered = Array.from(
     new Set(positionedNodes.map((n) => n.region))

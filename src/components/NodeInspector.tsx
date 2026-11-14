@@ -96,7 +96,7 @@ export default function NodeInspector({
     return () => window.removeEventListener("keydown", handleEsc);
   }, [node, isMaximized, onClose]);
 
-  if (!node) return null;
+  if (!node || !node.explored) return null;
 
   const isDark = theme === "dark";
   const regDef = KNOWLEDGE_REGIONS[node.region] || KNOWLEDGE_REGIONS["REG-01"];
@@ -497,6 +497,7 @@ export default function NodeInspector({
           type="button"
           onClick={() => onExpandNode(node.id)}
           disabled={isExpanding}
+          data-testid="inspector-expand-node-btn"
           className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] disabled:opacity-50 py-2.5 px-4 text-xs font-bold text-white shadow-sm transition-colors"
         >
           {isExpanding ? (

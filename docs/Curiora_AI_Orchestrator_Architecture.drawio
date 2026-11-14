@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2026-11-14T19:45:00.000Z" agent="Curiora Architecture Designer" version="24.7.5" type="device">
+<mxfile host="app.diagrams.net" modified="2026-11-14T20:45:00.000Z" agent="Curiora Architecture Designer" version="24.7.5" type="device">
   <diagram id="curiora-ai-orchestrator" name="Curiora 5-Stage AI Orchestrator Architecture">
     <mxGraphModel dx="1422" dy="850" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="980" math="0" shadow="0">
       <root>
@@ -6,7 +6,7 @@
         <mxCell id="1" parent="0" />
 
         <!-- Title Banner -->
-        <mxCell id="title_box" value="ARSITEKTUR CURIORA 5-STAGE AI KNOWLEDGE ORCHESTRATOR&#xa;Structured Input Envelope → Intent Router → Cross-Node Relation Analyzer → DAG &amp; Organic Layout Guard → Non-Destructive Output Envelope" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#17263C;strokeColor=#0F172A;fontColor=#FFFFFF;fontStyle=1;fontSize=15;align=center;verticalAlign=middle;arcSize=12;" vertex="1" parent="1">
+        <mxCell id="title_box" value="ARSITEKTUR CURIORA 5-STAGE AI KNOWLEDGE ORCHESTRATOR&#xa;Input Envelope → Pre-AI Relevance &amp; Typo Gate + Spatial Cross-Region Planner → Gemini 2.5 Flash / Fallback → DAG &amp; Cross-Region Pull Layout → Output Envelope" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#17263C;strokeColor=#0F172A;fontColor=#FFFFFF;fontStyle=1;fontSize=15;align=center;verticalAlign=middle;arcSize=12;" vertex="1" parent="1">
           <mxGeometry x="40" y="25" width="1520" height="65" as="geometry" />
         </mxCell>
 
@@ -14,17 +14,17 @@
         <mxCell id="lane_app" value="1. APPLICATION WORKSPACE LAYER (Next.js Client &amp; Local Vault State)" style="swimlane;startSize=34;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontColor=#17233C;fontStyle=1;fontSize=13;rounded=1;arcSize=6;" vertex="1" parent="1">
           <mxGeometry x="40" y="110" width="330" height="820" as="geometry" />
         </mxCell>
-        <mxCell id="app_vault" value="Vault Profile &amp; Identity&#xa;• Vault Name &amp; Main Interest&#xa;• Focus Question &amp; Learning Goal&#xa;• Related Interest Tags" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#2F80ED;fontColor=#17233C;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_app">
+        <mxCell id="app_vault" value="Vault Profile &amp; Direct Nodes List&#xa;• Vault Name &amp; Main Interest&#xa;• Focus Question &amp; Learning Goal&#xa;• Direct Nodes: Baca Materi | Ke Tree" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#2F80ED;fontColor=#17233C;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_app">
           <mxGeometry x="25" y="55" width="280" height="95" as="geometry" />
         </mxCell>
-        <mxCell id="app_modal" value="Node Action Trigger (Buka / Tambah Node)&#xa;1) Langsung Buka (instant_ai)&#xa;2) Tambah Materi Dulu:&#xa;   • Prompt / Pertanyaan Fokus&#xa;   • Catatan Pribadi (user_note)&#xa;   • 1 Chapter Buku (book_chapter)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#F59E0B;fontColor=#78350F;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_app">
-          <mxGeometry x="25" y="180" width="280" height="130" as="geometry" />
+        <mxCell id="app_modal" value="Trigger: Buka / Tambah Node Baru&#xa;1) Langsung Buka (instant_ai)&#xa;2) Tambah Catatan / Materi Dulu:&#xa;   • Prompt (custom_prompt)&#xa;   • Catatan Pribadi (user_note)&#xa;   • 1 Chapter Buku (book_chapter)&#xa;• Menampilkan Danger Alert jika Topik Terlalu Jauh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#F59E0B;fontColor=#78350F;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_app">
+          <mxGeometry x="25" y="175" width="280" height="145" as="geometry" />
         </mxCell>
-        <mxCell id="app_tree" value="Interactive Knowledge Tree Canvas&#xa;• Circular Nodes (r=22px) + 5 Edge Styles&#xa;• Callout Topic Box Above Circle (▼)&#xa;• Hide/Show Labels Toggle (Eye Button)&#xa;• Dynamic Staggered Positions&#xa;• Progressive Frontier Fog of War" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#0D9468;fontColor=#065F46;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_app">
-          <mxGeometry x="25" y="490" width="280" height="140" as="geometry" />
+        <mxCell id="app_tree" value="Interactive Knowledge Tree Canvas&#xa;• Circular Nodes (r=22px) + 5 Edge Styles&#xa;• Callout Topik di Atas Lingkaran (▼)&#xa;• Tombol Hide/Show Keterangan Node&#xa;• Fog Node Abu-abu (Hanya Judul Topik)&#xa;• Posisi Dinamis &amp; Cross-Region Rapi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#0D9468;fontColor=#065F46;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_app">
+          <mxGeometry x="25" y="485" width="280" height="145" as="geometry" />
         </mxCell>
-        <mxCell id="app_lib" value="Vault Nodes &amp; Knowledge Library&#xa;• 2 Direct Buttons: Baca Materi | Ke Tree&#xa;• Attached Chapter/Prompt/Note View&#xa;• Safe AI Diff Preview &amp; Revision History" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;fontColor=#4C1D95;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_app">
-          <mxGeometry x="25" y="660" width="280" height="125" as="geometry" />
+        <mxCell id="app_lib" value="Full-Page Pustaka Catatan &amp; Reader&#xa;• Baca 1 Halaman Penuh (Tidak Terpotong)&#xa;• Popup/Sidebar Daftar Node + Filter Region&#xa;• Tombol Expand Cabang (Spawn Fog Stub)&#xa;• Safe AI Diff Preview &amp; History v1..vn" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;fontColor=#4C1D95;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_app">
+          <mxGeometry x="25" y="655" width="280" height="135" as="geometry" />
         </mxCell>
 
         <!-- SWIMLANE 2: AI KNOWLEDGE ORCHESTRATOR -->
@@ -32,27 +32,27 @@
           <mxGeometry x="410" y="110" width="760" height="820" as="geometry" />
         </mxCell>
 
-        <mxCell id="stage1" value="STAGE 1: Input Context Assembler (OrchestratorInputEnvelope)&#xa;• Packages VaultIdentity + Target Node Action (instant_ai | custom_prompt | user_note | book_chapter)&#xa;• Builds Compact Existing Graph Snapshot: All existing Nodes [id, title, region, summary] &amp; Edges" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F80ED;strokeWidth=2;fontColor=#17233C;fontStyle=1;fontSize=12;align=left;spacingLeft=14;" vertex="1" parent="lane_orch">
+        <mxCell id="stage1" value="STAGE 1: Input Context Assembler (OrchestratorInputEnvelope)&#xa;• Membungkus VaultIdentity + Aksi Node (SEED_FIRST_NODE | OPEN_NODE | BRANCH_NEW_NODE | EXPAND_FOG_BRANCHES)&#xa;• Menyusun ExistingGraphSnapshot: daftar Node yang sudah dibuka (explored: true) &amp; Fog Stub (explored: false)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F80ED;strokeWidth=2;fontColor=#17233C;fontStyle=1;fontSize=12;align=left;spacingLeft=14;" vertex="1" parent="lane_orch">
           <mxGeometry x="35" y="55" width="690" height="95" as="geometry" />
         </mxCell>
 
-        <mxCell id="stage2a" value="STAGE 2A: Intent Router &amp; Schema Compiler&#xa;• Routes: SEED_FIRST_NODE | OPEN_NODE | BRANCH_NEW_NODE&#xa;• Compiles Strict JSON Schema Contract&#xa;• Enforces Zero Internal Code Leak Guard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=2;fontColor=#17233C;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_orch">
-          <mxGeometry x="35" y="185" width="330" height="120" as="geometry" />
+        <mxCell id="stage2a" value="STAGE 2A: Pre-AI Topic Relevance &amp; Typo Gate&#xa;• Cek relevansi topik input vs topik Vault &amp; node lain&#xa;• Koreksi typo otomatis tanpa peringatan (valid/typo)&#xa;• Tolak &amp; kirim Danger Alert jika topik terlalu jauh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=2;fontColor=#17233C;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_orch">
+          <mxGeometry x="35" y="180" width="330" height="125" as="geometry" />
         </mxCell>
 
-        <mxCell id="stage2b" value="STAGE 2B: Cross-Node Relationship Analyzer&#xa;• Scans ALL existing nodes in Vault when a node opens&#xa;• Detects semantic &amp; cross-region links across branches&#xa;• Generates OrchestratorCrossLink[] + Edge Reasons" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=2;fontColor=#7C2D12;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_orch">
-          <mxGeometry x="395" y="185" width="330" height="120" as="geometry" />
+        <mxCell id="stage2b" value="STAGE 2B: Pre-AI Cross-Region Spatial Planner&#xa;• Berjalan di backend SEBELUM memanggil API AI&#xa;• Hitung ketetanggaan 6 Region (2x3 Grid) &amp; batas relasi&#xa;• Analisis relasi hanya antar-node yang sudah dibuka" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=2;fontColor=#7C2D12;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_orch">
+          <mxGeometry x="395" y="180" width="330" height="125" as="geometry" />
         </mxCell>
 
-        <mxCell id="stage3" value="STAGE 3: Structured Synthesis &amp; Frontier Spawner&#xa;• Synthesizes Primary Node: 3-Level Explanations (Simple/Standard/Deep), Formula, Application, QuickCheck&#xa;• Spawns 2–3 Progressive Frontier Nodes in Fog of War (explored: false) for step-by-step exploration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0D9468;strokeWidth=2;fontColor=#065F46;fontStyle=1;fontSize=12;align=left;spacingLeft=14;" vertex="1" parent="lane_orch">
+        <mxCell id="stage3" value="STAGE 3: Node Material Synthesizer &amp; True Fog-of-War Lifecycle Engine&#xa;• Buka Node (OPEN_NODE): generate materi 3-Level khusus di node tersebut &amp; hubungkan ke node explored (tanpa auto-buka node lain)&#xa;• Expand Node (EXPAND_FOG_BRANCHES dari dalam node): spawn Fog Stub abu-abu (hanya judul topik, belum ada isi &amp; relasi lain)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0D9468;strokeWidth=2;fontColor=#065F46;fontStyle=1;fontSize=12;align=left;spacingLeft=14;" vertex="1" parent="lane_orch">
           <mxGeometry x="35" y="340" width="690" height="105" as="geometry" />
         </mxCell>
 
-        <mxCell id="stage4" value="STAGE 4: DAG Validator, Anti-Orphan Guard &amp; Organic Staggered Layout Engine (validator.ts)&#xa;• Verifies Acyclic Prerequisite DAG &amp; Valid 6-Region Classification&#xa;• Computes Dynamic Organic Node Coordinates (Staggered X/Y Wave + Region Aura Containment)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7C3AED;strokeWidth=2;fontColor=#4C1D95;fontStyle=1;fontSize=12;align=left;spacingLeft=14;" vertex="1" parent="lane_orch">
+        <mxCell id="stage4" value="STAGE 4: DAG Validator, Single-Edge Guard &amp; Cross-Region Pull Layout (validator.ts)&#xa;• Validasi DAG bebas siklus, hapus duplikasi edge paralel, &amp; jaga Fog Stub hanya memiliki 1 edge dari induknya&#xa;• Tata letak Cross-Region Pull Vector + Organic Wave Stagger agar node lintas-region menghadap rapi tanpa garis semrawut" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7C3AED;strokeWidth=2;fontColor=#4C1D95;fontStyle=1;fontSize=12;align=left;spacingLeft=14;" vertex="1" parent="lane_orch">
           <mxGeometry x="35" y="480" width="690" height="105" as="geometry" />
         </mxCell>
 
-        <mxCell id="stage5" value="STAGE 5: Non-Destructive Vault Reconciler &amp; Output Envelope (OrchestratorOutputEnvelope)&#xa;• Preserves User-Edited Notes &amp; Attaches Node Chapter/Prompt/Note Metadata&#xa;• Emits Trace Telemetry (openedNodeId, spawnedFrontierNodeIds, crossLinksDiscovered, dagValid) + Normalized Vault" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1E3A8A;strokeColor=#172554;strokeWidth=2;fontColor=#FFFFFF;fontStyle=1;fontSize=12;align=left;spacingLeft=14;" vertex="1" parent="lane_orch">
+        <mxCell id="stage5" value="STAGE 5: Non-Destructive Vault Reconciler &amp; Output Envelope (OrchestratorOutputEnvelope)&#xa;• Simpan materi bab/prompt/catatan pada node &amp; lindungi catatan User Edited&#xa;• Kembalikan OrchestratorOutputEnvelope (ok, validationGate, trace, vault) ke aplikasi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1E3A8A;strokeColor=#172554;strokeWidth=2;fontColor=#FFFFFF;fontStyle=1;fontSize=12;align=left;spacingLeft=14;" vertex="1" parent="lane_orch">
           <mxGeometry x="35" y="620" width="690" height="115" as="geometry" />
         </mxCell>
 
@@ -60,10 +60,10 @@
         <mxCell id="lane_ai" value="3. INTELLIGENCE &amp; FALLBACK LAYER" style="swimlane;startSize=34;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontColor=#17233C;fontStyle=1;fontSize=13;rounded=1;arcSize=6;" vertex="1" parent="1">
           <mxGeometry x="1210" y="110" width="350" height="820" as="geometry" />
         </mxCell>
-        <mxCell id="ai_gemini" value="Google Gemini 2.5 Flash API&#xa;• responseMimeType: application/json&#xa;• Context-Aware Node Synthesis&#xa;• Cross-Domain Link Discovery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#2F80ED;fontColor=#1E3A8A;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_ai">
+        <mxCell id="ai_gemini" value="Google Gemini 2.5 Flash API&#xa;• Structured JSON Mode&#xa;• Menerima Spatial Topology Directive&#xa;• Sintesis Materi &amp; Relasi Lintas-Bidang" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#2F80ED;fontColor=#1E3A8A;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_ai">
           <mxGeometry x="30" y="175" width="290" height="115" as="geometry" />
         </mxCell>
-        <mxCell id="ai_fallback" value="Deterministic Graph &amp; Semantic Engine&#xa;• Zero-Downtime Local Synthesis&#xa;• Keyword &amp; Region Bridge Scorer&#xa;• Subtopic Chapter Parser" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#0D9468;fontColor=#065F46;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_ai">
+        <mxCell id="ai_fallback" value="Deterministic Graph &amp; Semantic Engine&#xa;• Zero-Downtime Local Synthesis&#xa;• Orthogonal Region Bridge Scorer&#xa;• Typo Fuzzy Matcher &amp; Relevance Guard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#0D9468;fontColor=#065F46;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_ai">
           <mxGeometry x="30" y="335" width="290" height="115" as="geometry" />
         </mxCell>
         <mxCell id="ai_revise" value="Safe Note Diff Engine (/api/revise-note)&#xa;• Preview-Only Revision Generator&#xa;• Never Overwrites Without Approval&#xa;• Appends Version v1..vn History" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;fontColor=#4C1D95;fontStyle=1;fontSize=12;align=left;spacingLeft=12;" vertex="1" parent="lane_ai">
@@ -80,10 +80,10 @@
         <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#EA580C;strokeWidth=2;" edge="1" parent="1" source="stage1" target="stage2b">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e4" value="Strict JSON Prompt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2F80ED;strokeWidth=2;fontStyle=1;" edge="1" parent="1" source="stage2a" target="ai_gemini">
+        <mxCell id="e4" value="Validated Prompt + Topology Plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2F80ED;strokeWidth=2;fontStyle=1;" edge="1" parent="1" source="stage2a" target="ai_gemini">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e5" value="Primary + Frontier + CrossLinks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0D9468;strokeWidth=2;fontStyle=1;" edge="1" parent="1" source="ai_gemini" target="stage3">
+        <mxCell id="e5" value="Primary + Fog Stubs + CrossLinks" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0D9468;strokeWidth=2;fontStyle=1;" edge="1" parent="1" source="ai_gemini" target="stage3">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="e6" value="Fallback / Hybrid" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0D9468;strokeWidth=2;dashed=1;" edge="1" parent="1" source="ai_fallback" target="stage3">
@@ -98,10 +98,7 @@
         <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=2;" edge="1" parent="1" source="stage4" target="stage5">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e10" value="Output Envelope JSON&#xa;(Updated Vault + Trace)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1E3A8A;strokeWidth=2.5;fontStyle=1;fontColor=#1E3A8A;" edge="1" parent="1" source="stage5" target="app_tree">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=2;" edge="1" parent="1" source="app_lib" target="ai_revise">
+        <mxCell id="e10" value="Output Envelope JSON" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1E3A8A;strokeWidth=2.5;fontStyle=1;fontColor=#1E3A8A;" edge="1" parent="1" source="stage5" target="app_tree">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
       </root>

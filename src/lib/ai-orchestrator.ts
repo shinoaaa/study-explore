@@ -11,7 +11,6 @@ import {
 import {
   DifficultyLevel,
   EdgeRelationType,
-  ExplanationDepth,
   KnowledgeEdge,
   KnowledgeNode,
   KnowledgeVault,
@@ -21,72 +20,67 @@ import {
   OrchestratorIntent,
   OrchestratorNodePayload,
   OrchestratorOutputEnvelope,
+  OrchestratorSpatialTopologyPlan,
+  OrchestratorValidationGate,
   RegionCode,
 } from "@/types/knowledge";
 
-const ADJACENT_REGION: Record<RegionCode, RegionCode> = {
-  "REG-01": "REG-02",
-  "REG-02": "REG-03",
-  "REG-03": "REG-05",
-  "REG-04": "REG-01",
-  "REG-05": "REG-03",
-  "REG-06": "REG-02",
+const GRID_NEIGHBORS: Record<RegionCode, RegionCode[]> = {
+  "REG-01": ["REG-02", "REG-04"],
+  "REG-02": ["REG-01", "REG-03", "REG-05"],
+  "REG-03": ["REG-02", "REG-06"],
+  "REG-04": ["REG-01", "REG-05"],
+  "REG-05": ["REG-02", "REG-04", "REG-06"],
+  "REG-06": ["REG-03", "REG-05"],
 };
 
-const CROSS_REGION: Record<RegionCode, RegionCode> = {
-  "REG-01": "REG-04",
-  "REG-02": "REG-06",
-  "REG-03": "REG-01",
-  "REG-04": "REG-03",
-  "REG-05": "REG-04",
-  "REG-06": "REG-03",
+const COMMON_TYPO_DICTIONARY: Record<string, string> = {
+  respirsi: "Respirasi",
+  selulr: "Seluler",
+  mitokndria: "Mitokondria",
+  bioenergtika: "Bioenergetika",
+  fotosintsis: "Fotosintesis",
+  magntik: "Magnetik",
+  elektromagntik: "Elektromagnetik",
+  indksi: "Induksi",
+  neouron: "Neuron",
+  neuroplastisitas: "Neuroplastisitas",
+  sinpsis: "Sinapsis",
+  kardiovaskulr: "Kardiovaskular",
+  onklogi: "Onkologi",
+  algoritm: "Algoritma",
+  komputsi: "Komputasi",
+  termodinmika: "Termodinamika",
+  homeostsis: "Homeostasis",
+   metablisme: "Metabolisme",
+  metabolismee: "Metabolisme",
+  pernapasn: "Pernapasan",
+  fluks: "Fluks",
 };
 
 function regionNameForLang(code: RegionCode, lang: "en" | "id"): string {
   return regionShortName(code, lang);
 }
 
-/**
- * STAGE 1: Assemble Input Context Envelope
- * Builds a structured, token-efficient snapshot of the active Vault and all existing nodes/edges
- * so the AI Orchestrator can synthesize node material and analyze cross-node relationships.
- */
-export function assembleOrchestratorEnvelope(params: {
-  intent: OrchestratorIntent;
-  vault: KnowledgeVault;
-  nodeAction: OrchestratorNodePayload;
-  lang: "en" | "id";
-}): OrchestratorInputEnvelope {
-  const { intent, vault, nodeAction, lang } = params;
-  const identity = deriveVaultIdentity(vault);
-
-  return {
-    requestId: `orch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    intent,
-    lang,
-    vaultContext: {
-      vaultId: vault.id,
-      vaultName: vault.name,
-      identity,
-    },
-    nodeAction,
-    existingGraphSnapshot: {
-      nodes: vault.nodes.map((n) => ({
-        id: n.id,
-        title: n.title,
-        region: n.region,
-        summary: n.summary.slice(0, 180),
-        explored: n.explored,
-        mastered: n.mastered,
-      })),
-      edges: vault.edges.map((e) => ({
-        source: e.source,
-        target: e.target,
-        relation: e.relation,
-        reason: e.reason.slice(0, 140),
-      })),
-    },
-  };
+function editDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    Array(n + 1).fill(0)
+  );
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return dp[m][n];
 }
 
 function extractKeywords(text: string): string[] {
@@ -127,14 +121,304 @@ function extractKeywords(text: string): string[] {
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter((w) => w.length >= 4 && !stopWords.has(w));
+    .filter((w) => w.length >= 3 && !stopWords.has(w));
 }
 
 /**
- * STAGE 2B: Deterministic Cross-Node Relationship Analyzer
- * Scans all existing nodes in the Vault whenever a node is opened or created,
- * discovering meaningful semantic connections (same-domain extension/related_concept
- * or cross-region bridge) that do not yet have an edge.
+ * STAGE 2A (Pre-AI Gate): Validate Node Topic Relevance & Auto-Normalize Minor Typos
+ * - If the input has a minor typo, silently corrects it and returns status "typo_corrected" (treated identically to "valid" in UI).
+ * - If the input is genuinely out-of-scope / too far from the Vault topic & existing nodes, returns status "rejected_too_far" with a clear danger message.
+ */
+export function validateNodeInputRelevance(params: {
+  rawTitle: string;
+  inputContent?: string;
+  vault: KnowledgeVault;
+  intent: OrchestratorIntent;
+  lang: "en" | "id";
+}): OrchestratorValidationGate {
+  const { rawTitle, inputContent, vault, intent, lang } = params;
+  const trimmed = (rawTitle || "").trim();
+
+  // Existing nodes being opened or expanded without new unrelated titles are always valid
+  if (intent === "EXPAND_FOG_BRANCHES" || intent === "ANALYZE_RELATIONS") {
+    return {
+      status: "valid",
+      originalTitle: trimmed,
+      normalizedTitle: trimmed,
+    };
+  }
+
+  const identity = deriveVaultIdentity(vault);
+  const vaultVocabularyRaw = [
+    vault.name,
+    identity.mainInterest,
+    identity.shortDescription,
+    identity.focusQuestion,
+    identity.learningGoal,
+    ...identity.relatedInterests,
+    ...vault.nodes.map((n) => `${n.title} ${n.summary || ""}`),
+  ].join(" ");
+
+  const vaultWords = Array.from(
+    new Set(
+      vaultVocabularyRaw
+        .replace(/[^a-zA-Z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length >= 5)
+    )
+  );
+
+  // Step 1: Check for gibberish / random keysmash
+  const alphaOnly = trimmed.replace(/[^a-zA-Z]/g, "");
+  const vowelCount = (alphaOnly.match(/[aiueoAIUEO]/g) || []).length;
+  if (
+    trimmed.length < 2 ||
+    (alphaOnly.length >= 6 && vowelCount === 0) ||
+    /^(asdf|qwer|zxcv|test123|12345)/i.test(trimmed)
+  ) {
+    return {
+      status: "rejected_too_far",
+      originalTitle: trimmed,
+      normalizedTitle: trimmed,
+      dangerMessage:
+        lang === "en"
+          ? `Topic "${trimmed}" is not a valid concept related to "${vault.name}". Please enter a meaningful topic connected to ${identity.mainInterest}.`
+          : `Topik "${trimmed}" tidak dikenali sebagai konsep yang berkaitan dengan Vault "${vault.name}". Silakan masukkan topik yang relevan dengan ${identity.mainInterest}.`,
+    };
+  }
+
+  // Step 2: Silent Typo Normalization (dictionary + fuzzy match against Vault vocabulary)
+  let wasTypoCorrected = false;
+  const normalizedTokens = trimmed.split(/\s+/).map((token) => {
+    const cleanLower = token.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (COMMON_TYPO_DICTIONARY[cleanLower]) {
+      wasTypoCorrected = true;
+      return COMMON_TYPO_DICTIONARY[cleanLower];
+    }
+    if (cleanLower.length >= 5) {
+      for (const vw of vaultWords) {
+        const vwLower = vw.toLowerCase();
+        if (vwLower !== cleanLower && Math.abs(vwLower.length - cleanLower.length) <= 2) {
+          const dist = editDistance(cleanLower, vwLower);
+          if (dist === 1 || (cleanLower.length >= 8 && dist <= 2)) {
+            wasTypoCorrected = true;
+            return vw.charAt(0).toUpperCase() + vw.slice(1);
+          }
+        }
+      }
+    }
+    return token;
+  });
+
+  const normalizedTitle = normalizedTokens.join(" ");
+
+  // Step 3: Check for clearly unrelated / out-of-scope everyday topics (culinary, gaming, shopping, gossip, etc.)
+  const combinedInputLower = `${normalizedTitle} ${inputContent || ""}`.toLowerCase();
+  const vaultDomainLower = vaultVocabularyRaw.toLowerCase();
+
+  const unrelatedPatterns = [
+    /\b(nasi goreng|ayam bakar|resep masakan|seblak|mie instan|bakso|rendang|martabak|bumbu dapur|gorengan)\b/i,
+    /\b(mobile legends|free fire|valorant|genshin impact|push rank|top up diamond|gacha|slot gacor)\b/i,
+    /\b(gosip artis|selebgram|diskon shopee|keranjang kuning|tiket konser|zodiak hari ini)\b/i,
+    /\b(cara cepat kaya|pinjol|judol|taruhan bola)\b/i,
+  ];
+
+  for (const pat of unrelatedPatterns) {
+    if (pat.test(combinedInputLower) && !pat.test(vaultDomainLower)) {
+      return {
+        status: "rejected_too_far",
+        originalTitle: trimmed,
+        normalizedTitle,
+        dangerMessage:
+          lang === "en"
+            ? `Topic "${trimmed}" is too far from this Vault's domain (${vault.name} · ${identity.mainInterest}) and cannot be connected to existing nodes.`
+            : `Topik "${trimmed}" terlalu jauh dari fokus Vault ini (${vault.name} · ${identity.mainInterest}) dan tidak memiliki keterhubungan ilmiah dengan node yang ada.`,
+      };
+    }
+  }
+
+  // Step 4: Check cross-domain distance when Vault already has nodes
+  if (intent === "BRANCH_NEW_NODE" && vault.nodes.length > 0) {
+    const inputRegion = inferStartingRegion(
+      `${normalizedTitle} ${inputContent || ""}`
+    );
+    const vaultPrimaryRegion =
+      vault.overview?.startingRegion ||
+      inferStartingRegion(`${vault.name} ${identity.mainInterest}`);
+    const activeRegions = new Set<RegionCode>([
+      vaultPrimaryRegion,
+      ...vault.nodes.map((n) => n.region),
+    ]);
+
+    const inputKeywords = extractKeywords(
+      `${normalizedTitle} ${inputContent || ""}`
+    );
+    const vaultKeywordSet = new Set(extractKeywords(vaultVocabularyRaw));
+
+    let keywordOverlap = 0;
+    for (const kw of inputKeywords) {
+      if (vaultKeywordSet.has(kw)) {
+        keywordOverlap++;
+      } else {
+        for (const vkw of Array.from(vaultKeywordSet)) {
+          if (
+            (kw.length >= 5 && vkw.includes(kw)) ||
+            (vkw.length >= 5 && kw.includes(vkw))
+          ) {
+            keywordOverlap++;
+            break;
+          }
+        }
+      }
+    }
+
+    // Check if the topic has any academic/conceptual indicator or shares a neighboring region
+    const isNeighboringRegion =
+      activeRegions.has(inputRegion) ||
+      Array.from(activeRegions).some((r) =>
+        GRID_NEIGHBORS[r]?.includes(inputRegion)
+      );
+
+    // Detect completely disconnected non-academic topics (e.g., sports tournament scores, fashion, tourism) in a specialized science/tech vault
+    const distantNonBridgePattern =
+      /\b(wisata pantai|hotel murah|jadwal bioskop|skor pertandingan|liga inggris|transfer pemain|rekomendasi outfit|skincare rutin|kpop idol)\b/i;
+
+    if (
+      distantNonBridgePattern.test(combinedInputLower) ||
+      (!isNeighboringRegion && keywordOverlap === 0 && inputKeywords.length <= 2)
+    ) {
+      // Allow if it shares at least a conceptual bridge word, otherwise reject if it's a distant non-bridge topic
+      if (distantNonBridgePattern.test(combinedInputLower)) {
+        return {
+          status: "rejected_too_far",
+          originalTitle: trimmed,
+          normalizedTitle,
+          dangerMessage:
+            lang === "en"
+              ? `Topic "${trimmed}" is too far from "${vault.name}" (${identity.mainInterest}) and has no conceptual link with existing nodes.`
+              : `Topik "${trimmed}" terlalu jauh dari topik Vault "${vault.name}" (${identity.mainInterest}) serta tidak memiliki kaitan dengan node lain di dalam Vault.`,
+        };
+      }
+    }
+  }
+
+  return {
+    status: wasTypoCorrected ? "typo_corrected" : "valid",
+    originalTitle: trimmed,
+    normalizedTitle,
+  };
+}
+
+/**
+ * STAGE 2B (Pre-AI Backend Spatial & Cross-Region Topology Planner):
+ * Computes the 2D Region Grid Adjacency & Boundary Node Map BEFORE calling the AI API
+ * so the AI selects regions and relations that form a clean, non-tangled cross-region layout.
+ */
+export function buildSpatialTopologyPlan(params: {
+  vault: KnowledgeVault;
+  focusRegion: RegionCode;
+}): OrchestratorSpatialTopologyPlan {
+  const { vault, focusRegion } = params;
+  const regionNodeCounts: Record<RegionCode, number> = {
+    "REG-01": 0,
+    "REG-02": 0,
+    "REG-03": 0,
+    "REG-04": 0,
+    "REG-05": 0,
+    "REG-06": 0,
+  };
+
+  const boundaryNodeIdsByRegion: Partial<Record<RegionCode, string[]>> = {};
+
+  for (const node of vault.nodes) {
+    regionNodeCounts[node.region] = (regionNodeCounts[node.region] || 0) + 1;
+    if (node.explored) {
+      if (!boundaryNodeIdsByRegion[node.region]) {
+        boundaryNodeIdsByRegion[node.region] = [];
+      }
+      boundaryNodeIdsByRegion[node.region]!.push(node.id);
+    }
+  }
+
+  const activeRegions = (Object.keys(regionNodeCounts) as RegionCode[]).filter(
+    (rc) => regionNodeCounts[rc] > 0
+  );
+
+  const adjacentRegionCandidates = GRID_NEIGHBORS[focusRegion] || ["REG-02"];
+
+  return {
+    primaryRegion: focusRegion,
+    adjacentRegionCandidates,
+    activeRegions,
+    regionNodeCounts,
+    maxCrossRegionLinksPerNode: 1,
+    boundaryNodeIdsByRegion,
+    layoutDirective: `Prioritize same-region (${focusRegion}) or orthogonally adjacent regions (${adjacentRegionCandidates.join(", ")}) on the 2x3 grid to prevent diagonal edge crossings. Connect cross-region links only to explored boundary nodes (max 1 cross-region link).`,
+  };
+}
+
+/**
+ * STAGE 1: Assemble Input Context Envelope
+ * Builds a structured, token-efficient snapshot of the active Vault, Pre-AI Validation Gate,
+ * and Spatial Topology Plan before calling the AI model.
+ */
+export function assembleOrchestratorEnvelope(params: {
+  intent: OrchestratorIntent;
+  vault: KnowledgeVault;
+  nodeAction: OrchestratorNodePayload;
+  preValidationGate: OrchestratorValidationGate;
+  spatialTopologyPlan: OrchestratorSpatialTopologyPlan;
+  lang: "en" | "id";
+}): OrchestratorInputEnvelope {
+  const {
+    intent,
+    vault,
+    nodeAction,
+    preValidationGate,
+    spatialTopologyPlan,
+    lang,
+  } = params;
+  const identity = deriveVaultIdentity(vault);
+
+  return {
+    requestId: `orch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    intent,
+    lang,
+    vaultContext: {
+      vaultId: vault.id,
+      vaultName: vault.name,
+      identity,
+    },
+    nodeAction: {
+      ...nodeAction,
+      nodeTitle: preValidationGate.normalizedTitle || nodeAction.nodeTitle,
+    },
+    preValidationGate,
+    spatialTopologyPlan,
+    existingGraphSnapshot: {
+      nodes: vault.nodes.map((n) => ({
+        id: n.id,
+        title: n.title,
+        region: n.region,
+        summary: n.explored ? n.summary.slice(0, 160) : "",
+        explored: n.explored,
+        mastered: n.mastered,
+      })),
+      edges: vault.edges.map((e) => ({
+        source: e.source,
+        target: e.target,
+        relation: e.relation,
+        reason: e.reason.slice(0, 140),
+      })),
+    },
+  };
+}
+
+/**
+ * STAGE 2C: Deterministic Cross-Node Relationship Analyzer
+ * Scans ONLY already-opened (`explored: true`) nodes in the Vault when a node is opened/created,
+ * discovering at most 1 clean, high-confidence semantic connection in the same or orthogonally adjacent Region
+ * so cross-region lines never become tangled.
  */
 export function analyzeCrossNodeRelationships(params: {
   focusNode: KnowledgeNode;
@@ -160,6 +444,8 @@ export function analyzeCrossNodeRelationships(params: {
     connectedPairs.add(`${focusNode.id}->${parentNodeId}`);
   }
 
+  const adjacentRegions = new Set(GRID_NEIGHBORS[focusNode.region] || []);
+
   const scoredCandidates: {
     other: KnowledgeNode;
     score: number;
@@ -167,6 +453,8 @@ export function analyzeCrossNodeRelationships(params: {
   }[] = [];
 
   for (const other of existingNodes) {
+    // CRITICAL RULE: Never wire cross-links to unopened Fog of War nodes!
+    if (!other.explored) continue;
     if (other.id === focusNode.id || other.id === parentNodeId) continue;
     if (connectedPairs.has(`${other.id}->${focusNode.id}`)) continue;
 
@@ -180,12 +468,17 @@ export function analyzeCrossNodeRelationships(params: {
       }
     }
 
-    // Also reward explored nodes or complementary regions so new nodes weave into the graph
-    const regionBonus = other.region !== focusNode.region ? 1.5 : 1.0;
-    const exploredBonus = other.explored ? 1.2 : 0.5;
-    const totalScore = sharedCount * 3 + regionBonus + exploredBonus;
+    // Prefer same region or orthogonally adjacent region on the 2x3 grid so edges never criss-cross diagonally
+    const isSameRegion = other.region === focusNode.region;
+    const isOrthoNeighbor = adjacentRegions.has(other.region);
+    if (!isSameRegion && !isOrthoNeighbor && sharedCount === 0) {
+      continue;
+    }
 
-    if (totalScore >= 2.2) {
+    const spatialBonus = isSameRegion ? 1.6 : isOrthoNeighbor ? 1.4 : 0.4;
+    const totalScore = sharedCount * 3 + spatialBonus;
+
+    if (totalScore >= 2.8) {
       scoredCandidates.push({
         other,
         score: totalScore,
@@ -197,7 +490,8 @@ export function analyzeCrossNodeRelationships(params: {
   scoredCandidates.sort((a, b) => b.score - a.score);
 
   const discovered: OrchestratorCrossLink[] = [];
-  for (const cand of scoredCandidates.slice(0, 2)) {
+  // Cap at 1 high-confidence cross-link per node open action to keep the tree layout clean
+  for (const cand of scoredCandidates.slice(0, 1)) {
     const isCross = cand.other.region !== focusNode.region;
     const relation: EdgeRelationType = isCross
       ? "cross_disciplinary"
@@ -227,11 +521,19 @@ export function analyzeCrossNodeRelationships(params: {
 }
 
 /**
- * STAGE 2A: Compile Prompt & Strict JSON Output Contract for LLM
+ * Compile Prompt & Strict JSON Output Contract for Gemini 2.5 Flash
+ * Includes Pre-Join Relevance Gate check and Spatial Topology Plan directives.
  */
 function buildOrchestratorPrompt(envelope: OrchestratorInputEnvelope): string {
-  const { intent, lang, vaultContext, nodeAction, existingGraphSnapshot } =
-    envelope;
+  const {
+    intent,
+    lang,
+    vaultContext,
+    nodeAction,
+    spatialTopologyPlan,
+    existingGraphSnapshot,
+  } = envelope;
+
   const langInstruction =
     lang === "en"
       ? "Write all titles, summaries, explanations, formulas, applications, and edge reasons in clear English."
@@ -244,16 +546,27 @@ function buildOrchestratorPrompt(envelope: OrchestratorInputEnvelope): string {
 Input Title: ${nodeAction.inputTitle || nodeAction.nodeTitle || "User Material"}
 Input Content / Prompt / Chapter: ${nodeAction.inputContent || "-"}`;
 
-  return `You are the Curiora AI Knowledge Orchestrator.
-Your job is to process a structured input envelope from the Curiora web application and return a strictly formatted JSON response envelope.
+  const exploredExistingNodes = existingGraphSnapshot.nodes.filter(
+    (n) => n.explored
+  );
 
-STRICT RULES:
+  return `You are the Curiora AI Knowledge Orchestrator.
+Process this structured input envelope and return a strictly formatted JSON response envelope.
+
+STRICT ARCHITECTURAL RULES:
 1. ${langInstruction}
 2. NEVER output internal codes like "REG-01", "Mode A", "Mode B", "BR-", or "NFR-" inside user-visible text.
-3. Valid region codes for the "region" property ONLY: "REG-01", "REG-02", "REG-03", "REG-04", "REG-05", "REG-06".
-4. Valid edge relations ONLY: "prerequisite", "extension", "application", "related_concept", "cross_disciplinary".
-5. Every edge MUST include a clear 1-sentence scientific "reason".
-6. Check EXISTING NODES in the vault and output 1-2 "crossLinks" if the opened/new node genuinely relates to other existing nodes in the vault!
+3. TOPIC RELEVANCE & TYPO GATE ("relevanceGate"):
+   - Check if Target Node Title ("${nodeAction.nodeTitle || ""}") is relevant to Vault Name ("${vaultContext.vaultName}"), Main Interest ("${vaultContext.identity.mainInterest}"), or existing nodes.
+   - If it has a minor spelling typo, set "status": "typo_corrected" and put the corrected spelling in "normalizedTitle" (do NOT warn or scold for typos).
+   - ONLY if the topic is completely unrelated / too far from the vault domain (e.g. cooking recipes or video games inside a Physics/Biology vault), set "status": "rejected_too_far" and provide a clear 1-sentence "dangerMessage". Otherwise set "status": "valid".
+4. SPATIAL TOPOLOGY & CROSS-REGION LAYOUT DIRECTIVE:
+   - ${spatialTopologyPlan.layoutDirective}
+   - Primary Region: ${spatialTopologyPlan.primaryRegion}
+   - Orthogonally Adjacent Regions: ${spatialTopologyPlan.adjacentRegionCandidates.join(", ")}
+5. FOG OF WAR STUB RULE:
+   - "frontierNodes" represent unopened Fog of War stubs: they ONLY need "title", "region", "relation", "edgeReason", and "difficulty" (no full material body yet, and no cross-links to other nodes).
+   - "crossLinks" may ONLY connect to ALREADY-OPENED existing nodes (explored = true) and at most 1 crossLink.
 
 INPUT ENVELOPE:
 - Intent: ${intent}
@@ -264,16 +577,21 @@ INPUT ENVELOPE:
 - Target Node ID: ${nodeAction.targetNodeId || "new"}
 - Target Node Title: ${nodeAction.nodeTitle || "Auto-derive from context"}
 - ${userInputSummary}
-- Existing Graph Nodes (${existingGraphSnapshot.nodes.length}):
-${JSON.stringify(existingGraphSnapshot.nodes, null, 2)}
+- Opened Nodes in Vault (${exploredExistingNodes.length}):
+${JSON.stringify(exploredExistingNodes, null, 2)}
 
 RETURN ONLY VALID JSON MATCHING THIS EXACT CONTRACT:
 {
+  "relevanceGate": {
+    "status": "valid | typo_corrected | rejected_too_far",
+    "normalizedTitle": "Corrected or validated title",
+    "dangerMessage": "Only populated when status is rejected_too_far"
+  },
   "primaryNode": {
     "title": "Clear 2-5 word concept title",
     "region": "REG-01",
     "difficulty": "Foundation | Basic | Intermediate | Advanced",
-    "summary": "2-sentence synthesis integrating the user's prompt/chapter/note and vault context.",
+    "summary": "2-sentence synthesis integrating user prompt/chapter/note and vault context.",
     "levels": {
       "simple": "Everyday intuitive analogy (2-3 sentences).",
       "standard": "Structured core mechanism (2-3 sentences).",
@@ -293,19 +611,18 @@ RETURN ONLY VALID JSON MATCHING THIS EXACT CONTRACT:
   },
   "frontierNodes": [
     {
-      "title": "Next progressive concept 1 (2-5 words)",
+      "title": "Next progressive concept stub (2-5 words, title only)",
       "region": "REG-02",
       "relation": "extension | prerequisite | application | cross_disciplinary",
-      "edgeReason": "Why this next node branches from primaryNode",
-      "difficulty": "Intermediate",
-      "summary": "2-sentence teaser summary for this frontier node."
+      "edgeReason": "Why this fog stub branches from primaryNode",
+      "difficulty": "Intermediate"
     }
   ],
   "crossLinks": [
     {
-      "existingNodeId": "id-from-existing-graph",
+      "existingNodeId": "id-of-explored-node",
       "relation": "related_concept | cross_disciplinary | extension | application",
-      "reason": "Specific reason why primaryNode connects to this existing node in the vault."
+      "reason": "Specific scientific reason why primaryNode connects to this opened node."
     }
   ]
 }`;
@@ -450,6 +767,50 @@ function buildSynthesizedPrimaryNode(params: {
   });
 }
 
+/**
+ * Builds a lightweight Fog of War Stub Node (`explored: false`).
+ * As required by the UX design: a Fog node ONLY has its topic `title` and `region` —
+ * its material body (`summary`, `levels`, `formula`, `application`) is empty until the user opens it!
+ */
+function buildFogStubNode(params: {
+  id: string;
+  title: string;
+  region: RegionCode;
+  difficulty: DifficultyLevel;
+  relationToOrigin: EdgeRelationType;
+}): KnowledgeNode {
+  const now = new Date().toISOString();
+  return normalizeNode({
+    id: params.id,
+    title: cleanLegacyText(params.title),
+    region: params.region,
+    relationToOrigin: params.relationToOrigin,
+    difficulty: params.difficulty,
+    x: 240,
+    y: 180,
+    explored: false,
+    mastered: false,
+    summary: "",
+    levels: {
+      simple: "",
+      standard: "",
+      deep: "",
+    },
+    formula: "",
+    application: "",
+    reference: "",
+    quickCheck: {
+      question: "",
+      options: [
+        { text: "True", correct: true },
+        { text: "False", correct: false },
+      ],
+    },
+    origin: "ai_generated",
+    updatedAt: now,
+  });
+}
+
 function deriveFrontierTopics(params: {
   parentNode: KnowledgeNode;
   vault: KnowledgeVault;
@@ -469,7 +830,6 @@ function deriveFrontierTopics(params: {
     vault.nodes.map((n) => n.title.toLowerCase().trim())
   );
 
-  // Extract comma/line-separated subtopics if user pasted a chapter or list
   const rawParts = (inputContent || "")
     .split(/[,;\n•]+/)
     .map((s) => s.trim())
@@ -483,30 +843,39 @@ function deriveFrontierTopics(params: {
     difficulty: DifficultyLevel;
   }[] = [];
 
+  const orthoNeighbors = GRID_NEIGHBORS[parentNode.region] || ["REG-02"];
+  const adjReg = orthoNeighbors[0] || "REG-02";
+
   for (const part of rawParts) {
     if (
       !existingTitles.has(part.toLowerCase()) &&
       part.toLowerCase() !== parentNode.title.toLowerCase()
     ) {
-      const reg = inferStartingRegion(`${part} ${identity.mainInterest}`);
-      const isCross = reg !== parentNode.region;
+      const inferred = inferStartingRegion(`${part} ${identity.mainInterest}`);
+      // Keep frontier in same region or orthogonally adjacent region so layout stays tidy
+      const safeReg =
+        inferred === parentNode.region || orthoNeighbors.includes(inferred)
+          ? inferred
+          : adjReg;
+      const isCross = safeReg !== parentNode.region;
       candidates.push({
         title: part,
-        region: reg,
+        region: safeReg,
         relation: isCross ? "cross_disciplinary" : "extension",
         reason:
           lang === "en"
-            ? `Derived directly from your material on ${parentNode.title} to deepen ${part}.`
-            : `Diturunkan langsung dari materi ${parentNode.title} untuk memperdalam ${part}.`,
+            ? `Branches progressively from ${parentNode.title} to explore ${part}.`
+            : `Cabang lanjutan dari ${parentNode.title} untuk mengeksplorasi ${part}.`,
         difficulty: "Intermediate",
       });
     }
   }
 
-  const adjReg = ADJACENT_REGION[parentNode.region] || "REG-02";
-  const crossReg = CROSS_REGION[parentNode.region] || "REG-03";
   const baseShort = parentNode.title
-    .replace(/^(Foundations|Fondasi|Applied|Terapan|Mechanism|Mekanisme):\s*/i, "")
+    .replace(
+      /^(Foundations|Fondasi|Applied|Terapan|Mechanism|Mekanisme|Pendalaman|Jembatan):\s*/i,
+      ""
+    )
     .slice(0, 28);
 
   const defaults =
@@ -520,18 +889,13 @@ function deriveFrontierTopics(params: {
             difficulty: "Intermediate" as DifficultyLevel,
           },
           {
-            title: `Applied ${baseShort} in ${regionNameForLang(adjReg, "en")}`,
+            title: `Applied: ${baseShort}`,
             region: adjReg,
-            relation: "application" as EdgeRelationType,
+            relation: (adjReg !== parentNode.region
+              ? "cross_disciplinary"
+              : "application") as EdgeRelationType,
             reason: `Applies ${parentNode.title} into ${regionNameForLang(adjReg, "en")}.`,
             difficulty: "Intermediate" as DifficultyLevel,
-          },
-          {
-            title: `${regionNameForLang(crossReg, "en")} Bridge: ${baseShort}`,
-            region: crossReg,
-            relation: "cross_disciplinary" as EdgeRelationType,
-            reason: `Cross-disciplinary bridge connecting ${parentNode.title} with ${regionNameForLang(crossReg, "en")}.`,
-            difficulty: "Advanced" as DifficultyLevel,
           },
         ]
       : [
@@ -543,18 +907,13 @@ function deriveFrontierTopics(params: {
             difficulty: "Intermediate" as DifficultyLevel,
           },
           {
-            title: `Terapan ${baseShort} (${regionNameForLang(adjReg, "id")})`,
+            title: `Terapan: ${baseShort}`,
             region: adjReg,
-            relation: "application" as EdgeRelationType,
+            relation: (adjReg !== parentNode.region
+              ? "cross_disciplinary"
+              : "application") as EdgeRelationType,
             reason: `Menerapkan prinsip ${parentNode.title} ke bidang ${regionNameForLang(adjReg, "id")}.`,
             difficulty: "Intermediate" as DifficultyLevel,
-          },
-          {
-            title: `Jembatan ${regionNameForLang(crossReg, "id")}: ${baseShort}`,
-            region: crossReg,
-            relation: "cross_disciplinary" as EdgeRelationType,
-            reason: `Jembatan lintas-disiplin yang menghubungkan ${parentNode.title} dengan ${regionNameForLang(crossReg, "id")}.`,
-            difficulty: "Advanced" as DifficultyLevel,
           },
         ];
 
@@ -568,7 +927,13 @@ function deriveFrontierTopics(params: {
 }
 
 /**
- * STAGE 3–5: Execute Orchestrator Pipeline (LLM + Deterministic Fallback + Cross-Node Analyzer + DAG Guard)
+ * STAGE 3–5: Execute Orchestrator Pipeline
+ * - Stage 1: Input Context Assembler
+ * - Stage 2A: Pre-AI Topic Relevance & Typo Gate (rejects `rejected_too_far` before mutating graph; silently normalizes typos)
+ * - Stage 2B: Pre-AI Spatial & Cross-Region Topology Planner
+ * - Stage 3: Gemini 2.5 Flash / Deterministic Synthesis & Fog-of-War Lifecycle Engine
+ * - Stage 4: DAG Validator, Single-Edge Guard & Cross-Region Pull Layout (`validator.ts`)
+ * - Stage 5: Non-Destructive State Reconciler & `OrchestratorOutputEnvelope`
  */
 export async function executeOrchestratorPipeline(params: {
   intent: OrchestratorIntent;
@@ -578,20 +943,66 @@ export async function executeOrchestratorPipeline(params: {
 }): Promise<OrchestratorOutputEnvelope> {
   const lang: "en" | "id" = params.lang === "id" ? "id" : "en";
   const normalizedVault = normalizeVault(params.vault);
+  const identity = deriveVaultIdentity(normalizedVault);
+  const now = new Date().toISOString();
+
+  // STAGE 2A: Pre-AI Relevance & Typo Validation Gate
+  const preValidationGate = validateNodeInputRelevance({
+    rawTitle:
+      params.nodeAction.nodeTitle ||
+      params.nodeAction.inputTitle ||
+      identity.focusQuestion ||
+      normalizedVault.name,
+    inputContent: params.nodeAction.inputContent,
+    vault: normalizedVault,
+    intent: params.intent,
+    lang,
+  });
+
+  const startReg = inferStartingRegion(
+    `${preValidationGate.normalizedTitle} ${params.nodeAction.inputTitle || ""} ${params.nodeAction.inputContent || ""} ${identity.mainInterest} ${identity.focusQuestion}`
+  );
+
+  // STAGE 2B: Pre-AI Spatial & Cross-Region Topology Planner
+  const spatialTopologyPlan = buildSpatialTopologyPlan({
+    vault: normalizedVault,
+    focusRegion: startReg,
+  });
+
+  // STAGE 1: Assemble Complete Input Envelope
   const envelope = assembleOrchestratorEnvelope({
     intent: params.intent,
     vault: normalizedVault,
     nodeAction: params.nodeAction,
+    preValidationGate,
+    spatialTopologyPlan,
     lang,
   });
 
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  let engineUsed = "Curiora Orchestrator (Deterministic Graph & Relation Engine)";
+  // If the Pre-AI Gate already detected a topic that is too far from the Vault, block immediately before joining!
+  if (preValidationGate.status === "rejected_too_far") {
+    return {
+      ok: false,
+      validationGate: preValidationGate,
+      trace: {
+        requestId: envelope.requestId,
+        intent: params.intent,
+        engineUsed: "Curiora Pre-Join Topic Relevance Gate",
+        validationStatus: "rejected_too_far",
+        openedNodeId: "",
+        spawnedFrontierNodeIds: [],
+        crossLinksDiscovered: [],
+        flaggedReviewNodeIds: [],
+        dagValid: true,
+        processedAt: now,
+      },
+      vault: normalizedVault,
+    };
+  }
 
-  const identity = deriveVaultIdentity(normalizedVault);
-  const startReg = inferStartingRegion(
-    `${params.nodeAction.nodeTitle || ""} ${params.nodeAction.inputTitle || ""} ${params.nodeAction.inputContent || ""} ${identity.mainInterest} ${identity.focusQuestion}`
-  );
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  let engineUsed =
+    "Curiora Orchestrator (Deterministic Graph & Spatial Topology Engine)";
 
   let workingNodes = [...normalizedVault.nodes];
   let workingEdges = [...normalizedVault.edges];
@@ -602,6 +1013,11 @@ export async function executeOrchestratorPipeline(params: {
 
   // Optional Gemini 2.5 Flash LLM execution with strict JSON contract
   let llmData: {
+    relevanceGate?: {
+      status?: "valid" | "typo_corrected" | "rejected_too_far";
+      normalizedTitle?: string;
+      dangerMessage?: string;
+    };
     primaryNode?: {
       title?: string;
       region?: RegionCode;
@@ -622,7 +1038,6 @@ export async function executeOrchestratorPipeline(params: {
       relation?: EdgeRelationType;
       edgeReason?: string;
       difficulty?: DifficultyLevel;
-      summary?: string;
     }[];
     crossLinks?: {
       existingNodeId?: string;
@@ -646,7 +1061,7 @@ export async function executeOrchestratorPipeline(params: {
               },
             ],
             generationConfig: {
-              temperature: 0.35,
+              temperature: 0.3,
               responseMimeType: "application/json",
             },
           }),
@@ -657,7 +1072,8 @@ export async function executeOrchestratorPipeline(params: {
         const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
         if (rawText) {
           llmData = JSON.parse(rawText);
-          engineUsed = "Curiora Orchestrator (Gemini 2.5 Flash + DAG Guard)";
+          engineUsed =
+            "Curiora Orchestrator (Gemini 2.5 Flash + Spatial Topology Guard)";
         }
       }
     } catch {
@@ -665,10 +1081,111 @@ export async function executeOrchestratorPipeline(params: {
     }
   }
 
-  const now = new Date().toISOString();
-
-  // CASE A: Unlock / Open an existing Node on the Tree (or enrich it with Note / Prompt / Chapter)
+  // Check if Gemini flagged the topic as rejected_too_far
   if (
+    llmData?.relevanceGate?.status === "rejected_too_far" &&
+    (params.intent === "BRANCH_NEW_NODE" || params.intent === "SEED_FIRST_NODE")
+  ) {
+    const gate: OrchestratorValidationGate = {
+      status: "rejected_too_far",
+      originalTitle: preValidationGate.originalTitle,
+      normalizedTitle:
+        llmData.relevanceGate.normalizedTitle ||
+        preValidationGate.normalizedTitle,
+      dangerMessage:
+        llmData.relevanceGate.dangerMessage ||
+        (lang === "en"
+          ? `Topic "${preValidationGate.originalTitle}" is too far from this Vault's focus (${normalizedVault.name}).`
+          : `Topik "${preValidationGate.originalTitle}" terlalu jauh dari fokus Vault ini (${normalizedVault.name}).`),
+    };
+    return {
+      ok: false,
+      validationGate: gate,
+      trace: {
+        requestId: envelope.requestId,
+        intent: params.intent,
+        engineUsed,
+        validationStatus: "rejected_too_far",
+        openedNodeId: "",
+        spawnedFrontierNodeIds: [],
+        crossLinksDiscovered: [],
+        flaggedReviewNodeIds: [],
+        dagValid: true,
+        processedAt: now,
+      },
+      vault: normalizedVault,
+    };
+  }
+
+  // CASE 1: EXPAND_FOG_BRANCHES — User clicked "Expand Node" inside an already-opened node
+  // Spawns 2 lightweight Fog of War stub nodes (`explored: false`, title only, 1 edge from parentNode, no cross-links)
+  if (
+    params.intent === "EXPAND_FOG_BRANCHES" &&
+    params.nodeAction.targetNodeId &&
+    workingNodes.some((n) => n.id === params.nodeAction.targetNodeId)
+  ) {
+    const parentNode = workingNodes.find(
+      (n) => n.id === params.nodeAction.targetNodeId
+    )!;
+    openedNodeId = parentNode.id;
+
+    const orthoNeighbors = GRID_NEIGHBORS[parentNode.region] || ["REG-02"];
+    const frontierSpecs =
+      llmData?.frontierNodes && llmData.frontierNodes.length > 0
+        ? llmData.frontierNodes.slice(0, 2).map((f) => {
+            const candidateReg =
+              (f.region as RegionCode) || orthoNeighbors[0] || parentNode.region;
+            const safeReg =
+              candidateReg === parentNode.region ||
+              orthoNeighbors.includes(candidateReg)
+                ? candidateReg
+                : orthoNeighbors[0];
+            return {
+              title: f.title || "Connected Concept",
+              region: safeReg,
+              relation: (f.relation as EdgeRelationType) || "extension",
+              reason:
+                f.edgeReason ||
+                (lang === "en"
+                  ? `Branches progressively from ${parentNode.title}.`
+                  : `Cabang eksplorasi lanjutan dari ${parentNode.title}.`),
+              difficulty: (f.difficulty as DifficultyLevel) || "Intermediate",
+            };
+          })
+        : deriveFrontierTopics({
+            parentNode,
+            vault: { ...normalizedVault, nodes: workingNodes },
+            inputContent: parentNode.nodeSourceContent || parentNode.summary,
+            count: 2,
+            lang,
+          });
+
+    frontierSpecs.forEach((fp, idx) => {
+      const fId = `n_fog_${Date.now()}_${idx}`;
+      const stubNode = buildFogStubNode({
+        id: fId,
+        title: fp.title,
+        region: fp.region,
+        difficulty: fp.difficulty,
+        relationToOrigin: fp.relation,
+      });
+      workingNodes.push(stubNode);
+      spawnedFrontierNodeIds.push(fId);
+
+      workingEdges.push({
+        id: `e_fog_${Date.now()}_${idx}`,
+        source: parentNode.id,
+        target: fId,
+        relation: fp.relation,
+        reason: fp.reason,
+        isCrossRegion: fp.region !== parentNode.region,
+      });
+    });
+  }
+  // CASE 2: OPEN_NODE — Unlock / Open an existing Fog Node on the Tree (or enrich it with Note / Prompt / Chapter)
+  // Generates material ONLY for this node and analyzes cross-links with already-opened nodes.
+  // Does NOT auto-open or auto-spawn other nodes (user can click Expand inside the opened node when ready).
+  else if (
     params.intent === "OPEN_NODE" &&
     params.nodeAction.targetNodeId &&
     workingNodes.some((n) => n.id === params.nodeAction.targetNodeId)
@@ -678,9 +1195,14 @@ export async function executeOrchestratorPipeline(params: {
     )!;
     openedNodeId = existingTarget.id;
 
+    const effectiveTitle =
+      llmData?.relevanceGate?.normalizedTitle ||
+      preValidationGate.normalizedTitle ||
+      existingTarget.title;
+
     const synthesized = buildSynthesizedPrimaryNode({
       id: existingTarget.id,
-      title: params.nodeAction.nodeTitle || existingTarget.title,
+      title: effectiveTitle,
       region: llmData?.primaryNode?.region || existingTarget.region,
       difficulty: llmData?.primaryNode?.difficulty || existingTarget.difficulty,
       relationToOrigin: existingTarget.relationToOrigin,
@@ -698,12 +1220,15 @@ export async function executeOrchestratorPipeline(params: {
     const updatedNode: KnowledgeNode = appendRevisionToNode(
       {
         ...existingTarget,
+        title: effectiveTitle,
         explored: true,
         nodeInputMode: params.nodeAction.openMode,
         nodeSourceTitle:
           params.nodeAction.inputTitle || existingTarget.nodeSourceTitle,
         nodeSourceContent:
           params.nodeAction.inputContent || existingTarget.nodeSourceContent,
+        quickCheck: synthesized.quickCheck,
+        reference: synthesized.reference,
       },
       {
         kind: hasUserInput ? "manual_edit" : "initial_ai",
@@ -711,42 +1236,28 @@ export async function executeOrchestratorPipeline(params: {
           lang === "en"
             ? hasUserInput
               ? `Opened with ${params.nodeAction.openMode.replace("_", " ")}`
-              : "Opened node material"
+              : "Generated node material"
             : hasUserInput
               ? "Dibuka dengan materi/catatan"
-              : "Membuka materi node",
-        summary:
-          llmData?.primaryNode?.summary ||
-          (hasUserInput ? synthesized.summary : existingTarget.summary),
+              : "Sintesis materi node",
+        summary: llmData?.primaryNode?.summary || synthesized.summary,
         levels: {
           simple:
-            llmData?.primaryNode?.levels?.simple ||
-            (hasUserInput
-              ? synthesized.levels.simple
-              : existingTarget.levels.simple),
+            llmData?.primaryNode?.levels?.simple || synthesized.levels.simple,
           standard:
             llmData?.primaryNode?.levels?.standard ||
-            (hasUserInput
-              ? synthesized.levels.standard
-              : existingTarget.levels.standard),
-          deep:
-            llmData?.primaryNode?.levels?.deep ||
-            (hasUserInput
-              ? synthesized.levels.deep
-              : existingTarget.levels.deep),
+            synthesized.levels.standard,
+          deep: llmData?.primaryNode?.levels?.deep || synthesized.levels.deep,
         },
-        formula:
-          llmData?.primaryNode?.formula ||
-          (hasUserInput ? synthesized.formula : existingTarget.formula),
+        formula: llmData?.primaryNode?.formula || synthesized.formula,
         application:
-          llmData?.primaryNode?.application ||
-          (hasUserInput ? synthesized.application : existingTarget.application),
+          llmData?.primaryNode?.application || synthesized.application,
         userAnnotation:
           params.nodeAction.openMode === "user_note" &&
           params.nodeAction.inputContent
             ? params.nodeAction.inputContent
             : existingTarget.userAnnotation,
-        origin: hasUserInput ? synthesized.origin : existingTarget.origin,
+        origin: hasUserInput ? synthesized.origin : "ai_generated",
         reviewStatus: "reviewed",
       }
     );
@@ -755,82 +1266,31 @@ export async function executeOrchestratorPipeline(params: {
       n.id === existingTarget.id ? updatedNode : n
     );
 
-    // Check if this node already has outgoing frontier children; if 0, spawn 2 progressive frontier nodes in Fog of War!
-    const outgoingCount = workingEdges.filter(
-      (e) => e.source === existingTarget.id
-    ).length;
-
-    if (outgoingCount === 0 || hasUserInput) {
-      const frontierSpecs =
-        llmData?.frontierNodes && llmData.frontierNodes.length > 0
-          ? llmData.frontierNodes.slice(0, 2).map((f) => ({
-              title: f.title || "Connected Concept",
-              region: (f.region as RegionCode) || ADJACENT_REGION[updatedNode.region],
-              relation: (f.relation as EdgeRelationType) || "extension",
-              reason:
-                f.edgeReason ||
-                (lang === "en"
-                  ? `Branches progressively from ${updatedNode.title}.`
-                  : `Cabang eksplorasi lanjutan dari ${updatedNode.title}.`),
-              difficulty: (f.difficulty as DifficultyLevel) || "Intermediate",
-            }))
-          : deriveFrontierTopics({
-              parentNode: updatedNode,
-              vault: normalizedVault,
-              inputContent: params.nodeAction.inputContent,
-              count: 2,
-              lang,
-            });
-
-      frontierSpecs.forEach((fp, idx) => {
-        const fId = `n_front_${Date.now()}_${idx}`;
-        const fNode = buildSynthesizedPrimaryNode({
-          id: fId,
-          title: fp.title,
-          region: fp.region,
-          difficulty: fp.difficulty,
-          relationToOrigin: fp.relation,
-          openMode: "instant_ai",
-          vault: normalizedVault,
-          lang,
-        });
-        fNode.explored = false; // Spawned in Fog of War until user chooses to open it!
-        workingNodes.push(fNode);
-        spawnedFrontierNodeIds.push(fId);
-
-        workingEdges.push({
-          id: `e_front_${Date.now()}_${idx}`,
-          source: updatedNode.id,
-          target: fId,
-          relation: fp.relation,
-          reason: fp.reason,
-          isCrossRegion: fp.region !== updatedNode.region,
-        });
-      });
-    }
-
-    // Run Cross-Node Relationship Analyzer against all existing nodes in the Vault
+    // Run Cross-Node Relationship Analyzer ONLY against already-opened (`explored: true`) nodes
     crossLinksDiscovered = analyzeCrossNodeRelationships({
       focusNode: updatedNode,
       existingNodes: workingNodes.filter(
-        (n) => !spawnedFrontierNodeIds.includes(n.id)
+        (n) => n.explored && n.id !== updatedNode.id
       ),
       existingEdges: workingEdges,
       lang,
     });
-  } else {
-    // CASE B: SEED_FIRST_NODE or BRANCH_NEW_NODE
+  }
+  // CASE 3: SEED_FIRST_NODE or BRANCH_NEW_NODE
+  else {
+    const exploredNodes = workingNodes.filter((n) => n.explored);
     const parentNode = params.nodeAction.parentNodeId
       ? workingNodes.find((n) => n.id === params.nodeAction.parentNodeId)
-      : workingNodes[0];
+      : exploredNodes[0] || workingNodes[0];
 
     const isFirstNode = workingNodes.length === 0;
     const newId = isFirstNode ? "root" : `n_node_${Date.now()}`;
     openedNodeId = newId;
 
     const rawTitle =
+      llmData?.relevanceGate?.normalizedTitle ||
       llmData?.primaryNode?.title ||
-      params.nodeAction.nodeTitle ||
+      preValidationGate.normalizedTitle ||
       params.nodeAction.inputTitle ||
       identity.focusQuestion ||
       identity.mainInterest ||
@@ -885,61 +1345,45 @@ export async function executeOrchestratorPipeline(params: {
       });
     }
 
-    // Spawn 2–3 progressive frontier nodes in Fog of War (`explored: false`)
-    const frontierCount = isFirstNode ? 3 : 2;
-    const frontierSpecs =
-      llmData?.frontierNodes && llmData.frontierNodes.length > 0
-        ? llmData.frontierNodes.slice(0, frontierCount).map((f) => ({
-            title: f.title || "Next Concept",
-            region:
-              (f.region as RegionCode) || ADJACENT_REGION[primaryNode.region],
-            relation: (f.relation as EdgeRelationType) || "extension",
-            reason:
-              f.edgeReason ||
-              (lang === "en"
-                ? `Progressive branch from ${primaryNode.title}.`
-                : `Cabang bertahap dari ${primaryNode.title}.`),
-            difficulty: (f.difficulty as DifficultyLevel) || "Basic",
-          }))
-        : deriveFrontierTopics({
-            parentNode: primaryNode,
-            vault: { ...normalizedVault, nodes: workingNodes },
-            inputContent: params.nodeAction.inputContent,
-            count: frontierCount,
-            lang,
-          });
-
-    frontierSpecs.forEach((fp, idx) => {
-      const fId = `n_front_${Date.now()}_${idx}`;
-      const fNode = buildSynthesizedPrimaryNode({
-        id: fId,
-        title: fp.title,
-        region: fp.region,
-        difficulty: fp.difficulty,
-        relationToOrigin: fp.relation,
-        openMode: "instant_ai",
-        vault: normalizedVault,
+    // Only spawn initial Fog stub nodes when seeding the very first node of an empty Vault.
+    // For subsequent nodes, the user triggers expansion explicitly from inside the opened node!
+    if (isFirstNode) {
+      const frontierSpecs = deriveFrontierTopics({
+        parentNode: primaryNode,
+        vault: { ...normalizedVault, nodes: workingNodes },
+        inputContent: params.nodeAction.inputContent,
+        count: 2,
         lang,
       });
-      fNode.explored = false; // Starts in Fog of War so user opens nodes one by one!
-      workingNodes.push(fNode);
-      spawnedFrontierNodeIds.push(fId);
 
-      workingEdges.push({
-        id: `e_front_${Date.now()}_${idx}`,
-        source: primaryNode.id,
-        target: fId,
-        relation: fp.relation,
-        reason: fp.reason,
-        isCrossRegion: fp.region !== primaryNode.region,
+      frontierSpecs.forEach((fp, idx) => {
+        const fId = `n_fog_${Date.now()}_${idx}`;
+        const stubNode = buildFogStubNode({
+          id: fId,
+          title: fp.title,
+          region: fp.region,
+          difficulty: fp.difficulty,
+          relationToOrigin: fp.relation,
+        });
+        workingNodes.push(stubNode);
+        spawnedFrontierNodeIds.push(fId);
+
+        workingEdges.push({
+          id: `e_fog_${Date.now()}_${idx}`,
+          source: primaryNode.id,
+          target: fId,
+          relation: fp.relation,
+          reason: fp.reason,
+          isCrossRegion: fp.region !== primaryNode.region,
+        });
       });
-    });
+    }
 
-    // Run Cross-Node Relationship Analyzer against all other existing nodes in the Vault
+    // Run Cross-Node Relationship Analyzer against already-opened (`explored: true`) nodes in the Vault
     crossLinksDiscovered = analyzeCrossNodeRelationships({
       focusNode: primaryNode,
       existingNodes: workingNodes.filter(
-        (n) => n.id !== primaryNode.id && !spawnedFrontierNodeIds.includes(n.id)
+        (n) => n.explored && n.id !== primaryNode.id
       ),
       existingEdges: workingEdges,
       parentNodeId: parentNode?.id,
@@ -947,25 +1391,29 @@ export async function executeOrchestratorPipeline(params: {
     });
   }
 
-  // Merge any LLM-suggested crossLinks as well
-  if (Array.isArray(llmData?.crossLinks)) {
+  // Merge at most 1 LLM-suggested crossLink if it points to an explored node and we don't have one yet
+  if (
+    crossLinksDiscovered.length === 0 &&
+    Array.isArray(llmData?.crossLinks) &&
+    params.intent !== "EXPAND_FOG_BRANCHES"
+  ) {
     for (const cl of llmData.crossLinks) {
       if (!cl.existingNodeId || !cl.reason) continue;
-      const exists = workingNodes.find((n) => n.id === cl.existingNodeId);
-      if (
-        exists &&
-        exists.id !== openedNodeId &&
-        !crossLinksDiscovered.some((d) => d.sourceId === exists.id)
-      ) {
+      const exists = workingNodes.find(
+        (n) => n.id === cl.existingNodeId && n.explored
+      );
+      if (exists && exists.id !== openedNodeId) {
         const focusN = workingNodes.find((n) => n.id === openedNodeId);
         const isCross = Boolean(focusN && focusN.region !== exists.region);
         crossLinksDiscovered.push({
           sourceId: exists.id,
           targetId: openedNodeId,
-          relation: cl.relation || (isCross ? "cross_disciplinary" : "related_concept"),
+          relation:
+            cl.relation || (isCross ? "cross_disciplinary" : "related_concept"),
           reason: cleanLegacyText(cl.reason),
           isCrossRegion: isCross,
         });
+        break;
       }
     }
   }
@@ -982,7 +1430,7 @@ export async function executeOrchestratorPipeline(params: {
     });
   });
 
-  // STAGE 4: Validate DAG, Anti-Orphan, and compute Organic Staggered Layout
+  // STAGE 4: Validate DAG, Enforce Fog Stub Rules, Deduplicate Parallel Edges & Compute Cross-Region Layout
   const validated = validateAndBuildGraph(workingNodes, workingEdges);
 
   // STAGE 5: Build Final Normalized Vault & Output Envelope
@@ -995,7 +1443,10 @@ export async function executeOrchestratorPipeline(params: {
         validated.nodes[0]?.region ||
         normalizedVault.overview.startingRegion ||
         startReg,
-      keyConcepts: validated.nodes.slice(0, 6).map((n) => n.title),
+      keyConcepts: validated.nodes
+        .filter((n) => n.explored)
+        .slice(0, 6)
+        .map((n) => n.title),
     },
     nodes: validated.nodes,
     edges: validated.edges,
@@ -1004,10 +1455,12 @@ export async function executeOrchestratorPipeline(params: {
 
   return {
     ok: true,
+    validationGate: preValidationGate,
     trace: {
       requestId: envelope.requestId,
       intent: params.intent,
       engineUsed,
+      validationStatus: preValidationGate.status,
       openedNodeId,
       spawnedFrontierNodeIds,
       crossLinksDiscovered,

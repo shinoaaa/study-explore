@@ -13,6 +13,19 @@ export type NodeOrigin = "ai_generated" | "user_edited" | "user_source";
 
 export type NodeReviewStatus = "needs_review" | "reviewed";
 
+export type NodeOpenInputMode =
+  | "instant_ai"
+  | "user_note"
+  | "custom_prompt"
+  | "book_chapter";
+
+export type OrchestratorIntent =
+  | "SEED_FIRST_NODE"
+  | "OPEN_NODE"
+  | "BRANCH_NEW_NODE"
+  | "ANALYZE_RELATIONS"
+  | "REVISE_NOTE";
+
 export type RegionCode =
   | "REG-01"
   | "REG-02"
@@ -82,6 +95,9 @@ export interface KnowledgeNode {
   reference: string;
   quickCheck: QuickCheckQuiz;
   origin?: NodeOrigin;
+  nodeInputMode?: NodeOpenInputMode;
+  nodeSourceTitle?: string;
+  nodeSourceContent?: string;
   userAnnotation?: string;
   reviewStatus?: NodeReviewStatus;
   reviewReason?: string;
@@ -182,4 +198,72 @@ export interface KnowledgeVault {
   nodes: KnowledgeNode[];
   edges: KnowledgeEdge[];
   validation: ValidationReport;
+}
+
+export interface OrchestratorGraphDigestNode {
+  id: string;
+  title: string;
+  region: RegionCode;
+  summary: string;
+  explored: boolean;
+  mastered: boolean;
+}
+
+export interface OrchestratorGraphDigestEdge {
+  source: string;
+  target: string;
+  relation: EdgeRelationType;
+  reason: string;
+}
+
+export interface OrchestratorNodePayload {
+  targetNodeId?: string;
+  parentNodeId?: string;
+  nodeTitle?: string;
+  openMode: NodeOpenInputMode;
+  inputTitle?: string;
+  inputContent?: string;
+  preferredDepth?: ExplanationDepth;
+}
+
+export interface OrchestratorInputEnvelope {
+  requestId: string;
+  intent: OrchestratorIntent;
+  lang: "en" | "id";
+  vaultContext: {
+    vaultId: string;
+    vaultName: string;
+    identity: VaultIdentity;
+  };
+  nodeAction: OrchestratorNodePayload;
+  existingGraphSnapshot: {
+    nodes: OrchestratorGraphDigestNode[];
+    edges: OrchestratorGraphDigestEdge[];
+  };
+}
+
+export interface OrchestratorCrossLink {
+  sourceId: string;
+  targetId: string;
+  relation: EdgeRelationType;
+  reason: string;
+  isCrossRegion: boolean;
+}
+
+export interface OrchestratorStageTrace {
+  requestId: string;
+  intent: OrchestratorIntent;
+  engineUsed: string;
+  openedNodeId: string;
+  spawnedFrontierNodeIds: string[];
+  crossLinksDiscovered: OrchestratorCrossLink[];
+  flaggedReviewNodeIds: string[];
+  dagValid: boolean;
+  processedAt: string;
+}
+
+export interface OrchestratorOutputEnvelope {
+  ok: boolean;
+  trace: OrchestratorStageTrace;
+  vault: KnowledgeVault;
 }

@@ -34,6 +34,18 @@ const VALID_DIFFICULTIES: DifficultyLevel[] = [
 
 export const NODE_CARD_W = 198;
 export const NODE_CARD_H = 74;
+export const NODE_CIRCLE_R = 22;
+export const NODE_CALLOUT_W = 172;
+export const NODE_CALLOUT_H = 38;
+
+function deterministicHash(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
 
 export interface RegionBounds {
   region: RegionCode;
@@ -69,11 +81,13 @@ export function layoutGraphWithRegionContainment(nodes: KnowledgeNode[]): {
     byRegion.get(safeReg)!.push({ ...node, region: safeReg });
   }
 
-  const gapX = 44;
-  const gapY = 38;
-  const padX = 36;
-  const padTop = 58;
-  const padBot = 30;
+  const cellW = 196;
+  const cellH = 104;
+  const gapX = 38;
+  const gapY = 34;
+  const padX = 48;
+  const padTop = 88;
+  const padBot = 42;
   const sectorChannel = 68;
   const outerMargin = 36;
 
@@ -98,13 +112,13 @@ export function layoutGraphWithRegionContainment(nodes: KnowledgeNode[]): {
 
     const cols = list.length <= 1 ? 1 : list.length <= 4 ? 2 : 3;
     const rows = Math.ceil(list.length / cols);
-    const gridW = cols * NODE_CARD_W + (cols - 1) * gapX;
-    const gridH = rows * NODE_CARD_H + (rows - 1) * gapY;
+    const gridW = cols * cellW + (cols - 1) * gapX;
+    const gridH = rows * cellH + (rows - 1) * gapY;
 
-    // Lebar minimal cukup untuk pill header Region + node count
-    const minHeaderWidth = 310;
+    // Lebar minimal cukup untuk pill header Region + node count + callout label
+    const minHeaderWidth = 320;
     const w = Math.max(minHeaderWidth, gridW + padX * 2);
-    const h = Math.max(176, gridH + padTop + padBot);
+    const h = Math.max(210, gridH + padTop + padBot);
 
     sectorSizes.set(rc, { w, h, cols, list });
   }
@@ -136,15 +150,35 @@ export function layoutGraphWithRegionContainment(nodes: KnowledgeNode[]): {
         nodeCount: spec.list.length,
       });
 
-      const innerGridW = spec.cols * NODE_CARD_W + (spec.cols - 1) * gapX;
-      const startX = boxX + (spec.w - innerGridW) / 2 + NODE_CARD_W / 2;
-      const startY = boxY + padTop + NODE_CARD_H / 2;
+      const innerGridW = spec.cols * cellW + (spec.cols - 1) * gapX;
+      const startX = boxX + (spec.w - innerGridW) / 2 + cellW / 2;
+      const startY = boxY + padTop + cellH / 2;
+
+      const minCx = boxX + Math.max(padX, NODE_CALLOUT_W / 2 + 14);
+      const maxCx = boxX + spec.w - Math.max(padX, NODE_CALLOUT_W / 2 + 14);
+      const minCy = boxY + padTop + 18;
+      const maxCy = boxY + spec.h - padBot;
 
       spec.list.forEach((node, idx) => {
         const col = idx % spec.cols;
         const row = Math.floor(idx / spec.cols);
-        const cx = Math.round(startX + col * (NODE_CARD_W + gapX));
-        const cy = Math.round(startY + row * (NODE_CARD_H + gapY));
+        const hVal = deterministicHash(`${node.id}:${node.title}`);
+        // Organic dynamic wave offset ("maju mundur dikit") so nodes & callout boxes sit on staggered diagonal bands
+        const staggerX =
+          (row % 2 === 1 ? 16 : -12) + (((hVal % 5) - 2) * 6);
+        const staggerY =
+          (col % 2 === 1 ? -18 : 16) + ((((hVal >> 4) % 5) - 2) * 5);
+
+        const rawCx = startX + col * (cellW + gapX) + staggerX;
+        const rawCy = startY + row * (cellH + gapY) + staggerY;
+
+        const cx = Math.round(
+          Math.max(minCx, Math.min(maxCx, rawCx))
+        );
+        const cy = Math.round(
+          Math.max(minCy, Math.min(maxCy, rawCy))
+        );
+
         placedNodes.push({
           ...node,
           region: rc,

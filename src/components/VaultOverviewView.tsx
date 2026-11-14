@@ -1,20 +1,23 @@
 "use client";
 
 import { BooksStackVector } from "@/components/Illustrations";
-import { deriveVaultIdentity, countVaultFavorites } from "@/lib/vault-storage";
-import { Language, regionShortName, sourceFormatLabel, UI_COPY } from "@/lib/i18n";
+import { deriveVaultIdentity } from "@/lib/vault-storage";
+import { Language, regionShortName, UI_COPY } from "@/lib/i18n";
 import { KNOWLEDGE_REGIONS } from "@/lib/regions";
-import { KnowledgeVault, VaultIdentity } from "@/types/knowledge";
 import {
-  ArrowRight,
-  BookMarked,
+  DifficultyLevel,
+  KnowledgeNode,
+  KnowledgeVault,
+  VaultIdentity,
+} from "@/types/knowledge";
+import {
   BookOpen,
   Check,
-  Compass,
   Edit3,
-  Layers,
+  Lock,
   Network,
   Plus,
+  Search,
   Sparkles,
   Star,
   X,
@@ -24,8 +27,7 @@ import React, { useEffect, useState } from "react";
 interface VaultOverviewViewProps {
   vault: KnowledgeVault;
   onUpdateIdentity: (vaultName: string, identity: VaultIdentity) => void;
-  onOpenAddExploration: () => void;
-  onOpenAddSourceModal: () => void;
+  onOpenAddExploration: (targetNode?: KnowledgeNode) => void;
   onOpenTree: (focusNodeId?: string) => void;
   onOpenLibrary: (options?: {
     itemType?: "node" | "source";
@@ -33,7 +35,6 @@ interface VaultOverviewViewProps {
     filter?: "all" | "sources" | "notes" | "favorites";
   }) => void;
   onToggleFavoriteNode: (nodeId: string) => void;
-  onToggleFavoriteSource: (sourceId: string) => void;
   lang: Language;
 }
 
@@ -41,163 +42,178 @@ export default function VaultOverviewView({
   vault,
   onUpdateIdentity,
   onOpenAddExploration,
-  onOpenAddSourceModal,
   onOpenTree,
   onOpenLibrary,
   onToggleFavoriteNode,
-  onToggleFavoriteSource,
   lang,
 }: VaultOverviewViewProps) {
   const t = UI_COPY[lang];
   const identity = deriveVaultIdentity(vault);
-  const sources = vault.learningSources || [];
-  const explorations = vault.explorations || [];
-  const favNodes = vault.nodes.filter((n) => n.isFavorite);
-  const favSources = sources.filter((s) => s.isFavorite);
-  const favCount = countVaultFavorites(vault);
-  const isEmpty = sources.length === 0 && vault.nodes.length === 0;
+  const isEmpty = vault.nodes.length === 0;
 
   const [isEditingIdentity, setIsEditingIdentity] = useState(false);
-  const [draftName, setDraftName] = useState(vault.name);
-  const [draftInterest, setDraftInterest] = useState(identity.mainInterest);
-  const [draftDesc, setDraftDesc] = useState(identity.shortDescription);
-  const [draftQuestion, setDraftQuestion] = useState(identity.focusQuestion);
-  const [draftGoal, setDraftGoal] = useState(identity.learningGoal);
-  const [draftTags, setDraftTags] = useState<string[]>(identity.relatedInterests);
+  const [nameInput, setNameInput] = useState(vault.name);
+  const [mainInterest, setMainInterest] = useState(identity.mainInterest);
+  const [shortDescription, setShortDescription] = useState(
+    identity.shortDescription
+  );
+  const [focusQuestion, setFocusQuestion] = useState(identity.focusQuestion);
+  const [learningGoal, setLearningGoal] = useState(identity.learningGoal);
+  const [relatedInterests, setRelatedInterests] = useState<string[]>(
+    identity.relatedInterests
+  );
   const [tagDraft, setTagDraft] = useState("");
+  const [difficultyComfort, setDifficultyComfort] = useState<DifficultyLevel>(
+    identity.difficultyComfort || "Basic"
+  );
+
+  // Clean Node list filter
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [nodeQuery, setNodeQuery] = useState("");
 
   useEffect(() => {
-    const id = deriveVaultIdentity(vault);
-    setDraftName(vault.name);
-    setDraftInterest(id.mainInterest);
-    setDraftDesc(id.shortDescription);
-    setDraftQuestion(id.focusQuestion);
-    setDraftGoal(id.learningGoal);
-    setDraftTags(id.relatedInterests);
+    const nextId = deriveVaultIdentity(vault);
+    setNameInput(vault.name);
+    setMainInterest(nextId.mainInterest);
+    setShortDescription(nextId.shortDescription);
+    setFocusQuestion(nextId.focusQuestion);
+    setLearningGoal(nextId.learningGoal);
+    setRelatedInterests(nextId.relatedInterests);
+    setDifficultyComfort(nextId.difficultyComfort || "Basic");
     setIsEditingIdentity(false);
-  }, [vault.id]);
+  }, [vault]);
 
-  const handleSaveIdentity = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!draftName.trim() || !draftInterest.trim()) return;
-    const extra = tagDraft.trim();
-    const finalTags =
-      extra && !draftTags.includes(extra) ? [...draftTags, extra] : draftTags;
-    onUpdateIdentity(draftName.trim(), {
-      mainInterest: draftInterest.trim(),
-      shortDescription: draftDesc.trim(),
-      focusQuestion: draftQuestion.trim(),
-      learningGoal: draftGoal.trim(),
-      relatedInterests: finalTags,
-      difficultyComfort: identity.difficultyComfort || "Intermediate",
-    });
-    setTagDraft("");
-    setIsEditingIdentity(false);
-  };
-
-  const addDraftTag = () => {
+  const handleAddTag = () => {
     const clean = tagDraft.trim();
-    if (clean && !draftTags.includes(clean)) {
-      setDraftTags((prev) => [...prev, clean]);
+    if (!clean) return;
+    if (!relatedInterests.includes(clean)) {
+      setRelatedInterests([...relatedInterests, clean]);
     }
     setTagDraft("");
   };
 
+  const handleSaveIdentity = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdateIdentity(nameInput.trim() || vault.name, {
+      mainInterest: mainInterest.trim() || identity.mainInterest,
+      shortDescription: shortDescription.trim(),
+      focusQuestion: focusQuestion.trim(),
+      learningGoal: learningGoal.trim(),
+      relatedInterests,
+      difficultyComfort,
+    });
+    setIsEditingIdentity(false);
+  };
+
+  const filteredNodes = vault.nodes.filter((n) => {
+    if (onlyFavorites && !n.isFavorite) return false;
+    const q = nodeQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      n.title.toLowerCase().includes(q) ||
+      n.summary.toLowerCase().includes(q)
+    );
+  });
+
+  const startReg =
+    KNOWLEDGE_REGIONS[vault.overview.startingRegion] ||
+    KNOWLEDGE_REGIONS["REG-01"];
+
   return (
-    <div className="mx-auto max-w-[1260px] px-4 sm:px-8 py-5 space-y-6">
-      {/* Identity Card */}
-      <section className="rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-6 shadow-sm space-y-4">
+    <div className="mx-auto max-w-[1260px] w-full px-4 sm:px-8 py-6 space-y-6">
+      {/* 1. VAULT PROFILE / IDENTITY CARD */}
+      <section className="rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-6 sm:p-7 shadow-sm">
         {!isEditingIdentity ? (
-          <>
+          <div className="space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-2 max-w-3xl">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 border border-[#BFDBFE] dark:border-blue-800 px-3 py-0.5 text-xs font-bold text-[#2F80ED] dark:text-blue-300">
+                  <span
+                    className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${startReg.badgeClass}`}
+                  >
+                    {regionShortName(startReg.code, lang)}
+                  </span>
+                  <span className="rounded-full bg-[#EAF2FF] dark:bg-blue-950/70 px-3 py-0.5 text-xs font-bold text-[#2F80ED] dark:text-blue-300">
                     {identity.mainInterest}
                   </span>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6F7E93] dark:text-slate-400">
-                    {t.vaultOverview.identityTitle}
-                  </span>
                 </div>
+
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-[#17233C] dark:text-slate-100">
                   {vault.name}
                 </h1>
-                <p className="text-sm leading-relaxed text-[#475569] dark:text-slate-300">
-                  {identity.shortDescription}
-                </p>
+                {identity.shortDescription && (
+                  <p className="text-sm leading-relaxed text-[#6F7E93] dark:text-slate-400">
+                    {identity.shortDescription}
+                  </p>
+                )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsEditingIdentity(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] px-3.5 py-2 text-xs font-bold text-[#17233C] dark:text-slate-100 transition-colors"
-                >
-                  <Edit3 className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400" />
-                  {t.vaultOverview.editIdentity}
-                </button>
-                <button
-                  type="button"
-                  onClick={onOpenAddExploration}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {t.vaultBar.addExploration.replace(/^\+\s*/, "")}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingIdentity(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] px-3.5 py-2 text-xs font-bold text-[#17233C] dark:text-slate-200 transition-colors"
+              >
+                <Edit3 className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400" />
+                {t.vaultOverview.editIdentity}
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-              <div className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-800/50 p-3.5">
-                <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#2F80ED] dark:text-blue-400">
-                  {t.vaultOverview.focusQuestion}
-                </div>
-                <p className="mt-1 text-xs font-semibold leading-relaxed text-[#17233C] dark:text-slate-200">
-                  {identity.focusQuestion || "—"}
-                </p>
+            {(identity.focusQuestion ||
+              identity.learningGoal ||
+              identity.relatedInterests.length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-[#DFE6F0] dark:border-slate-800">
+                {identity.focusQuestion && (
+                  <div className="rounded-2xl bg-[#F8FAFC] dark:bg-slate-800/60 p-3.5">
+                    <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93] dark:text-slate-400">
+                      {t.vaultOverview.focusQuestion}
+                    </div>
+                    <div className="mt-1 text-xs font-bold text-[#17233C] dark:text-slate-100">
+                      {identity.focusQuestion}
+                    </div>
+                  </div>
+                )}
+                {identity.learningGoal && (
+                  <div className="rounded-2xl bg-[#F8FAFC] dark:bg-slate-800/60 p-3.5">
+                    <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#6F7E93] dark:text-slate-400">
+                      {t.vaultOverview.learningGoal}
+                    </div>
+                    <div className="mt-1 text-xs font-bold text-[#17233C] dark:text-slate-100">
+                      {identity.learningGoal}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-800/50 p-3.5">
-                <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0D9468] dark:text-emerald-400">
-                  {t.vaultOverview.learningGoal}
-                </div>
-                <p className="mt-1 text-xs font-semibold leading-relaxed text-[#17233C] dark:text-slate-200">
-                  {identity.learningGoal || "—"}
-                </p>
-              </div>
-            </div>
+            )}
 
             {identity.relatedInterests.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[11px] font-bold text-[#6F7E93] dark:text-slate-400 mr-1">
-                  {t.vaultOverview.relatedInterests}:
-                </span>
+              <div className="flex flex-wrap items-center gap-1.5">
                 {identity.relatedInterests.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-[#DFE6F0] dark:border-slate-700 bg-[#F3F6FC] dark:bg-slate-800 px-2.5 py-0.5 text-[11px] font-semibold text-[#17233C] dark:text-slate-200"
+                    className="rounded-full border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 px-2.5 py-0.5 text-[11px] font-semibold text-[#17233C] dark:text-slate-200"
                   >
                     {tag}
                   </span>
                 ))}
               </div>
             )}
-          </>
+          </div>
         ) : (
-          <form onSubmit={handleSaveIdentity} className="space-y-3.5">
+          <form onSubmit={handleSaveIdentity} className="space-y-4">
             <div className="flex items-center justify-between border-b border-[#DFE6F0] dark:border-slate-800 pb-3">
-              <h2 className="text-base font-extrabold text-[#17233C] dark:text-slate-100">
-                {t.vaultOverview.editIdentity}
+              <h2 className="text-sm font-extrabold text-[#17233C] dark:text-slate-100">
+                {t.vaultOverview.identityTitle}
               </h2>
               <button
                 type="button"
                 onClick={() => setIsEditingIdentity(false)}
-                className="rounded-lg p-1.5 text-[#6F7E93] hover:bg-[#F3F6FC] dark:hover:bg-slate-800"
+                className="rounded-lg p-1 text-[#6F7E93] hover:text-[#17233C] dark:hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
                   {t.create.vaultName}
@@ -205,21 +221,21 @@ export default function VaultOverviewView({
                 <input
                   type="text"
                   required
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800/90 px-3.5 py-2 text-xs text-[#17233C] dark:text-slate-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[#2F80ED] dark:text-blue-400 mb-1">
+                <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
                   {t.vaultOverview.mainInterest}
                 </label>
                 <input
                   type="text"
                   required
-                  value={draftInterest}
-                  onChange={(e) => setDraftInterest(e.target.value)}
-                  className="w-full rounded-xl border border-[#BFDBFE] dark:border-blue-900/60 bg-[#F8FAFC] dark:bg-slate-900 px-3 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
+                  value={mainInterest}
+                  onChange={(e) => setMainInterest(e.target.value)}
+                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800/90 px-3.5 py-2 text-xs text-[#17233C] dark:text-slate-100"
                 />
               </div>
             </div>
@@ -228,24 +244,24 @@ export default function VaultOverviewView({
               <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
                 {t.vaultOverview.shortDesc}
               </label>
-              <textarea
-                rows={2}
-                value={draftDesc}
-                onChange={(e) => setDraftDesc(e.target.value)}
-                className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none resize-none"
+              <input
+                type="text"
+                value={shortDescription}
+                onChange={(e) => setShortDescription(e.target.value)}
+                className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800/90 px-3.5 py-2 text-xs text-[#17233C] dark:text-slate-100"
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
                   {t.vaultOverview.focusQuestion}
                 </label>
                 <input
                   type="text"
-                  value={draftQuestion}
-                  onChange={(e) => setDraftQuestion(e.target.value)}
-                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
+                  value={focusQuestion}
+                  onChange={(e) => setFocusQuestion(e.target.value)}
+                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800/90 px-3.5 py-2 text-xs text-[#17233C] dark:text-slate-100"
                 />
               </div>
               <div>
@@ -254,9 +270,9 @@ export default function VaultOverviewView({
                 </label>
                 <input
                   type="text"
-                  value={draftGoal}
-                  onChange={(e) => setDraftGoal(e.target.value)}
-                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
+                  value={learningGoal}
+                  onChange={(e) => setLearningGoal(e.target.value)}
+                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800/90 px-3.5 py-2 text-xs text-[#17233C] dark:text-slate-100"
                 />
               </div>
             </div>
@@ -265,17 +281,19 @@ export default function VaultOverviewView({
               <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
                 {t.vaultOverview.relatedInterests}
               </label>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {draftTags.map((tag) => (
+              <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                {relatedInterests.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 border border-[#BFDBFE] dark:border-blue-800 px-2.5 py-0.5 text-xs font-semibold text-[#2F80ED] dark:text-blue-300"
+                    className="inline-flex items-center gap-1 rounded-full bg-[#EAF2FF] dark:bg-blue-950/70 px-2.5 py-0.5 text-xs font-bold text-[#2F80ED] dark:text-blue-300"
                   >
                     {tag}
                     <button
                       type="button"
                       onClick={() =>
-                        setDraftTags((prev) => prev.filter((item) => item !== tag))
+                        setRelatedInterests(
+                          relatedInterests.filter((item) => item !== tag)
+                        )
                       }
                     >
                       <X className="h-3 w-3" />
@@ -283,7 +301,7 @@ export default function VaultOverviewView({
                   </span>
                 ))}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex gap-2">
                 <input
                   type="text"
                   value={tagDraft}
@@ -291,15 +309,15 @@ export default function VaultOverviewView({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      addDraftTag();
+                      handleAddTag();
                     }
                   }}
                   placeholder={t.create.addInterestPlaceholder}
-                  className="flex-1 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3 py-1.5 text-xs text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
+                  className="flex-1 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800/90 px-3 py-1.5 text-xs text-[#17233C] dark:text-slate-100"
                 />
                 <button
                   type="button"
-                  onClick={addDraftTag}
+                  onClick={handleAddTag}
                   className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 px-3 py-1.5 text-xs font-bold text-[#17233C] dark:text-slate-200"
                 >
                   {t.create.addTagBtn}
@@ -307,7 +325,7 @@ export default function VaultOverviewView({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setIsEditingIdentity(false)}
@@ -327,389 +345,194 @@ export default function VaultOverviewView({
         )}
       </section>
 
-      {/* 4 Open Count Metrics Cards (zero % bars) */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <button
-          type="button"
-          onClick={() => onOpenLibrary({ filter: "sources" })}
-          className="text-left rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] hover:border-[#0D9468]/60 p-4 flex items-center gap-3.5 shadow-sm transition-all"
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ECFDF5] dark:bg-emerald-950/60 text-[#0D9468] dark:text-emerald-400">
-            <BookOpen className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
-              {sources.length}
-            </div>
-            <div className="text-xs font-medium text-[#6F7E93] dark:text-slate-400">
-              {t.vaultOverview.statSources}
-            </div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onOpenLibrary({ filter: "notes" })}
-          className="text-left rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] hover:border-[#2F80ED]/60 p-4 flex items-center gap-3.5 shadow-sm transition-all"
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EAF2FF] dark:bg-blue-950/60 text-[#2F80ED] dark:text-blue-400">
-            <Layers className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
-              {vault.nodes.length}
-            </div>
-            <div className="text-xs font-medium text-[#6F7E93] dark:text-slate-400">
-              {t.vaultOverview.statNotes}
-            </div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onOpenTree()}
-          className="text-left rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] hover:border-[#2F80ED]/60 p-4 flex items-center gap-3.5 shadow-sm transition-all"
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F5F3FF] dark:bg-violet-950/60 text-[#7C3AED] dark:text-violet-400">
-            <Compass className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
-              {explorations.length}
-            </div>
-            <div className="text-xs font-medium text-[#6F7E93] dark:text-slate-400">
-              {t.vaultOverview.statExplorations}
-            </div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onOpenLibrary({ filter: "favorites" })}
-          className="text-left rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] hover:border-amber-400/70 p-4 flex items-center gap-3.5 shadow-sm transition-all"
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFF4E5] dark:bg-amber-950/60 text-[#FFA33A]">
-            <Star className="h-5 w-5 fill-current" />
-          </div>
-          <div>
-            <div className="text-2xl font-extrabold text-[#17233C] dark:text-slate-100">
-              {favCount}
-            </div>
-            <div className="text-xs font-medium text-[#6F7E93] dark:text-slate-400">
-              {t.vaultOverview.statFavorites}
-            </div>
-          </div>
-        </button>
-      </section>
-
+      {/* 2. DIRECT NODES SECTION BELOW VAULT PROFILE (Clean, Zero Clutter) */}
       {isEmpty ? (
-        /* Empty Vault Launch Card */
-        <section className="rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm">
+        <section className="rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
           <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-            <div className="shrink-0">
-              <BooksStackVector className="w-32 h-20" />
+            <div className="w-28 h-24 shrink-0">
+              <BooksStackVector className="w-full h-full" />
             </div>
-            <div className="space-y-1.5">
-              <h2 className="text-xl font-extrabold text-[#17233C] dark:text-slate-100">
+            <div className="space-y-1.5 max-w-lg">
+              <h2 className="text-lg sm:text-xl font-extrabold text-[#17233C] dark:text-slate-100">
                 {t.vaultOverview.emptyTitle}
               </h2>
-              <p className="text-xs font-medium text-[#6F7E93] dark:text-slate-400 max-w-md">
-                {identity.focusQuestion || identity.learningGoal}
+              <p className="text-xs text-[#6F7E93] dark:text-slate-400">
+                {identity.focusQuestion || identity.mainInterest}
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={onOpenAddSourceModal}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] px-4 py-2.5 text-xs font-bold text-[#17233C] dark:text-slate-100"
-            >
-              <BookOpen className="h-4 w-4 text-[#0D9468]" />
-              {t.vaultOverview.emptyActionSource.replace(/^\+\s*/, "")}
-            </button>
-            <button
-              type="button"
-              onClick={onOpenAddExploration}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-5 py-2.5 text-xs font-bold text-white shadow-sm"
-            >
-              <Sparkles className="h-4 w-4" />
-              {t.vaultOverview.emptyActionAdd.replace(/^\+\s*/, "")}
-            </button>
-          </div>
+
+          <button
+            type="button"
+            onClick={() => onOpenAddExploration()}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-5 py-3 text-xs font-bold text-white shadow-md shadow-[#2F80ED]/25 transition-all shrink-0"
+          >
+            <Sparkles className="h-4 w-4" />
+            {lang === "en" ? "+ Open First Node" : "+ Buka Node Pertama"}
+          </button>
         </section>
       ) : (
-        /* Two-Column Sources & Favorites + Workspace Shortcuts */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Recent Learning Sources */}
-          <section className="lg:col-span-6 rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 space-y-3 shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-extrabold text-[#17233C] dark:text-slate-100 flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-[#0D9468] dark:text-emerald-400" />
-                {t.vaultOverview.recentSources}
+        <section className="space-y-4">
+          {/* Clean Nodes Header Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-lg font-extrabold text-[#17233C] dark:text-slate-100">
+                {lang === "en" ? "Nodes" : "Daftar Node"} ({vault.nodes.length})
               </h2>
-              <div className="flex items-center gap-2">
+
+              <div className="inline-flex rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-[#111827] p-1">
                 <button
                   type="button"
-                  onClick={onOpenAddSourceModal}
-                  className="rounded-lg bg-[#ECFDF5] dark:bg-emerald-950/60 px-2.5 py-1 text-[11px] font-bold text-[#047857] dark:text-emerald-300 hover:brightness-95"
+                  onClick={() => setOnlyFavorites(false)}
+                  className={`rounded-lg px-3 py-1 text-xs font-bold transition-colors ${
+                    !onlyFavorites
+                      ? "bg-[#2F80ED] text-white"
+                      : "text-[#6F7E93] dark:text-slate-300 hover:text-[#17233C] dark:hover:text-white"
+                  }`}
                 >
-                  {t.vaultOverview.addSourceNote}
+                  {lang === "en" ? "All" : "Semua"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => onOpenLibrary({ filter: "sources" })}
-                  className="text-xs font-bold text-[#2F80ED] dark:text-blue-400 hover:underline"
+                  onClick={() => setOnlyFavorites(true)}
+                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1 text-xs font-bold transition-colors ${
+                    onlyFavorites
+                      ? "bg-[#FFFBEB] dark:bg-amber-950/70 text-[#B45309] dark:text-amber-300"
+                      : "text-[#6F7E93] dark:text-slate-300 hover:text-[#17233C] dark:hover:text-white"
+                  }`}
                 >
-                  {t.home.viewAll} →
+                  <Star className="h-3 w-3 fill-[#F59E0B] text-[#F59E0B]" />
+                  {lang === "en" ? "Favorites" : "Favorit"}
                 </button>
               </div>
             </div>
 
-            {sources.length === 0 ? (
-              <p className="text-xs text-[#6F7E93] dark:text-slate-400 py-4">
-                {t.vaultOverview.noSourcesYet}
-              </p>
-            ) : (
-              <div className="space-y-2.5">
-                {sources.slice(0, 4).map((src) => (
-                  <div
-                    key={src.id}
-                    className="rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-800/50 p-3 flex items-start justify-between gap-3 hover:border-[#2F80ED]/60 transition-all"
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onOpenLibrary({
-                          itemType: "source",
-                          itemId: src.id,
-                          filter: "sources",
-                        })
-                      }
-                      className="min-w-0 flex-1 text-left space-y-1"
-                    >
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="rounded-full bg-[#ECFDF5] dark:bg-emerald-950/60 border border-[#A7F3D0] dark:border-emerald-700/60 px-2 py-0.5 text-[10px] font-bold text-[#047857] dark:text-emerald-300">
-                          {t.library.statusBadges.user_source}
-                        </span>
-                        <span className="rounded-full bg-white dark:bg-slate-800 border border-[#DFE6F0] dark:border-slate-700 px-2 py-0.5 text-[10px] font-semibold text-[#6F7E93] dark:text-slate-300">
-                          {sourceFormatLabel(src.format, lang)}
-                        </span>
-                      </div>
-                      <div className="text-xs font-extrabold text-[#17233C] dark:text-slate-100 truncate">
-                        {src.title}
-                      </div>
-                      <div className="text-[11px] text-[#6F7E93] dark:text-slate-400 line-clamp-1">
-                        {src.excerptOrNotes}
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onToggleFavoriteSource(src.id)}
-                      aria-label={t.reader.favorite}
-                      className={`shrink-0 rounded-lg p-1.5 transition-colors ${
-                        src.isFavorite
-                          ? "text-[#F59E0B]"
-                          : "text-[#94A3B8] hover:text-[#F59E0B]"
-                      }`}
-                    >
-                      <Star
-                        className={`h-4 w-4 ${
-                          src.isFavorite ? "fill-current" : ""
-                        }`}
-                      />
-                    </button>
-                  </div>
-                ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8C9AAE]" />
+                <input
+                  type="text"
+                  value={nodeQuery}
+                  onChange={(e) => setNodeQuery(e.target.value)}
+                  placeholder={
+                    lang === "en" ? "Search nodes..." : "Cari node..."
+                  }
+                  className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-[#111827] pl-8 pr-3 py-1.5 text-xs text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
+                />
               </div>
-            )}
-          </section>
 
-          {/* Starred Favorites & Explorations */}
-          <section className="lg:col-span-6 space-y-4">
-            <div className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 space-y-3 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-extrabold text-[#17233C] dark:text-slate-100 flex items-center gap-2">
-                  <Star className="h-4 w-4 text-[#F59E0B] fill-current" />
-                  {t.vaultOverview.starredTitle}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => onOpenLibrary({ filter: "favorites" })}
-                  className="text-xs font-bold text-[#2F80ED] dark:text-blue-400 hover:underline"
+              <button
+                type="button"
+                onClick={() => onOpenAddExploration()}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#EAF2FF] dark:bg-blue-950/70 hover:bg-[#2F80ED] text-[#2F80ED] dark:text-blue-300 hover:text-white px-3.5 py-2 text-xs font-bold transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {lang === "en" ? "+ Add Node" : "+ Tambah Node"}
+              </button>
+            </div>
+          </div>
+
+          {/* Direct Node Cards Grid with 2 Clean Action Buttons */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredNodes.map((node) => {
+              const reg =
+                KNOWLEDGE_REGIONS[node.region] || KNOWLEDGE_REGIONS["REG-01"];
+              const isLocked = !node.explored;
+
+              return (
+                <div
+                  key={node.id}
+                  className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 flex flex-col justify-between gap-4 shadow-sm hover:border-[#2F80ED]/60 transition-all"
                 >
-                  {t.vaultOverview.viewAllLibrary} →
-                </button>
-              </div>
-
-              {favNodes.length === 0 && favSources.length === 0 ? (
-                <p className="text-xs text-[#6F7E93] dark:text-slate-400 py-2">
-                  {t.vaultOverview.noFavoritesYet}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {favNodes.slice(0, 3).map((fn) => {
-                    const reg =
-                      KNOWLEDGE_REGIONS[fn.region] || KNOWLEDGE_REGIONS["REG-01"];
-                    return (
-                      <div
-                        key={fn.id}
-                        className="rounded-xl border border-[#FDE68A] dark:border-amber-800/60 bg-[#FFFBEB]/60 dark:bg-amber-950/25 p-2.5 flex items-center justify-between gap-2"
-                      >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onOpenLibrary({
-                              itemType: "node",
-                              itemId: fn.id,
-                              filter: "favorites",
-                            })
-                          }
-                          className="min-w-0 flex-1 text-left"
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`rounded-full border px-2.5 py-0.5 text-[10.5px] font-bold ${reg.badgeClass}`}
                         >
-                          <div className="text-xs font-extrabold text-[#17233C] dark:text-slate-100 truncate">
-                            {fn.title}
-                          </div>
-                          <div className="mt-0.5 flex items-center gap-1.5">
-                            <span
-                              className={`rounded-full border px-2 py-0 text-[10px] font-bold ${reg.badgeClass}`}
-                            >
-                              {regionShortName(fn.region, lang)}
-                            </span>
-                            {fn.origin === "user_edited" && (
-                              <span className="rounded-full bg-[#F5F3FF] dark:bg-violet-950/60 px-2 py-0 text-[10px] font-bold text-[#6D28D9] dark:text-violet-300">
-                                {t.library.statusBadges.user_edited}
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => onOpenTree(fn.id)}
-                            className="rounded-lg bg-white dark:bg-slate-800 border border-[#DFE6F0] dark:border-slate-700 px-2 py-1 text-[10.5px] font-bold text-[#2F80ED] dark:text-blue-400 hover:border-[#2F80ED]"
-                          >
-                            {t.vaultBar.tree}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onToggleFavoriteNode(fn.id)}
-                            className="p-1 text-[#F59E0B]"
-                            aria-label={t.reader.unfavorite}
-                          >
-                            <Star className="h-4 w-4 fill-current" />
-                          </button>
-                        </div>
+                          {regionShortName(reg.code, lang)}
+                        </span>
+                        {isLocked && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#F3F6FC] dark:bg-slate-800 px-2.5 py-0.5 text-[10.5px] font-bold text-[#6F7E93] dark:text-slate-400">
+                            <Lock className="h-3 w-3" />
+                            {lang === "en" ? "Unopened" : "Belum Dibuka"}
+                          </span>
+                        )}
                       </div>
-                    );
-                  })}
-                  {favSources.slice(0, 2).map((fs) => (
-                    <div
-                      key={fs.id}
-                      className="rounded-xl border border-[#FDE68A] dark:border-amber-800/60 bg-[#FFFBEB]/60 dark:bg-amber-950/25 p-2.5 flex items-center justify-between gap-2"
-                    >
+
+                      <button
+                        type="button"
+                        onClick={() => onToggleFavoriteNode(node.id)}
+                        className="p-1 rounded-lg hover:bg-[#F3F6FC] dark:hover:bg-slate-800 transition-colors"
+                        aria-label="Toggle favorite"
+                      >
+                        <Star
+                          className={`h-4 w-4 ${
+                            node.isFavorite
+                              ? "fill-[#F59E0B] text-[#F59E0B]"
+                              : "text-[#94A3B8]"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <h3 className="text-base font-extrabold text-[#17233C] dark:text-slate-100">
+                      {node.title}
+                    </h3>
+
+                    <p className="text-xs text-[#6F7E93] dark:text-slate-400 line-clamp-2 leading-relaxed">
+                      {node.summary}
+                    </p>
+                  </div>
+
+                  {/* Two Clean Action Buttons: 1) Read Material / Open Node  2) Go to Node in Tree */}
+                  <div className="flex items-center gap-2 pt-3 border-t border-[#DFE6F0] dark:border-slate-800">
+                    {isLocked ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenAddExploration(node)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] py-2.5 px-3 text-xs font-bold text-white transition-colors"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        <span>
+                          {lang === "en" ? "Open Node" : "Buka Node"}
+                        </span>
+                      </button>
+                    ) : (
                       <button
                         type="button"
                         onClick={() =>
                           onOpenLibrary({
-                            itemType: "source",
-                            itemId: fs.id,
-                            filter: "favorites",
+                            itemType: "node",
+                            itemId: node.id,
+                            filter: "all",
                           })
                         }
-                        className="min-w-0 flex-1 text-left"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] py-2.5 px-3 text-xs font-bold text-white transition-colors"
                       >
-                        <div className="text-xs font-extrabold text-[#17233C] dark:text-slate-100 truncate">
-                          {fs.title}
-                        </div>
-                        <span className="inline-block mt-0.5 rounded-full bg-[#ECFDF5] dark:bg-emerald-950/60 px-2 py-0 text-[10px] font-bold text-[#047857] dark:text-emerald-300">
-                          {t.library.statusBadges.user_source}
+                        <BookOpen className="h-3.5 w-3.5" />
+                        <span>
+                          {lang === "en" ? "Read Material" : "Baca Materi"}
                         </span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => onToggleFavoriteSource(fs.id)}
-                        className="p-1 text-[#F59E0B] shrink-0"
-                        aria-label={t.reader.unfavorite}
-                      >
-                        <Star className="h-4 w-4 fill-current" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    )}
 
-            {/* Quick Explorations List + Jump Buttons */}
-            <div className="rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-5 space-y-3 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-extrabold text-[#17233C] dark:text-slate-100 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-[#2F80ED] dark:text-blue-400" />
-                  {t.vaultOverview.explorationsTitle}
-                </h2>
-                <button
-                  type="button"
-                  onClick={onOpenAddExploration}
-                  className="text-xs font-bold text-[#2F80ED] dark:text-blue-400 hover:underline"
-                >
-                  {t.vaultBar.addExploration}
-                </button>
-              </div>
-              {explorations.length === 0 ? (
-                <p className="text-xs text-[#6F7E93] dark:text-slate-400">
-                  {t.vaultOverview.noExplorationsYet}
-                </p>
-              ) : (
-                <div className="space-y-1.5">
-                  {explorations.slice(0, 3).map((exp) => (
-                    <div
-                      key={exp.id}
-                      className="rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-800/50 px-3 py-2 flex items-center justify-between gap-2 text-xs"
+                    <button
+                      type="button"
+                      onClick={() => onOpenTree(node.id)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] py-2.5 px-3 text-xs font-bold text-[#17233C] dark:text-slate-100 transition-colors"
                     >
-                      <div className="min-w-0">
-                        <div className="font-bold text-[#17233C] dark:text-slate-100 truncate">
-                          {exp.title}
-                        </div>
-                        <div className="text-[11px] text-[#6F7E93] dark:text-slate-400 truncate">
-                          {exp.path === "material"
-                            ? t.exploreModal.fromMaterial
-                            : t.exploreModal.fromCuriosity}{" "}
-                          · {exp.mappedNodeIds.length} {t.home.concepts}
-                        </div>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-white dark:bg-slate-800 border border-[#DFE6F0] dark:border-slate-700 px-2 py-0.5 text-[10px] font-bold text-[#6F7E93] dark:text-slate-300">
-                        {exp.depth === "simple"
-                          ? t.reader.simple
-                          : exp.depth === "deep"
-                            ? t.reader.deep
-                            : t.reader.standard}
+                      <Network className="h-3.5 w-3.5 text-[#2F80ED] dark:text-blue-400" />
+                      <span>
+                        {lang === "en" ? "View in Tree" : "Ke Node di Tree"}
                       </span>
-                    </div>
-                  ))}
+                    </button>
+                  </div>
                 </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => onOpenTree()}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-4 py-2.5 text-xs font-bold text-white shadow-sm"
-                >
-                  <Network className="h-4 w-4" />
-                  {t.vaultOverview.openTree}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenLibrary({ filter: "all" })}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] px-4 py-2.5 text-xs font-bold text-[#17233C] dark:text-slate-100"
-                >
-                  <BookMarked className="h-4 w-4 text-[#2F80ED] dark:text-blue-400" />
-                  {t.vaultOverview.viewAllLibrary}
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
+              );
+            })}
+          </div>
+        </section>
       )}
     </div>
   );

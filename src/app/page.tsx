@@ -42,6 +42,7 @@ import {
 import {
   EdgeRelationType,
   ExplanationLevels,
+  KnowledgeNode,
   KnowledgeVault,
   LearningSource,
   NodeRevision,
@@ -68,6 +69,8 @@ import {
   Moon,
   MousePointerClick,
   Network,
+  PanelLeftClose,
+  PanelLeftOpen,
   RotateCcw,
   Search,
   Sparkles,
@@ -181,9 +184,12 @@ export default function HomePage() {
   const [addSourceTrigger, setAddSourceTrigger] = useState(0);
 
   // Modals & loading states
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isAddExplorationOpen, setIsAddExplorationOpen] = useState(false);
-  const [explorationSourceId, setExplorationSourceId] = useState<
+  const [targetNodeToOpen, setTargetNodeToOpen] =
+    useState<KnowledgeNode | null>(null);
+  const [defaultParentNodeId, setDefaultParentNodeId] = useState<
     string | undefined
   >(undefined);
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
@@ -335,8 +341,12 @@ export default function HomePage() {
     else setActiveTab("library");
   };
 
-  const handleOpenAddExploration = (sourceId?: string) => {
-    setExplorationSourceId(sourceId);
+  const handleOpenAddExploration = (
+    targetNode?: KnowledgeNode,
+    parentNodeId?: string
+  ) => {
+    setTargetNodeToOpen(targetNode || null);
+    setDefaultParentNodeId(parentNodeId);
     setIsAddExplorationOpen(true);
   };
 
@@ -351,17 +361,6 @@ export default function HomePage() {
 
   const handleSelectNode = (nodeId: string | null) => {
     setSelectedNodeId(nodeId);
-    if (!nodeId) return;
-    const targetNode = activeVault.nodes.find((n) => n.id === nodeId);
-    if (targetNode && !targetNode.explored) {
-      updateActiveVault((v) => ({
-        ...v,
-        updatedAt: new Date().toISOString(),
-        nodes: v.nodes.map((n) =>
-          n.id === nodeId ? { ...n, explored: true } : n
-        ),
-      }));
-    }
   };
 
   const handleUnlockAllFog = () => {
@@ -557,33 +556,31 @@ export default function HomePage() {
     setActiveTab("overview");
   };
 
-  // Step 2: add Exploration inside active Vault (From Material or From Curiosity)
+  // Step 2: Open / Add Node via Curiora 5-Stage AI Knowledge Orchestrator
   const handleSubmitExploration = async (data: AddExplorationSubmitData) => {
-    if (data.saveSourceOnly) {
-      const saved = handleSaveSource({
-        title: data.title,
-        format: data.sourceFormat,
-        chapterOrSection: data.chapterOrSection,
-        excerptOrNotes: data.excerptOrNotes,
-        focusQuestion: data.focusQuestion,
-      });
-      setIsAddExplorationOpen(false);
-      openVaultInLibrary(activeVault.id, {
-        itemType: "source",
-        itemId: saved.id,
-        filter: "sources",
-      });
-      return;
-    }
-
     setIsAddingExploration(true);
     try {
-      const res = await fetch("/api/explore", {
+      const intent = data.targetNodeId
+        ? "OPEN_NODE"
+        : activeVault.nodes.length === 0
+          ? "SEED_FIRST_NODE"
+          : "BRANCH_NEW_NODE";
+
+      const res = await fetch("/api/orchestrate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          intent,
           vault: activeVault,
-          explorationInput: data,
+          nodeAction: {
+            targetNodeId: data.targetNodeId,
+            parentNodeId: data.parentNodeId,
+            nodeTitle: data.nodeTitle,
+            openMode: data.openMode,
+            inputTitle: data.inputTitle,
+            inputContent: data.inputContent,
+            preferredDepth: data.depth,
+          },
           lang,
         }),
       });
@@ -595,34 +592,52 @@ export default function HomePage() {
         );
         persistVaults(nextVaults);
 
-        const addedIds: string[] = Array.isArray(json.addedNodeIds)
-          ? json.addedNodeIds
+        const openedId: string =
+          json.trace?.openedNodeId ||
+          data.targetNodeId ||
+          updatedVault.nodes[0]?.id ||
+          "";
+        const frontierIds: string[] = Array.isArray(
+          json.trace?.spawnedFrontierNodeIds
+        )
+          ? json.trace.spawnedFrontierNodeIds
           : [];
-        const newNodes = updatedVault.nodes.filter((n) =>
-          addedIds.includes(n.id)
-        );
-        const touchedRegs = Array.from(new Set(newNodes.map((n) => n.region)));
+        const crossLinksCount = Array.isArray(json.trace?.crossLinksDiscovered)
+          ? json.trace.crossLinksDiscovered.length
+          : 0;
 
-        setNewlyAddedIds(addedIds);
+        const highlightIds = [openedId, ...frontierIds].filter(Boolean);
+        const touchedNodes = updatedVault.nodes.filter((n) =>
+          highlightIds.includes(n.id)
+        );
+        const touchedRegs = Array.from(
+          new Set(touchedNodes.map((n) => n.region))
+        );
+
+        setNewlyAddedIds(highlightIds);
         setExpandedRegions(touchedRegs);
         setIsAddExplorationOpen(false);
+        setTargetNodeToOpen(null);
         setActiveTab("tree");
-        if (addedIds[0]) {
-          setSelectedNodeId(addedIds[0]);
+        if (openedId) {
+          setSelectedNodeId(openedId);
         }
 
-        const reviewFlagCount = Array.isArray(json.flaggedReviewIds)
-          ? json.flaggedReviewIds.length
-          : 0;
-        const baseMsg =
-          newNodes.length === 1
-            ? t.tree.branchSingleAdded
-            : `${newNodes.length} ${t.tree.branchesAdded}`;
-        setExpandToast(
-          reviewFlagCount > 0
-            ? `${baseMsg} · ${reviewFlagCount} ${t.vaultBar.needsReview}`
-            : baseMsg
-        );
+        const msgParts = [
+          lang === "en" ? "Node opened" : "Node dibuka",
+          frontierIds.length > 0
+            ? lang === "en"
+              ? `${frontierIds.length} new frontier nodes`
+              : `${frontierIds.length} node cabang baru`
+            : "",
+          crossLinksCount > 0
+            ? lang === "en"
+              ? `${crossLinksCount} cross-node links discovered`
+              : `${crossLinksCount} hubungan lintas-node ditemukan`
+            : "",
+        ].filter(Boolean);
+
+        setExpandToast(msgParts.join(" · "));
         setTimeout(() => setExpandToast(null), 5000);
       }
     } finally {
@@ -631,49 +646,7 @@ export default function HomePage() {
   };
 
   const handleExpandNode = async (nodeId: string) => {
-    setIsExpanding(true);
-    try {
-      const prevIds = new Set(activeVault.nodes.map((n) => n.id));
-      const res = await fetch("/api/expand", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vault: activeVault,
-          targetNodeId: nodeId,
-          lang,
-        }),
-      });
-      const data = await res.json();
-      if (data?.ok && data.vault) {
-        const updatedVault: KnowledgeVault = normalizeVault(data.vault);
-        const nextVaults = vaults.map((v) =>
-          v.id === activeVault.id ? updatedVault : v
-        );
-        persistVaults(nextVaults);
-
-        const newNodes = updatedVault.nodes.filter((n) => !prevIds.has(n.id));
-        const touchedRegs = Array.from(new Set(newNodes.map((n) => n.region)));
-        const touchedLabels = touchedRegs
-          .map((r) => regionShortName(r, lang))
-          .join(" & ");
-        setNewlyAddedIds(newNodes.map((n) => n.id));
-        setExpandedRegions(touchedRegs);
-        setExpandToast(
-          `${
-            newNodes.length === 1
-              ? t.tree.branchSingleAdded
-              : `${newNodes.length} ${t.tree.branchesAdded}`
-          }${touchedLabels ? ` · ${touchedLabels}` : ""}`
-        );
-        setTimeout(() => setExpandToast(null), 5000);
-
-        if (Array.isArray(data.addedNodeIds) && data.addedNodeIds[0]) {
-          setSelectedNodeId(data.addedNodeIds[0]);
-        }
-      }
-    } finally {
-      setIsExpanding(false);
-    }
+    handleOpenAddExploration(undefined, nodeId);
   };
 
   const handleDeleteVault = (vaultId: string) => {
@@ -792,24 +765,49 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Left Navy Navigation Sidebar */}
+      {/* Desktop Reopen Sidebar Button when Sidebar is Collapsed */}
+      {sidebarCollapsed && (
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed(false)}
+          aria-label="Open sidebar"
+          className="hidden lg:inline-flex fixed left-3 top-3 z-40 h-9 w-9 items-center justify-center rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#17263C] text-white shadow-md hover:bg-[#2F80ED] transition-all"
+        >
+          <PanelLeftOpen className="h-4 w-4" />
+        </button>
+      )}
+
+      {/* Left Navy Navigation Sidebar (Collapsible on Desktop) */}
       <aside
         className={`${
           mobileMenuOpen ? "flex" : "hidden"
-        } lg:flex lg:w-64 lg:shrink-0 flex-col justify-between bg-[#17263C] dark:bg-[#0F172A] dark:border-r dark:border-slate-800 text-white p-4 lg:sticky lg:top-0 lg:h-screen z-30 transition-colors`}
+        } ${
+          sidebarCollapsed ? "lg:hidden" : "lg:flex lg:w-64 lg:shrink-0"
+        } flex-col justify-between bg-[#17263C] dark:bg-[#0F172A] dark:border-r dark:border-slate-800 text-white p-4 lg:sticky lg:top-0 lg:h-screen z-30 transition-all`}
       >
         <div className="space-y-6">
-          {/* Brand Logo */}
-          <div className="hidden lg:flex items-center gap-3 px-2 pt-1">
-            <CurioraLogo size={36} />
-            <div className="min-w-0">
-              <div className="text-xl font-extrabold tracking-tight text-white leading-tight">
-                Curiora
-              </div>
-              <div className="text-[10.5px] font-medium text-[#8FA2BD] truncate">
-                {t.nav.cosmosTag}
+          {/* Brand Logo + Collapse Sidebar Button */}
+          <div className="hidden lg:flex items-center justify-between gap-2 px-2 pt-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <CurioraLogo size={36} />
+              <div className="min-w-0">
+                <div className="text-xl font-extrabold tracking-tight text-white leading-tight">
+                  Curiora
+                </div>
+                <div className="text-[10.5px] font-medium text-[#8FA2BD] truncate">
+                  {t.nav.cosmosTag}
+                </div>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(true)}
+              aria-label="Close sidebar"
+              className="rounded-lg p-1.5 text-[#8FA2BD] hover:bg-white/10 hover:text-white transition-colors shrink-0"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
           </div>
 
           {/* Primary Nav */}
@@ -837,7 +835,7 @@ export default function HomePage() {
             })}
           </nav>
 
-          {/* Recent Vaults Switcher */}
+          {/* Recent Vaults Switcher (Clean, Zero Star Clutter) */}
           <div>
             <div className="px-2 mb-2 text-[10.5px] font-bold uppercase tracking-wider text-[#647B99]">
               {t.nav.recentVaults}
@@ -849,27 +847,19 @@ export default function HomePage() {
                   (activeTab === "overview" ||
                     activeTab === "tree" ||
                     activeTab === "library");
-                const vFavs = countVaultFavorites(v);
                 return (
                   <button
                     type="button"
                     key={v.id}
                     onClick={() => openVaultOverview(v.id)}
-                    className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-medium transition-all ${
+                    className={`w-full flex items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-medium transition-all ${
                       isCur
                         ? "bg-white/10 text-white font-bold"
                         : "text-[#B4C2D6] hover:bg-white/5 hover:text-white"
                     }`}
                   >
-                    <span className="flex items-center gap-2 min-w-0">
-                      <Folder className="h-3.5 w-3.5 shrink-0 text-[#60A5FA]" />
-                      <span className="truncate">{v.name}</span>
-                    </span>
-                    {vFavs > 0 && (
-                      <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-[#F59E0B]">
-                        ★ {vFavs}
-                      </span>
-                    )}
+                    <Folder className="h-3.5 w-3.5 shrink-0 text-[#60A5FA]" />
+                    <span className="truncate">{v.name}</span>
                   </button>
                 );
               })}
@@ -1557,20 +1547,14 @@ export default function HomePage() {
             <VaultOverviewView
               vault={activeVault}
               onUpdateIdentity={handleUpdateVaultIdentity}
-              onOpenAddExploration={() => handleOpenAddExploration()}
-              onOpenAddSourceModal={() => {
-                setAddSourceTrigger((c) => c + 1);
-                openVaultInLibrary(activeVault.id, {
-                  filter: "sources",
-                  openAddSource: true,
-                });
-              }}
+              onOpenAddExploration={(targetNode) =>
+                handleOpenAddExploration(targetNode)
+              }
               onOpenTree={(nid) => openVaultInTree(activeVault.id, nid)}
               onOpenLibrary={(opts) =>
                 openVaultInLibrary(activeVault.id, opts)
               }
               onToggleFavoriteNode={handleToggleFavoriteNode}
-              onToggleFavoriteSource={handleToggleFavoriteSource}
               lang={lang}
             />
           </div>
@@ -1606,7 +1590,7 @@ export default function HomePage() {
               onRestoreRevision={handleRestoreRevision}
               onSaveSource={handleSaveSource}
               onViewInTree={(nid) => openVaultInTree(activeVault.id, nid)}
-              onOpenAddExploration={(sid) => handleOpenAddExploration(sid)}
+              onOpenAddExploration={() => handleOpenAddExploration()}
               openAddSourceTrigger={addSourceTrigger}
               lang={lang}
             />
@@ -1649,7 +1633,9 @@ export default function HomePage() {
                     filter: "all",
                   })
                 }
-                onOpenAddExploration={() => handleOpenAddExploration()}
+                onOpenAddExploration={(targetNode) =>
+                  handleOpenAddExploration(targetNode)
+                }
                 hideVaultSwitcher
                 newlyAddedIds={newlyAddedIds}
                 expandedRegions={expandedRegions}
@@ -1658,10 +1644,10 @@ export default function HomePage() {
                 onToggleTheme={toggleTheme}
                 onToggleLang={toggleLang}
               >
-                {/* Floating Node Study Modal */}
+                {/* Floating Node Study Modal (Only shown when selected node is already opened) */}
                 <NodeInspector
                   vault={activeVault}
-                  node={selectedNode}
+                  node={selectedNode?.explored ? selectedNode : null}
                   onSelectNode={handleSelectNode}
                   onClose={() => setSelectedNodeId(null)}
                   onMarkMastered={handleMarkMastered}
@@ -1912,9 +1898,13 @@ export default function HomePage() {
       />
       <AddExplorationModal
         isOpen={isAddExplorationOpen}
-        onClose={() => setIsAddExplorationOpen(false)}
+        onClose={() => {
+          setIsAddExplorationOpen(false);
+          setTargetNodeToOpen(null);
+        }}
         vault={activeVault}
-        initialSourceId={explorationSourceId}
+        targetNode={targetNodeToOpen}
+        defaultParentNodeId={defaultParentNodeId}
         onSubmitExploration={handleSubmitExploration}
         isLoading={isAddingExploration}
         lang={lang}

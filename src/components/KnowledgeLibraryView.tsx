@@ -203,31 +203,13 @@ export default function KnowledgeLibraryView({
     }
   }, [openAddSourceTrigger]);
 
-  // Filtered unified items
+  // Filtered node items (Node-centric material & notes)
   const items = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const list: UnifiedLibraryItem[] = [];
 
-    if (filterTab === "all" || filterTab === "sources" || filterTab === "favorites") {
-      for (const s of sources) {
-        if (filterTab === "favorites" && !s.isFavorite) continue;
-        if (statusFilter !== "all") continue; // status filters focus on topic notes
-        if (q) {
-          const hay = `${s.title} ${s.chapterOrSection || ""} ${s.excerptOrNotes} ${s.focusQuestion}`.toLowerCase();
-          if (!hay.includes(q)) continue;
-        }
-        list.push({
-          kind: "source",
-          id: s.id,
-          favorite: Boolean(s.isFavorite),
-          item: s,
-        });
-      }
-    }
-
-    if (filterTab === "all" || filterTab === "notes" || filterTab === "favorites") {
-      for (const n of vault.nodes) {
-        if (filterTab === "favorites" && !n.isFavorite) continue;
+    for (const n of vault.nodes) {
+      if (filterTab === "favorites" && !n.isFavorite) continue;
         if (
           statusFilter === "needs_review" &&
           n.reviewStatus !== "needs_review"
@@ -241,21 +223,20 @@ export default function KnowledgeLibraryView({
           const hay = `${n.title} ${n.summary} ${n.levels.simple} ${n.levels.standard} ${n.levels.deep} ${n.userAnnotation || ""}`.toLowerCase();
           if (!hay.includes(q)) continue;
         }
-        list.push({
-          kind: "node",
-          id: n.id,
-          favorite: Boolean(n.isFavorite),
-          item: n,
-        });
-      }
-    }
+          list.push({
+            kind: "node",
+            id: n.id,
+            favorite: Boolean(n.isFavorite),
+            item: n,
+          });
+        }
 
     if (favoritesFirst) {
       list.sort((a, b) => Number(b.favorite) - Number(a.favorite));
     }
 
     return list;
-  }, [sources, vault.nodes, filterTab, statusFilter, searchQuery, favoritesFirst]);
+  }, [vault.nodes, filterTab, statusFilter, searchQuery, favoritesFirst]);
 
   // Ensure valid active selection when filter/vault changes
   useEffect(() => {
@@ -399,24 +380,17 @@ export default function KnowledgeLibraryView({
             {t.library.title}
           </h1>
           <span className="rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 border border-[#BFDBFE] dark:border-blue-800 px-2.5 py-0.5 text-xs font-bold text-[#2F80ED] dark:text-blue-300">
-            {sources.length + vault.nodes.length}
+            {vault.nodes.length}
           </span>
         </div>
 
         <button
           type="button"
-          onClick={() => {
-            setSrcTitle("");
-            setSrcFormat("book_chapter");
-            setSrcChapter("");
-            setSrcExcerpt("");
-            setSrcQuestion(identity.focusQuestion);
-            setShowNewSourceModal(true);
-          }}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-[#111827] hover:border-[#0D9468] px-3.5 py-2 text-xs font-bold text-[#047857] dark:text-emerald-300 shadow-sm"
+          onClick={() => onOpenAddExploration()}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors"
         >
           <Plus className="h-3.5 w-3.5" />
-          {t.library.addSourceBtn.replace(/^\+\s*/, "")}
+          {lang === "en" ? "New Node" : "Node Baru"}
         </button>
       </div>
 
@@ -436,13 +410,11 @@ export default function KnowledgeLibraryView({
             />
           </div>
 
-          {/* 4 Main Filter Tabs */}
-          <div className="grid grid-cols-4 gap-1 rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F3F6FC] dark:bg-slate-900 p-1">
+          {/* 2 Main Filter Tabs: All Nodes & Favorites */}
+          <div className="grid grid-cols-2 gap-1 rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F3F6FC] dark:bg-slate-900 p-1">
             {(
               [
                 { id: "all", label: t.library.allTab },
-                { id: "sources", label: t.library.sourcesTab },
-                { id: "notes", label: t.library.notesTab },
                 { id: "favorites", label: t.library.favoritesTab },
               ] as const
             ).map((tab) => (
@@ -450,8 +422,9 @@ export default function KnowledgeLibraryView({
                 key={tab.id}
                 type="button"
                 onClick={() => setFilterTab(tab.id)}
-                className={`rounded-lg py-1.5 px-1.5 text-[11px] font-bold truncate transition-colors ${
-                  filterTab === tab.id
+                className={`rounded-lg py-1.5 px-2 text-xs font-bold truncate transition-colors ${
+                  filterTab === tab.id ||
+                  (tab.id === "all" && filterTab !== "favorites")
                     ? "bg-[#2F80ED] text-white shadow-sm"
                     : "text-[#6F7E93] dark:text-slate-400 hover:text-[#17233C] dark:hover:text-slate-200"
                 }`}
@@ -941,6 +914,27 @@ export default function KnowledgeLibraryView({
               </div>
 
               {/* Non-Destructive Needs Review Banner */}
+              {activeNode.nodeSourceContent && (
+                <div className="rounded-2xl border border-[#A7F3D0] dark:border-emerald-800/60 bg-[#ECFDF5]/70 dark:bg-emerald-950/30 p-4 space-y-1">
+                  <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#047857] dark:text-emerald-300">
+                    {activeNode.nodeInputMode === "book_chapter"
+                      ? lang === "en"
+                        ? `Chapter Material · ${activeNode.nodeSourceTitle || activeNode.title}`
+                        : `Materi Bab · ${activeNode.nodeSourceTitle || activeNode.title}`
+                      : activeNode.nodeInputMode === "custom_prompt"
+                        ? lang === "en"
+                          ? "Node Focus Prompt"
+                          : "Prompt Fokus Node"
+                        : lang === "en"
+                          ? "Node Note"
+                          : "Catatan Node"}
+                  </div>
+                  <p className="text-xs leading-relaxed text-[#065F46] dark:text-emerald-100 whitespace-pre-line">
+                    {activeNode.nodeSourceContent}
+                  </p>
+                </div>
+              )}
+
               {activeNode.reviewStatus === "needs_review" && (
                 <div className="rounded-2xl border border-[#FCD34D] dark:border-amber-700/70 bg-[#FFFBEB] dark:bg-amber-950/35 p-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-start gap-2.5 min-w-0 flex-1">

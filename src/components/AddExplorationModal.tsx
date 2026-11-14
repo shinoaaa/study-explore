@@ -1,34 +1,31 @@
 "use client";
 
 import { deriveVaultIdentity } from "@/lib/vault-storage";
-import { Language, UI_COPY } from "@/lib/i18n";
+import { Language } from "@/lib/i18n";
 import {
   ExplanationDepth,
-  ExplorationPath,
+  KnowledgeNode,
   KnowledgeVault,
-  LearningSource,
-  SourceFormat,
+  NodeOpenInputMode,
 } from "@/types/knowledge";
 import {
   BookOpen,
-  Compass,
+  FileText,
   Loader2,
-  RotateCcw,
+  MessageSquarePlus,
   Sparkles,
+  Zap,
   X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
 export interface AddExplorationSubmitData {
-  path: ExplorationPath;
-  saveSourceOnly: boolean;
-  existingSourceId?: string;
-  sourceFormat: SourceFormat;
-  title: string;
-  chapterOrSection: string;
-  excerptOrNotes: string;
-  focusQuestion: string;
-  explorationGoal: string;
+  targetNodeId?: string;
+  parentNodeId?: string;
+  nodeTitle: string;
+  openMode: NodeOpenInputMode;
+  inputTitle: string;
+  inputContent: string;
   depth: ExplanationDepth;
 }
 
@@ -36,7 +33,8 @@ interface AddExplorationModalProps {
   isOpen: boolean;
   onClose: () => void;
   vault: KnowledgeVault;
-  initialSourceId?: string;
+  targetNode?: KnowledgeNode | null;
+  defaultParentNodeId?: string;
   onSubmitExploration: (data: AddExplorationSubmitData) => Promise<void>;
   isLoading: boolean;
   lang: Language;
@@ -46,445 +44,326 @@ export default function AddExplorationModal({
   isOpen,
   onClose,
   vault,
-  initialSourceId,
+  targetNode,
+  defaultParentNodeId,
   onSubmitExploration,
   isLoading,
   lang,
 }: AddExplorationModalProps) {
-  const t = UI_COPY[lang];
   const identity = deriveVaultIdentity(vault);
-  const existingSources: LearningSource[] = vault.learningSources || [];
+  const isUnlockingExisting = Boolean(targetNode);
+  const isFirstNode = vault.nodes.length === 0 && !targetNode;
 
-  const [path, setPath] = useState<ExplorationPath>("material");
-  const [sourceMode, setSourceMode] = useState<"new" | "existing">(
-    initialSourceId ? "existing" : "new"
+  const [choiceMode, setChoiceMode] = useState<"direct" | "with_input">(
+    "direct"
   );
-  const [selectedSourceId, setSelectedSourceId] = useState<string>(
-    initialSourceId || existingSources[0]?.id || ""
-  );
-  const [sourceFormat, setSourceFormat] = useState<SourceFormat>("book_chapter");
-  const [title, setTitle] = useState("");
-  const [chapterOrSection, setChapterOrSection] = useState("");
-  const [excerptOrNotes, setExcerptOrNotes] = useState("");
-  const [focusQuestion, setFocusQuestion] = useState(identity.focusQuestion);
-  const [explorationGoal, setExplorationGoal] = useState(identity.learningGoal);
+  const [inputType, setInputType] = useState<
+    "custom_prompt" | "user_note" | "book_chapter"
+  >("custom_prompt");
+
+  const [nodeTitle, setNodeTitle] = useState("");
+  const [parentNodeId, setParentNodeId] = useState<string>("");
+  const [inputTitle, setInputTitle] = useState("");
+  const [inputContent, setInputContent] = useState("");
   const [depth, setDepth] = useState<ExplanationDepth>("standard");
-
-  const resetToVaultDefaults = () => {
-    const id = deriveVaultIdentity(vault);
-    setFocusQuestion(id.focusQuestion);
-    setExplorationGoal(id.learningGoal);
-    setDepth(
-      id.difficultyComfort === "Foundation"
-        ? "simple"
-        : id.difficultyComfort === "Advanced"
-          ? "deep"
-          : "standard"
-    );
-  };
 
   useEffect(() => {
     if (!isOpen) return;
-    resetToVaultDefaults();
-    if (initialSourceId) {
-      setPath("material");
-      setSourceMode("existing");
-      setSelectedSourceId(initialSourceId);
-      const found = existingSources.find((s) => s.id === initialSourceId);
-      if (found) {
-        setTitle(found.title);
-        setChapterOrSection(found.chapterOrSection || "");
-        setExcerptOrNotes(found.excerptOrNotes);
-        if (found.focusQuestion) setFocusQuestion(found.focusQuestion);
-      }
+    setChoiceMode("direct");
+    setInputType("custom_prompt");
+    setInputTitle("");
+    setInputContent("");
+    setDepth("standard");
+
+    if (targetNode) {
+      setNodeTitle(targetNode.title);
+      setParentNodeId("");
+    } else if (vault.nodes.length === 0) {
+      setNodeTitle(
+        identity.focusQuestion || identity.mainInterest || vault.name
+      );
+      setParentNodeId("");
     } else {
-      setSourceMode("new");
-      setTitle("");
-      setChapterOrSection("");
-      setExcerptOrNotes("");
+      setNodeTitle("");
+      setParentNodeId(defaultParentNodeId || vault.nodes[0]?.id || "");
     }
-  }, [isOpen, vault.id, initialSourceId]);
+  }, [
+    isOpen,
+    targetNode,
+    defaultParentNodeId,
+    vault.id,
+    vault.name,
+    vault.nodes.length,
+    identity.focusQuestion,
+    identity.mainInterest,
+  ]);
 
   if (!isOpen) return null;
 
-  const isExistingReuse =
-    path === "material" && sourceMode === "existing" && existingSources.length > 0;
-  const activeExistingSource = isExistingReuse
-    ? existingSources.find((s) => s.id === selectedSourceId) || existingSources[0]
-    : undefined;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanTitle =
+      (targetNode ? targetNode.title : nodeTitle.trim()) ||
+      inputTitle.trim() ||
+      identity.mainInterest ||
+      vault.name;
 
-  const triggerSubmit = async (saveSourceOnly: boolean) => {
-    const effectiveTitle = isExistingReuse
-      ? activeExistingSource?.title || title
-      : title.trim() || focusQuestion.trim() || vault.name;
+    const effectiveOpenMode: NodeOpenInputMode =
+      choiceMode === "direct" ? "instant_ai" : inputType;
 
     await onSubmitExploration({
-      path,
-      saveSourceOnly,
-      existingSourceId: isExistingReuse ? activeExistingSource?.id : undefined,
-      sourceFormat: path === "material" ? sourceFormat : "curiosity",
-      title: effectiveTitle,
-      chapterOrSection: isExistingReuse
-        ? activeExistingSource?.chapterOrSection || ""
-        : chapterOrSection.trim(),
-      excerptOrNotes: isExistingReuse
-        ? activeExistingSource?.excerptOrNotes || ""
-        : excerptOrNotes.trim(),
-      focusQuestion: focusQuestion.trim() || identity.focusQuestion,
-      explorationGoal: explorationGoal.trim() || identity.learningGoal,
+      targetNodeId: targetNode?.id,
+      parentNodeId: !targetNode && parentNodeId ? parentNodeId : undefined,
+      nodeTitle: cleanTitle,
+      openMode: effectiveOpenMode,
+      inputTitle: inputTitle.trim() || cleanTitle,
+      inputContent: choiceMode === "direct" ? "" : inputContent.trim(),
       depth,
     });
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#17263C]/45 dark:bg-black/65 backdrop-blur-sm p-4 overflow-y-auto"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-2xl rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-6 shadow-2xl transition-colors my-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="relative w-full max-w-xl rounded-3xl border border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-[#111827] p-6 sm:p-7 shadow-2xl my-auto">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-[#DFE6F0] dark:border-slate-800 pb-4">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#EAF2FF] dark:bg-blue-950/60 border border-[#BFDBFE] dark:border-blue-800 px-2.5 py-0.5 text-[11px] font-bold text-[#2F80ED] dark:text-blue-300">
-                {vault.name}
-              </span>
-              <span className="rounded-full bg-[#ECFDF5] dark:bg-emerald-950/60 border border-[#A7F3D0] dark:border-emerald-700/60 px-2.5 py-0.5 text-[11px] font-bold text-[#047857] dark:text-emerald-300">
-                {t.exploreModal.prefilledBadge}
-              </span>
+        <div className="flex items-center justify-between gap-3 pb-4 border-b border-[#DFE6F0] dark:border-slate-800">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EAF2FF] dark:bg-blue-950/80 text-[#2F80ED] dark:text-blue-400">
+              <Sparkles className="h-4 w-4" />
             </div>
-            <h2 className="text-xl font-extrabold text-[#17233C] dark:text-slate-100">
-              {t.exploreModal.title}
+            <h2 className="text-lg sm:text-xl font-extrabold text-[#17233C] dark:text-slate-100 truncate">
+              {isUnlockingExisting
+                ? lang === "en"
+                  ? `Open Node: ${targetNode?.title}`
+                  : `Buka Node: ${targetNode?.title}`
+                : isFirstNode
+                  ? lang === "en"
+                    ? "Open First Node"
+                    : "Buka Node Pertama"
+                  : lang === "en"
+                    ? "Open New Node"
+                    : "Buka Node Baru"}
             </h2>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={resetToVaultDefaults}
-              className="inline-flex items-center gap-1 rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#2F80ED] px-2.5 py-1.5 text-[11px] font-bold text-[#6F7E93] dark:text-slate-300 hover:text-[#17233C] dark:hover:text-white"
-            >
-              <RotateCcw className="h-3 w-3" />
-              {t.exploreModal.resetDefaults}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-[#6F7E93] dark:text-slate-400 hover:bg-[#F3F6FC] dark:hover:bg-slate-700"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Exploration-Level Path Switcher */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => setPath("material")}
-            className={`flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
-              path === "material"
-                ? "border-[#2F80ED] bg-[#EAF2FF]/70 dark:bg-blue-950/50 dark:border-blue-500 ring-2 ring-[#2F80ED]/15"
-                : "border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-[#F8FAFC] dark:hover:bg-slate-800"
-            }`}
+            onClick={onClose}
+            className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 p-2 text-[#6F7E93] hover:text-[#17233C] dark:hover:text-white transition-colors"
           >
-            <div
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                path === "material"
-                  ? "bg-[#2F80ED] text-white"
-                  : "bg-[#F3F6FC] dark:bg-slate-800 text-[#6F7E93] dark:text-slate-400"
-              }`}
-            >
-              <BookOpen className="h-4 w-4" />
-            </div>
-            <span className="text-sm font-extrabold text-[#17233C] dark:text-slate-100">
-              {t.exploreModal.fromMaterial}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setPath("curiosity")}
-            className={`flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
-              path === "curiosity"
-                ? "border-[#2F80ED] bg-[#EAF2FF]/70 dark:bg-blue-950/50 dark:border-blue-500 ring-2 ring-[#2F80ED]/15"
-                : "border-[#DFE6F0] dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-[#F8FAFC] dark:hover:bg-slate-800"
-            }`}
-          >
-            <div
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                path === "curiosity"
-                  ? "bg-[#2F80ED] text-white"
-                  : "bg-[#F3F6FC] dark:bg-slate-800 text-[#6F7E93] dark:text-slate-400"
-              }`}
-            >
-              <Compass className="h-4 w-4" />
-            </div>
-            <span className="text-sm font-extrabold text-[#17233C] dark:text-slate-100">
-              {t.exploreModal.fromCuriosity}
-            </span>
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Form Fields */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void triggerSubmit(false);
-          }}
-          className="mt-4 space-y-3.5"
-        >
-          {path === "material" ? (
-            <>
-              {existingSources.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-[#17233C] dark:text-slate-200">
-                    {t.exploreModal.sourceModeLabel}
-                  </span>
-                  <div className="inline-flex rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F3F6FC] dark:bg-slate-900 p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setSourceMode("new")}
-                      className={`rounded-lg px-3 py-1 text-xs font-bold ${
-                        sourceMode === "new"
-                          ? "bg-[#2F80ED] text-white"
-                          : "text-[#6F7E93] dark:text-slate-400"
-                      }`}
-                    >
-                      {t.exploreModal.newSourceMode}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSourceMode("existing");
-                        if (!selectedSourceId && existingSources[0]) {
-                          setSelectedSourceId(existingSources[0].id);
-                        }
-                      }}
-                      className={`rounded-lg px-3 py-1 text-xs font-bold ${
-                        sourceMode === "existing"
-                          ? "bg-[#2F80ED] text-white"
-                          : "text-[#6F7E93] dark:text-slate-400"
-                      }`}
-                    >
-                      {t.exploreModal.existingSourceMode} ({existingSources.length})
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {isExistingReuse ? (
-                <div>
-                  <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
-                    {t.exploreModal.selectSource}
-                  </label>
-                  <select
-                    value={activeExistingSource?.id || ""}
-                    onChange={(e) => setSelectedSourceId(e.target.value)}
-                    className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
-                  >
-                    {existingSources.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.title}
-                        {s.chapterOrSection ? ` — ${s.chapterOrSection}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
-                        {t.exploreModal.materialTitle}{" "}
-                        <span className="text-[#D95C5C]">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={title}
-                        placeholder={t.exploreModal.materialTitlePlaceholder}
-                        onChange={(e) => setTitle(e.target.value)}
-                        className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
-                        {t.exploreModal.sourceFormat}
-                      </label>
-                      <select
-                        value={sourceFormat}
-                        onChange={(e) =>
-                          setSourceFormat(e.target.value as SourceFormat)
-                        }
-                        className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
-                      >
-                        {(
-                          [
-                            "book_chapter",
-                            "article",
-                            "lecture_notes",
-                            "topic",
-                          ] as SourceFormat[]
-                        ).map((fmt) => (
-                          <option key={fmt} value={fmt}>
-                            {t.exploreModal.formats[fmt]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
-                      {t.exploreModal.chapterSection}
-                    </label>
-                    <input
-                      type="text"
-                      value={chapterOrSection}
-                      placeholder={t.exploreModal.chapterSectionPlaceholder}
-                      onChange={(e) => setChapterOrSection(e.target.value)}
-                      className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
-                      {t.exploreModal.excerptNotes}
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={excerptOrNotes}
-                      placeholder={t.exploreModal.excerptNotesPlaceholder}
-                      onChange={(e) => setExcerptOrNotes(e.target.value)}
-                      className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none resize-none"
-                    />
-                  </div>
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <div>
-                <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
-                  {t.exploreModal.curiosityTopic}{" "}
-                  <span className="text-[#D95C5C]">*</span>
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          {/* Topic Title & Parent Node if creating a new node */}
+          {!isUnlockingExisting && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className={vault.nodes.length === 0 ? "sm:col-span-2" : ""}>
+                <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1.5">
+                  {lang === "en" ? "Node Topic" : "Topik Node"} *
                 </label>
                 <input
                   type="text"
                   required
-                  value={title}
-                  placeholder={t.exploreModal.curiosityTopicPlaceholder}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none"
+                  value={nodeTitle}
+                  onChange={(e) => setNodeTitle(e.target.value)}
+                  placeholder={
+                    lang === "en"
+                      ? "e.g. Cellular Respiration & ATP"
+                      : "mis. Respirasi Seluler & Sintesis ATP"
+                  }
+                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800/90 px-3.5 py-2.5 text-xs text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
-                  {t.exploreModal.curiositySpark}
-                </label>
-                <textarea
-                  rows={2}
-                  value={excerptOrNotes}
-                  placeholder={t.exploreModal.curiositySparkPlaceholder}
-                  onChange={(e) => setExcerptOrNotes(e.target.value)}
-                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:bg-white dark:focus:bg-slate-950 focus:outline-none resize-none"
-                />
-              </div>
-            </>
+
+              {vault.nodes.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1.5">
+                    {lang === "en" ? "Branch From" : "Cabang Dari Node"}
+                  </label>
+                  <select
+                    value={parentNodeId}
+                    onChange={(e) => setParentNodeId(e.target.value)}
+                    className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800/90 px-3 py-2.5 text-xs font-semibold text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
+                  >
+                    {vault.nodes.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
           )}
 
-          {/* Prefilled Question, Goal & Depth */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <div>
-              <label className="block text-xs font-bold text-[#2F80ED] dark:text-blue-400 mb-1">
-                {t.exploreModal.focusQuestion}
-              </label>
-              <input
-                type="text"
-                value={focusQuestion}
-                onChange={(e) => setFocusQuestion(e.target.value)}
-                className="w-full rounded-xl border border-[#BFDBFE] dark:border-blue-900/60 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#2F80ED] dark:text-blue-400 mb-1">
-                {t.exploreModal.explorationGoal}
-              </label>
-              <input
-                type="text"
-                value={explorationGoal}
-                onChange={(e) => setExplorationGoal(e.target.value)}
-                className="w-full rounded-xl border border-[#BFDBFE] dark:border-blue-900/60 bg-[#F8FAFC] dark:bg-slate-900 px-3.5 py-2 text-sm text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
-              />
-            </div>
+          {/* TWO PRIMARY OPTIONS: 1) Langsung Buka vs 2) Tambah Catatan / Materi Dulu */}
+          <div className="grid grid-cols-2 gap-2.5 rounded-2xl bg-[#F3F6FC] dark:bg-slate-800/90 p-1.5">
+            <button
+              type="button"
+              onClick={() => setChoiceMode("direct")}
+              className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-extrabold transition-all ${
+                choiceMode === "direct"
+                  ? "bg-white dark:bg-[#111827] text-[#2F80ED] dark:text-blue-400 shadow-sm"
+                  : "text-[#6F7E93] dark:text-slate-400 hover:text-[#17233C] dark:hover:text-white"
+              }`}
+            >
+              <Zap className="h-4 w-4" />
+              <span>{lang === "en" ? "Open Directly" : "Langsung Buka"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setChoiceMode("with_input")}
+              className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-extrabold transition-all ${
+                choiceMode === "with_input"
+                  ? "bg-white dark:bg-[#111827] text-[#2F80ED] dark:text-blue-400 shadow-sm"
+                  : "text-[#6F7E93] dark:text-slate-400 hover:text-[#17233C] dark:hover:text-white"
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              <span>
+                {lang === "en"
+                  ? "Add Note / Material First"
+                  : "Tambah Catatan / Materi Dulu"}
+              </span>
+            </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-            <span className="text-xs font-bold text-[#17233C] dark:text-slate-200">
-              {t.exploreModal.depth}
-            </span>
-            <div className="inline-flex rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F3F6FC] dark:bg-slate-900 p-0.5">
-              {(
-                [
-                  { id: "simple", label: t.reader.simple },
-                  { id: "standard", label: t.reader.standard },
-                  { id: "deep", label: t.reader.deep },
-                ] as const
-              ).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setDepth(item.id)}
-                  className={`rounded-lg px-3 py-1 text-xs font-bold transition-colors ${
-                    depth === item.id
-                      ? "bg-[#2F80ED] text-white shadow-sm"
-                      : "text-[#6F7E93] dark:text-slate-400 hover:text-[#17233C] dark:hover:text-slate-200"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+          {/* When user selects "Tambah Catatan / Materi Dulu": 3 clean sub-modes (Prompt, Catatan, 1 Chapter Buku) */}
+          {choiceMode === "with_input" && (
+            <div className="space-y-3.5 rounded-2xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-800/40 p-4">
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    {
+                      id: "custom_prompt",
+                      label: lang === "en" ? "Prompt" : "Prompt",
+                      icon: <MessageSquarePlus className="h-3.5 w-3.5" />,
+                    },
+                    {
+                      id: "user_note",
+                      label: lang === "en" ? "Note" : "Catatan",
+                      icon: <FileText className="h-3.5 w-3.5" />,
+                    },
+                    {
+                      id: "book_chapter",
+                      label: lang === "en" ? "1 Book Chapter" : "1 Chapter Buku",
+                      icon: <BookOpen className="h-3.5 w-3.5" />,
+                    },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    type="button"
+                    key={tab.id}
+                    onClick={() => setInputType(tab.id)}
+                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                      inputType === tab.id
+                        ? "bg-[#2F80ED] text-white"
+                        : "bg-white dark:bg-slate-800 border border-[#DFE6F0] dark:border-slate-700 text-[#6F7E93] dark:text-slate-300"
+                    }`}
+                  >
+                    {tab.icon}
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {inputType === "book_chapter" && (
+                <div>
+                  <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
+                    {lang === "en" ? "Chapter / Book Title" : "Judul Bab / Buku"}
+                  </label>
+                  <input
+                    type="text"
+                    value={inputTitle}
+                    onChange={(e) => setInputTitle(e.target.value)}
+                    placeholder={
+                      lang === "en"
+                        ? "e.g. Campbell Biology — Ch. 9 Cellular Respiration"
+                        : "mis. Biologi Campbell — Bab 9 Respirasi Seluler"
+                    }
+                    className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-[#111827] px-3.5 py-2 text-xs text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-[#17233C] dark:text-slate-200 mb-1">
+                  {inputType === "custom_prompt"
+                    ? lang === "en"
+                      ? "Prompt / Question for This Node"
+                      : "Prompt / Pertanyaan untuk Node Ini"
+                    : inputType === "user_note"
+                      ? lang === "en"
+                        ? "Your Note for This Node"
+                        : "Catatan Anda untuk Node Ini"
+                      : lang === "en"
+                        ? "Chapter Material / Key Concepts"
+                        : "Isi Materi / Konsep Kunci Bab"}
+                </label>
+                <textarea
+                  rows={4}
+                  required={choiceMode === "with_input"}
+                  value={inputContent}
+                  onChange={(e) => setInputContent(e.target.value)}
+                  placeholder={
+                    inputType === "custom_prompt"
+                      ? lang === "en"
+                        ? "What specific question or angle should this node focus on?"
+                        : "Apa pertanyaan atau fokus yang ingin dibahas pada node ini?"
+                      : inputType === "user_note"
+                        ? lang === "en"
+                          ? "Write your own note or summary to attach to this node..."
+                          : "Tulis catatan atau ringkasan Anda untuk node ini..."
+                        : lang === "en"
+                          ? "Paste chapter summary, subtopics, or key paragraphs for this node..."
+                          : "Tempelkan ringkasan bab, subbab, atau poin materi untuk node ini..."
+                  }
+                  className="w-full rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-[#111827] p-3 text-xs text-[#17233C] dark:text-slate-100 focus:border-[#2F80ED] focus:outline-none"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Actions */}
-          <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-[#DFE6F0] dark:border-slate-800">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#DFE6F0] dark:border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-bold text-[#6F7E93] dark:text-slate-300"
+              disabled={isLoading}
+              className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 px-4 py-2.5 text-xs font-bold text-[#6F7E93] dark:text-slate-300 hover:text-[#17233C] dark:hover:text-white"
             >
-              {t.exploreModal.cancel}
+              {lang === "en" ? "Cancel" : "Batal"}
             </button>
-            {!isExistingReuse && (
-              <button
-                type="button"
-                disabled={isLoading || !title.trim()}
-                onClick={() => void triggerSubmit(true)}
-                className="rounded-xl border border-[#DFE6F0] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#0D9468] disabled:opacity-50 px-4 py-2 text-xs font-bold text-[#047857] dark:text-emerald-300"
-              >
-                {t.exploreModal.saveSourceOnly}
-              </button>
-            )}
+
             <button
               type="submit"
-              disabled={isLoading || (!isExistingReuse && !title.trim())}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] disabled:opacity-50 px-5 py-2.5 text-xs font-bold text-white shadow-sm"
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] disabled:opacity-60 px-5 py-2.5 text-xs font-extrabold text-white shadow-md shadow-[#2F80ED]/25 transition-all"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {t.exploreModal.mapping}
+                  <span>
+                    {lang === "en"
+                      ? "Opening & analyzing links..."
+                      : "Membuka & menganalisis hubungan..."}
+                  </span>
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  {t.exploreModal.saveAndMap} →
+                  <span>
+                    {choiceMode === "direct"
+                      ? lang === "en"
+                        ? "Open Node Now"
+                        : "Langsung Buka Node"
+                      : lang === "en"
+                        ? "Save Material & Open Node"
+                        : "Simpan Materi & Buka Node"}
+                  </span>
                 </>
               )}
             </button>

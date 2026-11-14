@@ -33,6 +33,7 @@ import {
   CloudFog,
   Compass,
   Eye,
+  EyeOff,
   GitBranch,
   Layers,
   ListTree,
@@ -62,7 +63,7 @@ interface SkillTreeCanvasProps {
   onUnlockAllFog: () => void;
   onToggleFavoriteNode: (nodeId: string) => void;
   onOpenInLibrary: (nodeId: string) => void;
-  onOpenAddExploration: () => void;
+  onOpenAddExploration: (targetNode?: KnowledgeNode) => void;
   hideVaultSwitcher?: boolean;
   newlyAddedIds?: string[];
   expandedRegions?: RegionCode[];
@@ -76,19 +77,18 @@ interface SkillTreeCanvasProps {
 function trimToCardEdge(
   cx: number,
   cy: number,
-  w: number,
-  h: number,
+  _w: number,
+  _h: number,
   px: number,
   py: number,
   pad = 4
 ): [number, number] {
   const vx = px - cx;
   const vy = py - cy;
-  if (vx === 0 && vy === 0) return [cx, cy];
-  const sx = vx !== 0 ? (w / 2 + pad) / Math.abs(vx) : 1e9;
-  const sy = vy !== 0 ? (h / 2 + pad) / Math.abs(vy) : 1e9;
-  const k = Math.min(sx, sy, 1);
-  return [cx + vx * k, cy + vy * k];
+  const dist = Math.hypot(vx, vy);
+  if (dist < 1) return [cx, cy];
+  const r = 22 + pad;
+  return [cx + (vx / dist) * r, cy + (vy / dist) * r];
 }
 
 export default function SkillTreeCanvas({
@@ -120,6 +120,7 @@ export default function SkillTreeCanvas({
   );
   const [regionVisualMode, setRegionVisualMode] =
     useState<RegionVisualMode>("hybrid");
+  const [showNodeLabels, setShowNodeLabels] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [legendExpanded, setLegendExpanded] = useState(false);
   const [hoveredEdge, setHoveredEdge] = useState<KnowledgeEdge | null>(null);
@@ -362,16 +363,36 @@ export default function SkillTreeCanvas({
             />
           </div>
 
-          {/* Aura / Region Borders Toggle */}
+          {/* Hide / Show Node Callout Labels Button (Icon toggle, zero explanation text) + Aura Toggle */}
           {viewMode === "graph" && (
-            <button
-              type="button"
-              onClick={cycleVisualMode}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#2F80ED]/40 dark:border-blue-500/40 bg-[#EAF2FF] dark:bg-blue-950/60 hover:bg-[#DCEAFE] dark:hover:bg-blue-900/60 px-2.5 py-1.5 text-xs font-bold text-[#2F80ED] dark:text-blue-300 transition-all"
-            >
-              <Eye className="h-3.5 w-3.5" />
-              {visualModeLabel}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowNodeLabels((prev) => !prev)}
+                aria-label="Toggle node labels"
+                data-testid="toggle-node-labels"
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border transition-all ${
+                  showNodeLabels
+                    ? "border-[#2F80ED] bg-[#2F80ED] text-white shadow-sm"
+                    : "border-[#DFE6F0] dark:border-slate-700 bg-white dark:bg-slate-800 text-[#6F7E93] dark:text-slate-300 hover:border-[#2F80ED]"
+                }`}
+              >
+                {showNodeLabels ? (
+                  <Eye className="h-3.5 w-3.5" />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={cycleVisualMode}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#2F80ED]/40 dark:border-blue-500/40 bg-[#EAF2FF] dark:bg-blue-950/60 hover:bg-[#DCEAFE] dark:hover:bg-blue-900/60 px-2.5 py-1.5 text-xs font-bold text-[#2F80ED] dark:text-blue-300 transition-all"
+              >
+                <Layers className="h-3.5 w-3.5" />
+                {visualModeLabel}
+              </button>
+            </>
           )}
 
           {/* Region Filter (clean domain names only) */}
@@ -473,7 +494,7 @@ export default function SkillTreeCanvas({
               </h3>
               <button
                 type="button"
-                onClick={onOpenAddExploration}
+                onClick={() => onOpenAddExploration()}
                 className="inline-flex items-center gap-2 rounded-xl bg-[#2F80ED] hover:bg-[#236BCB] px-5 py-2.5 text-xs font-bold text-white shadow-sm"
               >
                 <Sparkles className="h-4 w-4" />
@@ -921,7 +942,7 @@ export default function SkillTreeCanvas({
               );
             })}
 
-            {/* Interactive Graph Nodes */}
+            {/* Interactive Circular Graph Nodes + Callout Box Above Circle */}
             {filteredNodes.map((node) => {
               const isSelected = node.id === selectedNodeId;
               const isRoot =
@@ -933,19 +954,30 @@ export default function SkillTreeCanvas({
                 node.title.toLowerCase().includes(normalizedQuery) ||
                 node.summary.toLowerCase().includes(normalizedQuery);
 
+              const showCallout = showNodeLabels || isSelected;
+              const accentColor = isRoot
+                ? "#2F80ED"
+                : isNew
+                  ? "#FFA33A"
+                  : node.mastered
+                    ? "#0D9468"
+                    : isDark
+                      ? reg.darkPillTextHex
+                      : reg.accentHex;
+
               return (
                 <div
                   key={node.id}
                   data-node-card="true"
                   style={{
-                    left: node.x - NODE_CARD_W / 2,
-                    top: node.y - NODE_CARD_H / 2,
-                    width: NODE_CARD_W,
-                    height: NODE_CARD_H,
+                    left: node.x - 22,
+                    top: node.y - 22,
+                    width: 44,
+                    height: 44,
                   }}
                   className={`absolute transition-all duration-200 ${
                     matchesSearch ? "opacity-100" : "opacity-30"
-                  }`}
+                  } ${isSelected ? "z-30" : "z-10 hover:z-20"}`}
                 >
                   {/* Atmospheric Fog of War Cloud Shroud when unexplored */}
                   {!node.explored && (
@@ -953,153 +985,121 @@ export default function SkillTreeCanvas({
                       aria-hidden="true"
                       style={{
                         background: isDark
-                          ? "radial-gradient(ellipse at center, rgba(30,41,59,0.78) 0%, rgba(15,23,42,0.52) 55%, rgba(9,15,28,0) 78%)"
-                          : "radial-gradient(ellipse at center, rgba(203,213,225,0.68) 0%, rgba(226,232,240,0.42) 55%, rgba(243,246,252,0) 78%)",
+                          ? "radial-gradient(circle at center, rgba(30,41,59,0.82) 0%, rgba(15,23,42,0.48) 58%, rgba(9,15,28,0) 80%)"
+                          : "radial-gradient(circle at center, rgba(203,213,225,0.75) 0%, rgba(226,232,240,0.42) 58%, rgba(243,246,252,0) 80%)",
                       }}
-                      className="pointer-events-none absolute -inset-5 rounded-3xl blur-[2px]"
+                      className="pointer-events-none absolute -inset-6 rounded-full blur-[2px]"
                     />
                   )}
 
+                  {/* Topic Callout Box Above Circle with Downward Pointer Triangle (Gambar 3) */}
+                  {showCallout && (
+                    <div
+                      onClick={() => {
+                        onSelectNode(node.id);
+                        if (!node.explored) {
+                          onOpenAddExploration(node);
+                        }
+                      }}
+                      style={{
+                        borderColor: isSelected ? "#2F80ED" : accentColor,
+                      }}
+                      className={`cursor-pointer absolute bottom-[calc(100%+10px)] left-1/2 -translate-x-1/2 w-[166px] rounded-xl border-[1.75px] px-2.5 py-1.5 text-center shadow-md transition-all ${
+                        isRoot
+                          ? "bg-[#2F80ED] text-white border-[#1B4FA8]"
+                          : !node.explored
+                            ? "bg-[#F8FAFC]/95 dark:bg-slate-800/95 border-dashed border-[#94A3B8] dark:border-slate-500 text-[#475569] dark:text-slate-300"
+                            : "bg-white/95 dark:bg-[#111827]/95 text-[#17233C] dark:text-slate-100"
+                      }`}
+                    >
+                      <div className="text-[11px] font-extrabold leading-tight line-clamp-2">
+                        {node.title}
+                      </div>
+
+                      {/* Downward Triangle Pointer connecting Callout to Circle */}
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          borderTopColor: isRoot
+                            ? "#2F80ED"
+                            : isSelected
+                              ? "#2F80ED"
+                              : accentColor,
+                        }}
+                        className="pointer-events-none absolute left-1/2 -bottom-[8px] -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[8px]"
+                      />
+                    </div>
+                  )}
+
+                  {/* Circular Node Button */}
                   <button
                     type="button"
-                    onClick={() => onSelectNode(node.id)}
-                    style={
-                      isRoot
-                        ? undefined
-                        : isSelected
-                        ? { borderColor: "#2F80ED" }
+                    onClick={() => {
+                      onSelectNode(node.id);
+                      if (!node.explored) {
+                        onOpenAddExploration(node);
+                      }
+                    }}
+                    style={{
+                      borderColor: isSelected ? "#2F80ED" : accentColor,
+                      backgroundColor: isRoot
+                        ? "#2F80ED"
                         : !node.explored
-                        ? undefined
-                        : {
-                            borderColor: isNew
-                              ? "#FFA33A"
-                              : node.mastered
-                              ? "#2D9D78"
-                              : isDark
-                              ? reg.darkPillTextHex
-                              : reg.accentHex,
-                          }
-                    }
-                    className={`relative flex h-full w-full items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left transition-all ${
+                          ? undefined
+                          : isSelected
+                            ? accentColor
+                            : isDark
+                              ? reg.darkTintBg
+                              : reg.tintBg,
+                    }}
+                    className={`relative flex h-11 w-11 items-center justify-center rounded-full transition-all ${
                       isSelected
-                        ? "z-20 ring-4 ring-[#2F80ED]/25 scale-[1.03]"
-                        : "z-10 hover:scale-[1.02]"
+                        ? "ring-4 ring-[#2F80ED]/35 scale-110 shadow-lg"
+                        : "hover:scale-105 shadow-sm"
                     } ${
                       isRoot
-                        ? "bg-gradient-to-br from-[#2F80ED] to-[#1D5BC7] text-white border border-[#1B4FA8] node-root-glow"
+                        ? "border-2 text-white node-root-glow"
                         : !node.explored
-                        ? "bg-[#F8FAFC]/90 dark:bg-slate-800/85 backdrop-blur-sm border border-dashed border-[#94A3B8] dark:border-slate-600 text-[#475569] dark:text-slate-300 hover:border-[#2F80ED] hover:bg-white dark:hover:bg-slate-800"
-                        : "bg-white dark:bg-[#111827] border-[1.75px] text-[#17233C] dark:text-slate-100 shadow-sm hover:shadow-md"
+                          ? "bg-[#F8FAFC]/90 dark:bg-slate-800/90 border-2 border-dashed border-[#94A3B8] dark:border-slate-500 text-[#64748B] dark:text-slate-300"
+                          : "border-[2.5px]"
                     }`}
                   >
-                    {/* Corner Badges */}
-                    {node.isFavorite && (
+                    {/* Inner Circle Status / Dot */}
+                    {isRoot ? (
+                      <Sparkles className="h-4 w-4 text-white" />
+                    ) : !node.explored ? (
+                      <Lock className="h-3.5 w-3.5 text-[#64748B] dark:text-slate-300" />
+                    ) : node.mastered ? (
+                      <CheckCircle2
+                        className={`h-4 w-4 ${
+                          isSelected ? "text-white" : "text-[#0D9468] dark:text-emerald-400"
+                        }`}
+                      />
+                    ) : (
                       <span
-                        title={t.reader.unfavorite}
-                        className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#F59E0B] text-white ring-2 ring-white dark:ring-[#111827] shadow-sm"
-                      >
-                        <Star className="h-3 w-3 fill-current" />
+                        style={{
+                          backgroundColor: isSelected ? "#FFFFFF" : accentColor,
+                        }}
+                        className="h-3 w-3 rounded-full"
+                      />
+                    )}
+
+                    {/* Favorite Star Corner Indicator on Circle */}
+                    {node.isFavorite && (
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#F59E0B] text-white ring-2 ring-white dark:ring-[#111827]">
+                        <Star className="h-2.5 w-2.5 fill-current" />
                       </span>
                     )}
-                    {isRoot && (
-                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#FFA33A] px-2.5 py-0.5 text-[9.5px] font-extrabold tracking-wider text-[#3A2200] shadow-sm">
-                        {t.tree.startBadge}
-                      </span>
-                    )}
-                    {!node.explored && !isRoot && (
-                      <span className="absolute -top-2 right-2 rounded-full border border-[#94A3B8] dark:border-slate-600 bg-[#E2E8F0] dark:bg-slate-700 px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-[#475569] dark:text-slate-200">
-                        {t.tree.fogBadge}
-                      </span>
-                    )}
+
+                    {/* Needs Review Dot Indicator */}
                     {node.reviewStatus === "needs_review" && (
                       <span
                         title={t.library.statusBadges.needs_review}
-                        className="absolute -bottom-2 right-2 inline-flex items-center gap-0.5 rounded-full bg-[#FEF3C7] dark:bg-amber-950/90 border border-[#FCD34D] dark:border-amber-700 px-1.5 py-0.5 text-[8.5px] font-extrabold text-[#92400E] dark:text-amber-300 shadow-sm"
+                        className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#F59E0B] text-white ring-2 ring-white dark:ring-[#111827]"
                       >
                         <AlertTriangle className="h-2.5 w-2.5" />
-                        {t.library.statusBadges.needs_review}
                       </span>
                     )}
-                    {node.origin === "user_edited" &&
-                      node.reviewStatus !== "needs_review" && (
-                        <span
-                          title={t.library.statusBadges.user_edited}
-                          className="absolute -bottom-2 right-2 rounded-full bg-[#F5F3FF] dark:bg-violet-950/90 border border-[#DDD6FE] dark:border-violet-700 px-1.5 py-0.5 text-[8.5px] font-extrabold text-[#6D28D9] dark:text-violet-300 shadow-sm"
-                        >
-                          {t.library.statusBadges.user_edited}
-                        </span>
-                      )}
-                    {node.explored && node.mastered && !isRoot && (
-                      <span
-                        title={t.reader.mastered}
-                        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#2D9D78] text-white ring-2 ring-white dark:ring-[#111827] shadow-sm"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                      </span>
-                    )}
-                    {isNew && node.explored && !node.mastered && (
-                      <span className="absolute -top-2.5 right-2 rounded-full bg-[#FFA33A] px-2 py-0.5 text-[9px] font-extrabold tracking-wider text-[#3A2200]">
-                        {t.tree.newBadge}
-                      </span>
-                    )}
-
-                    {/* Leading Icon Pill */}
-                    <div
-                      style={
-                        !isRoot && node.explored
-                          ? isDark
-                            ? {
-                                backgroundColor: reg.darkTintBg,
-                                color: reg.darkPillTextHex,
-                              }
-                            : {
-                                backgroundColor: reg.tintBg,
-                                color: reg.accentHex,
-                              }
-                          : undefined
-                      }
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                        isRoot
-                          ? "bg-white/20 text-white ring-1 ring-white/40"
-                          : !node.explored
-                          ? "bg-[#E2E8F0] dark:bg-slate-700 text-[#64748B] dark:text-slate-300"
-                          : ""
-                      }`}
-                    >
-                      {isRoot ? (
-                        <Sparkles className="h-4 w-4" />
-                      ) : !node.explored ? (
-                        <Lock className="h-3.5 w-3.5" />
-                      ) : (
-                        <Compass className="h-4 w-4" />
-                      )}
-                    </div>
-
-                    {/* Node Title */}
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={`text-xs font-bold leading-snug line-clamp-2 ${
-                          isRoot
-                            ? "text-white"
-                            : !node.explored
-                            ? "text-[#475569] dark:text-slate-300"
-                            : "text-[#17233C] dark:text-slate-100"
-                        }`}
-                      >
-                        {node.title}
-                      </div>
-                      <div
-                        className={`mt-0.5 text-[10px] font-medium truncate ${
-                          isRoot
-                            ? "text-[#E3EEFF]"
-                            : "text-[#6F7E93] dark:text-slate-400"
-                        }`}
-                      >
-                        {node.explored
-                          ? regionShortName(node.region, lang)
-                          : t.tree.inFogHint}
-                      </div>
-                    </div>
                   </button>
                 </div>
               );

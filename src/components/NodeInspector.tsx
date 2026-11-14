@@ -273,6 +273,28 @@ export default function NodeInspector({
           </p>
         </div>
 
+        {/* Attached Node Input / Chapter / Prompt (if provided when opening node) */}
+        {node.nodeSourceContent && (
+          <div className="rounded-xl border border-[#A7F3D0] dark:border-emerald-800/60 bg-[#ECFDF5]/80 dark:bg-emerald-950/35 px-3.5 py-2.5">
+            <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#047857] dark:text-emerald-300">
+              {node.nodeInputMode === "book_chapter"
+                ? lang === "en"
+                  ? `Chapter Material · ${node.nodeSourceTitle || node.title}`
+                  : `Materi Bab · ${node.nodeSourceTitle || node.title}`
+                : node.nodeInputMode === "custom_prompt"
+                  ? lang === "en"
+                    ? "Node Prompt"
+                    : "Prompt Node"
+                  : lang === "en"
+                    ? "Node Note"
+                    : "Catatan Node"}
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-[#065F46] dark:text-emerald-100 whitespace-pre-line">
+              {node.nodeSourceContent}
+            </p>
+          </div>
+        )}
+
         {/* 3-Level Explanation Switcher */}
         <div className="grid grid-cols-3 gap-1 rounded-xl border border-[#DFE6F0] dark:border-slate-800 bg-[#F3F6FC] dark:bg-slate-900 p-1">
           {(

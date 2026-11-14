@@ -544,11 +544,48 @@ function buildOrchestratorPrompt(envelope: OrchestratorInputEnvelope): string {
   const {
     intent,
     lang,
+    bilingualPivot,
     vaultContext,
     nodeAction,
     spatialTopologyPlan,
     existingGraphSnapshot,
   } = envelope;
+
+  const targetLangName =
+    lang === "id" ? "Indonesian (Bahasa Indonesia)" : "English";
+
+  if (intent === "EXPAND_FOG_BRANCHES") {
+    return `You are the Curiora Knowledge Graph Frontier Architect.
+Task: Propose exactly 2 specific, concrete sub-topic or cross-disciplinary frontier concepts branching from the parent node below.
+Target Output Language: ${targetLangName}
+Vault Title: "${vaultContext.vaultName}" (Domain: "${vaultContext.identity.mainInterest}")
+Canonical English Context: "${bilingualPivot?.canonicalEnglishTopic || ""}" in "${bilingualPivot?.canonicalEnglishVaultInterest || vaultContext.identity.mainInterest}"
+Parent Node Context: "${(nodeAction.inputContent || "").slice(0, 500)}"
+Existing Nodes in Vault (DO NOT duplicate): ${existingGraphSnapshot.nodes.map((n) => `"${n.title}"`).join(", ")}
+
+CRITICAL RULES FOR FRONTIER NODE TITLES:
+1. Each title MUST be a real, specific academic/engineering concept name (3 to 7 words) in ${targetLangName} (e.g., if parent is "How to Build a Robot" / "Cara Membangun Robot", good titles are "Actuators, Servo Motors & Kinematics" and "Embedded Sensors & PID Control Loops" in English, or "Aktuator, Motor Servo & Kinematika" and "Sensor Tertanam & Kendali Loop PID" in Indonesian).
+2. NEVER use prefixes like "Mechanism:", "Applied:", "Mekanisme:", "Terapan:", "Concept:", or sentence fragments!
+3. Return ONLY valid JSON matching this exact schema:
+{
+  "frontierNodes": [
+    {
+      "title": "Specific Concept Title 1 (${targetLangName})",
+      "region": "engineering | computing | natural | logic | humanities | social",
+      "relation": "extension | prerequisite | application | cross_disciplinary",
+      "edgeReason": "1 concise sentence explaining how this connects to the parent node (${targetLangName})",
+      "difficulty": "Foundation | Intermediate | Advanced"
+    },
+    {
+      "title": "Specific Concept Title 2 (${targetLangName})",
+      "region": "engineering | computing | natural | logic | humanities | social",
+      "relation": "extension | prerequisite | application | cross_disciplinary",
+      "edgeReason": "1 concise sentence explaining how this connects to the parent node (${targetLangName})",
+      "difficulty": "Foundation | Intermediate | Advanced"
+    }
+  ]
+}`;
+  }
 
   const langInstruction =
     lang === "en"
@@ -834,12 +871,12 @@ function buildSynthesizedPrimaryNode(params: {
     levels,
     formula:
       lang === "en"
-        ? `${cleanTitle} → Functional State Change (ΔSystem)`
-        : `${cleanTitle} → Perubahan Status Fungsional (ΔSistem)`,
+        ? `Core Governing Principle: Input Parameters & Constraints → System Dynamics (${cleanTitle}) → Measurable Output`
+        : `Prinsip & Hubungan Inti: Parameter Input & Batasan → Mekanisme Kerja (${cleanTitle}) → Keluaran Sistem Terukur`,
     application:
       lang === "en"
-        ? `Applied across ${identity.mainInterest} to connect "${cleanTitle}" with real-world problem solving.`
-        : `Diterapkan pada ${identity.mainInterest} untuk menghubungkan "${cleanTitle}" dengan pemecahan masalah nyata.`,
+        ? `Applied across ${identity.mainInterest} to design, analyze, and optimize "${cleanTitle}" in real-world engineering & scientific workflows.`
+        : `Diterapkan pada bidang ${identity.mainInterest} untuk merancang, menganalisis, dan mengoptimalkan "${cleanTitle}" pada pemecahan masalah nyata.`,
     reference:
       inputTitle && openMode === "book_chapter"
         ? `${inputTitle} · Curiora Synthesis`
@@ -955,9 +992,19 @@ function deriveFrontierTopics(params: {
   );
 
   const rawParts = (inputContent || "")
-    .split(/[,;\n•]+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 4 && s.length <= 48);
+    .split(/[;\n•]+/)
+    .map((s) => s.replace(/^[-*0-9.)\s]+/, "").trim())
+    .filter(
+      (s) =>
+        s.length >= 4 &&
+        s.length <= 36 &&
+        !s.includes('"') &&
+        !s.includes("“") &&
+        !s.endsWith(".") &&
+        !/^(and|or|but|so|because|directly|which|that|untuk|yang|dengan|secara|karena|sehingga)\b/i.test(
+          s
+        )
+    );
 
   const candidates: {
     title: string;
@@ -1006,32 +1053,32 @@ function deriveFrontierTopics(params: {
     lang === "en"
       ? [
           {
-            title: `Mechanism: ${baseShort}`,
+            title: `Core Architecture & Subsystems of ${baseShort}`,
             region: parentNode.region,
             relation: "extension" as EdgeRelationType,
-            reason: `Unpacks the core causal mechanism behind ${parentNode.title}.`,
+            reason: `Unpacks the core causal mechanisms, sensors, and subsystems behind ${parentNode.title}.`,
             difficulty: "Intermediate" as DifficultyLevel,
           },
           {
-            title: `Applied: ${baseShort}`,
+            title: `Control & Cross-Domain Integration of ${baseShort}`,
             region: adjReg,
             relation: (adjReg !== parentNode.region
               ? "cross_disciplinary"
               : "application") as EdgeRelationType,
-            reason: `Applies ${parentNode.title} into ${regionNameForLang(adjReg, "en")}.`,
+            reason: `Connects ${parentNode.title} with ${regionNameForLang(adjReg, "en")} for real-world deployment.`,
             difficulty: "Intermediate" as DifficultyLevel,
           },
         ]
       : [
           {
-            title: `Mekanisme: ${baseShort}`,
+            title: `Arsitektur & Komponen Inti ${baseShort}`,
             region: parentNode.region,
             relation: "extension" as EdgeRelationType,
-            reason: `Menguraikan mekanisme sebab-akibat di balik ${parentNode.title}.`,
+            reason: `Menguraikan mekanisme kerja dan sub-sistem utama di balik ${parentNode.title}.`,
             difficulty: "Intermediate" as DifficultyLevel,
           },
           {
-            title: `Terapan: ${baseShort}`,
+            title: `Integrasi & Kendali Sistem ${baseShort}`,
             region: adjReg,
             relation: (adjReg !== parentNode.region
               ? "cross_disciplinary"
@@ -1255,7 +1302,7 @@ export async function executeOrchestratorPipeline(params: {
         : deriveFrontierTopics({
             parentNode,
             vault: { ...normalizedVault, nodes: workingNodes },
-            inputContent: parentNode.nodeSourceContent || parentNode.summary,
+            inputContent: parentNode.nodeSourceContent,
             count: 2,
             lang,
           });
@@ -1411,6 +1458,42 @@ export async function executeOrchestratorPipeline(params: {
       lang,
     });
 
+    const VALID_REGIONS: string[] = [
+      "natural_life",
+      "tech_computing",
+      "engineering_applied",
+      "logic_math",
+      "humanities_culture",
+      "social_econ",
+      "science",
+      "computing",
+      "engineering",
+      "math",
+      "humanities",
+      "social",
+      "natural",
+      "logic",
+    ];
+    if (llmData?.primaryNode?.title) {
+      const cleanedTitle = cleanLegacyText(llmData.primaryNode.title).trim();
+      if (cleanedTitle.length >= 3) {
+        primaryNode.title = cleanedTitle;
+      }
+    }
+    if (
+      llmData?.primaryNode?.region &&
+      VALID_REGIONS.includes(String(llmData.primaryNode.region))
+    ) {
+      primaryNode.region = llmData.primaryNode.region as RegionCode;
+    }
+    if (
+      llmData?.primaryNode?.difficulty &&
+      (["Basic", "Intermediate", "Advanced"] as DifficultyLevel[]).includes(
+        llmData.primaryNode.difficulty as DifficultyLevel
+      )
+    ) {
+      primaryNode.difficulty = llmData.primaryNode.difficulty as DifficultyLevel;
+    }
     if (llmData?.primaryNode?.summary) {
       primaryNode.summary = cleanLegacyText(llmData.primaryNode.summary);
     }
@@ -1425,6 +1508,35 @@ export async function executeOrchestratorPipeline(params: {
         deep:
           cleanLegacyText(llmData.primaryNode.levels.deep || "") ||
           primaryNode.levels.deep,
+      };
+    }
+    if (llmData?.primaryNode?.formula) {
+      primaryNode.formula = cleanLegacyText(llmData.primaryNode.formula);
+    }
+    if (llmData?.primaryNode?.application) {
+      primaryNode.application = cleanLegacyText(llmData.primaryNode.application);
+    }
+    if (llmData?.primaryNode?.reference) {
+      primaryNode.reference = cleanLegacyText(llmData.primaryNode.reference);
+    }
+    if (
+      llmData?.primaryNode?.quickCheck?.question &&
+      Array.isArray(llmData.primaryNode.quickCheck.options) &&
+      llmData.primaryNode.quickCheck.options.length >= 2
+    ) {
+      primaryNode.quickCheck = {
+        question: cleanLegacyText(llmData.primaryNode.quickCheck.question),
+        options: llmData.primaryNode.quickCheck.options.map((opt) => ({
+          text: cleanLegacyText(String(opt.text || "")),
+          correct: Boolean(opt.correct),
+        })),
+      };
+    }
+    if (primaryNode.revisions && primaryNode.revisions.length > 0) {
+      primaryNode.revisions[0] = {
+        ...primaryNode.revisions[0],
+        summary: primaryNode.summary,
+        levels: { ...primaryNode.levels },
       };
     }
 
@@ -1448,13 +1560,56 @@ export async function executeOrchestratorPipeline(params: {
     // Only spawn initial Fog stub nodes when seeding the very first node of an empty Vault.
     // For subsequent nodes, the user triggers expansion explicitly from inside the opened node!
     if (isFirstNode) {
-      const frontierSpecs = deriveFrontierTopics({
-        parentNode: primaryNode,
-        vault: { ...normalizedVault, nodes: workingNodes },
-        inputContent: params.nodeAction.inputContent,
-        count: 2,
-        lang,
-      });
+      const llmFrontierSpecs =
+        llmData?.frontierNodes && llmData.frontierNodes.length > 0
+          ? llmData.frontierNodes
+              .filter(
+                (f) =>
+                  f.title &&
+                  f.title.trim().length >= 3 &&
+                  !/^(Mechanism:|Applied:|Mekanisme:|Terapan:)/i.test(
+                    f.title.trim()
+                  ) &&
+                  !f.title.trim().endsWith(".")
+              )
+              .slice(0, 2)
+              .map((f) => ({
+                title: cleanLegacyText(f.title!),
+                region: (VALID_REGIONS.includes(String(f.region))
+                  ? f.region
+                  : primaryNode.region) as RegionCode,
+                relation: ([
+                  "prerequisite",
+                  "extension",
+                  "application",
+                  "contrasts",
+                  "cross_disciplinary",
+                ].includes(String(f.relation))
+                  ? f.relation
+                  : "extension") as EdgeRelationType,
+                reason: cleanLegacyText(
+                  f.edgeReason ||
+                    (lang === "en"
+                      ? `Natural frontier branch extending ${primaryNode.title}.`
+                      : `Cabang lanjutan dari konsep ${primaryNode.title}.`)
+                ),
+                difficulty: (["Basic", "Intermediate", "Advanced"].includes(
+                  String(f.difficulty)
+                )
+                  ? f.difficulty
+                  : "Intermediate") as DifficultyLevel,
+              }))
+          : [];
+      const frontierSpecs =
+        llmFrontierSpecs.length > 0
+          ? llmFrontierSpecs
+          : deriveFrontierTopics({
+              parentNode: primaryNode,
+              vault: { ...normalizedVault, nodes: workingNodes },
+              inputContent: params.nodeAction.inputContent,
+              count: 2,
+              lang,
+            });
 
       frontierSpecs.forEach((fp, idx) => {
         const fId = `n_fog_${Date.now()}_${idx}`;

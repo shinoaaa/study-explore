@@ -10,11 +10,11 @@ export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 export const DEFAULT_OPENROUTER_NEMOTRON_MODEL =
   "nvidia/nemotron-3-ultra-550b-a55b:free";
 export const DEFAULT_OPENROUTER_TRANSLATOR_MODEL =
-  "google/gemma-4-31b-it:free";
+  "nvidia/nemotron-3.5-lightning:free";
 export const DEFAULT_OPENROUTER_FALLBACK_MODELS = [
   "nvidia/nemotron-3-ultra-550b-a55b:free",
   "nvidia/nemotron-3.5-lightning:free",
-  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
 ];
 
 export const DEFAULT_SUMOPOD_BASE_URL = "https://ai.sumopod.com/v1";
@@ -328,7 +328,7 @@ async function callOpenAiCompatibleChat(params: {
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
-    params.timeoutMs || 18000
+    params.timeoutMs || 38000
   );
 
   try {
@@ -343,18 +343,24 @@ async function callOpenAiCompatibleChat(params: {
       headers["X-Title"] = "Curiora Knowledge Cosmos";
     }
 
+    const requestBody: Record<string, unknown> = {
+      model: params.model,
+      messages: [
+        { role: "system", content: params.systemPrompt },
+        { role: "user", content: params.userPrompt },
+      ],
+      temperature: params.temperature ?? 0.3,
+    };
+
+    if (params.isOpenRouter && /nemotron/i.test(params.model)) {
+      requestBody.reasoning = { effort: "low" };
+    }
+
     const res = await fetch(`${params.baseUrl}/chat/completions`, {
       method: "POST",
       headers,
       signal: controller.signal,
-      body: JSON.stringify({
-        model: params.model,
-        messages: [
-          { role: "system", content: params.systemPrompt },
-          { role: "user", content: params.userPrompt },
-        ],
-        temperature: params.temperature ?? 0.3,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!res.ok) {
@@ -363,10 +369,13 @@ async function callOpenAiCompatibleChat(params: {
 
     const data = await res.json();
     const msg = data?.choices?.[0]?.message;
-    const content = msg?.content || "";
-    return typeof content === "string" && content.trim().length > 0
-      ? content
-      : null;
+    const content =
+      typeof msg?.content === "string" && msg.content.trim().length > 0
+        ? msg.content
+        : typeof msg?.reasoning === "string" && msg.reasoning.includes("{")
+          ? msg.reasoning
+          : "";
+    return content.trim().length > 0 ? content : null;
   } catch {
     return null;
   } finally {
@@ -394,7 +403,7 @@ export async function translateInboundFieldsIdToEn(params: {
   learningGoalEn: string;
   inputContentEn?: string;
 }> {
-  const deterministicResult = {
+  return {
     topicTitleEn: pivotTextIdToEn(params.topicTitle),
     vaultNameEn: pivotTextIdToEn(params.vaultName),
     mainInterestEn: pivotTextIdToEn(params.mainInterest),
@@ -404,53 +413,6 @@ export async function translateInboundFieldsIdToEn(params: {
       ? pivotTextIdToEn(params.inputContent)
       : undefined,
   };
-
-  const cfg = resolveGatewayConfig();
-  if (cfg.provider === "deterministic" || !cfg.apiKey) {
-    return deterministicResult;
-  }
-
-  // Only invoke live translation pre-pass if there is substantial Indonesian text
-  if (cfg.provider === "openrouter" || cfg.provider === "sumopod") {
-    const raw = await callOpenAiCompatibleChat({
-      baseUrl: cfg.baseUrl,
-      apiKey: cfg.apiKey,
-      model: cfg.translatorModel,
-      systemPrompt:
-        "You are a scientific Indonesian-to-English translator for Curiora. Translate all JSON string values from Indonesian (ID) into concise, accurate academic English (EN). Return ONLY valid JSON with identical keys.",
-      userPrompt: JSON.stringify({
-        topicTitleEn: params.topicTitle,
-        vaultNameEn: params.vaultName,
-        mainInterestEn: params.mainInterest,
-        focusQuestionEn: params.focusQuestion,
-        learningGoalEn: params.learningGoal,
-        inputContentEn: params.inputContent || "",
-      }),
-      temperature: 0.1,
-      timeoutMs: 8000,
-      isOpenRouter: cfg.provider === "openrouter",
-    });
-
-    const parsed = extractJsonFromReasoningOutput<typeof deterministicResult>(
-      raw || ""
-    );
-    if (parsed && parsed.topicTitleEn) {
-      return {
-        topicTitleEn: parsed.topicTitleEn || deterministicResult.topicTitleEn,
-        vaultNameEn: parsed.vaultNameEn || deterministicResult.vaultNameEn,
-        mainInterestEn:
-          parsed.mainInterestEn || deterministicResult.mainInterestEn,
-        focusQuestionEn:
-          parsed.focusQuestionEn || deterministicResult.focusQuestionEn,
-        learningGoalEn:
-          parsed.learningGoalEn || deterministicResult.learningGoalEn,
-        inputContentEn:
-          parsed.inputContentEn || deterministicResult.inputContentEn,
-      };
-    }
-  }
-
-  return deterministicResult;
 }
 
 export interface OrchestratorLlmSchema {
@@ -579,10 +541,23 @@ CRITICAL RULES:
   };
 }
 
+function needsIndonesianLocalization(payload: unknown): boolean {
+  const sample = JSON.stringify(payload || {});
+  const enMatches =
+    sample.match(
+      /\b(the|with|within|through|between|which|couples|explains|directly|across|requires|understanding|foundational)\b/gi
+    ) || [];
+  const idMatches =
+    sample.match(
+      /\b(yang|dan|dengan|untuk|pada|dalam|dari|adalah|secara|melalui|sebagai|terhadap)\b/gi
+    ) || [];
+  return enMatches.length >= 3 && enMatches.length > idMatches.length;
+}
+
 /**
  * STAGE 3A + 3B: Unified Multi-Provider Structured LLM Execution
  * - Supports OpenRouter (`nvidia/nemotron-3-ultra-550b-a55b:free` with fallback chain), SumoPod (`https://ai.sumopod.com/v1`), and Gemini.
- * - Automatically enforces the `ID -> EN -> Nemotron 3 Ultra -> EN -> ID` Bilingual Pivot when `userLang === "id"` and `requiresEnglishPivot` is true.
+ * - Uses In-Model English Reasoning Scratchpad (`reasoning.effort = "low"`) + target-language JSON synthesis, with automatic Stage 3B EN->ID guard if any output remains in English.
  */
 export async function executeGatewayStructuredReasoning<T = OrchestratorLlmSchema>(params: {
   englishSystemPrompt: string;
@@ -615,6 +590,11 @@ export async function executeGatewayStructuredReasoning<T = OrchestratorLlmSchem
     const modelsToTry =
       cfg.provider === "openrouter" ? cfg.fallbackModels : [cfg.reasoningModel];
 
+    const targetLangDirective =
+      params.userLang === "id"
+        ? "\nCRITICAL LANGUAGE RULE: Perform your internal scientific reasoning briefly in English (<50 words), then write ALL user-facing JSON string values (title, summary, simple, standard, deep, formula, application, question, options.text, edgeReason, reason) in natural, fluent Bahasa Indonesia. Never use awkward English prefixes like 'Applied:' or 'Mechanism:'."
+        : "\nCRITICAL LANGUAGE RULE: Keep internal reasoning brief (<50 words) and write all user-facing JSON string values in clear, natural English.";
+
     for (const candidateModel of modelsToTry) {
       const useEnglishPivot =
         cfg.requiresEnglishPivot || /nemotron/i.test(candidateModel);
@@ -623,12 +603,10 @@ export async function executeGatewayStructuredReasoning<T = OrchestratorLlmSchem
         baseUrl: cfg.baseUrl,
         apiKey: cfg.apiKey,
         model: candidateModel,
-        systemPrompt: params.englishSystemPrompt,
-        userPrompt: useEnglishPivot
-          ? params.englishUserPrompt
-          : params.directBilingualPrompt || params.englishUserPrompt,
+        systemPrompt: params.englishSystemPrompt + targetLangDirective,
+        userPrompt: params.directBilingualPrompt || params.englishUserPrompt,
         temperature: 0.3,
-        timeoutMs: 18000,
+        timeoutMs: 36000,
         isOpenRouter: cfg.provider === "openrouter",
       });
 
@@ -636,14 +614,18 @@ export async function executeGatewayStructuredReasoning<T = OrchestratorLlmSchem
       if (parsed) {
         let finalData: T = parsed;
         const pivotApplied = useEnglishPivot && params.userLang === "id";
-        if (pivotApplied && params.localizeOutputFn) {
+        if (
+          pivotApplied &&
+          params.localizeOutputFn &&
+          needsIndonesianLocalization(parsed)
+        ) {
           finalData = await params.localizeOutputFn(parsed);
         }
 
         const providerLabel =
           cfg.provider === "openrouter" ? "OpenRouter" : "SumoPod";
         const pivotBadge = pivotApplied
-          ? ` + ID→EN→ID Bilingual Adapter (${cfg.translatorModel})`
+          ? ` + ID↔EN Bilingual Reasoning Pivot`
           : "";
 
         return {
